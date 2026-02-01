@@ -2,6 +2,7 @@
   "common": {
     "confirm": "确认",
     "cancel": "取消",
+    "actions": "操作",
     "save": "保存",
     "delete": "删除",
     "edit": "编辑",
@@ -773,7 +774,13 @@
       "label": "示例:",
       "generating": "AI生成中...",
       "loading": "加载中...",
-      "empty": "暂无问题，请点击左侧按钮生成"
+      "empty": "暂无问题，请点击左侧按钮生成",
+      "generateTooltip": "点击生成示例问题",
+      "noQuestions": "暂无示例问题"
+    },
+    "actions": {
+      "showRaw": "显示原始数据",
+      "showFormatted": "显示格式化"
     },
     "tooltips": {
       "generateQuestions": "点击手动生成测试问题",
@@ -820,6 +827,8 @@
       "notRequired": "（当前基准无需）"
     },
     "empty": {
+      "selectBenchmark": "请选择一个基准开始评估",
+      "goToBenchmarks": "前往基准管理",
       "selectOrManage": "请在顶部选择评估基准或前往基准管理",
       "goToManagement": "前往基准管理"
     },
@@ -876,6 +885,19 @@
     }
   },
   "agentConfig": {
+    "systemPrompt": "系统提示词",
+    "llmModel": "语言模型",
+    "toolsLabel": "工具",
+    "knowledges": "知识库",
+    "defaultValue": "（默认: {value}）",
+    "tabs": {
+      "basic": "基础",
+      "tools": "工具",
+      "other": "其他"
+    },
+    "hints": {
+      "clickToEdit": "点击编辑"
+    },
     "alerts": {
       "noConfig": "该智能体没有配置项",
       "noCheckpointer": "该智能体没有配置 Checkpointer，功能无法正常使用"
@@ -898,7 +920,20 @@
       "other": "其他类型"
     },
     "buttons": {
-      "saveAndReload": "保存配置并重新加载"
+      "saveAndReload": "保存配置并重新加载",
+      "selectTools": "选择工具",
+      "clear": "清空"
+    },
+    "tools": {
+      "selected": "已选择"
+    },
+    "multiSelect": {
+      "selected": "已选择"
+    },
+    "modal": {
+      "selectTools": "选择工具",
+      "searchPlaceholder": "搜索工具...",
+      "selectedCount": "已选择 {count} 个工具"
     },
     "toolsModal": {
       "title": "选择工具",
@@ -909,12 +944,23 @@
     }
   },
   "mcpServers": {
+    "title": "MCP 服务器管理",
+    "description": "管理 MCP（Model Context Protocol）服务器配置。添加、编辑或删除 MCP 服务器以扩展 AI 的能力。",
     "header": {
       "title": "MCP 服务器管理",
       "description": "管理 MCP（Model Context Protocol）服务器配置。添加、编辑或删除 MCP 服务器以扩展 AI 的能力。"
     },
     "buttons": {
-      "addServer": "添加服务器"
+      "addServer": "添加服务器",
+      "viewDetails": "查看详情",
+      "details": "详情",
+      "testConnection": "测试连接",
+      "test": "测试",
+      "editConfig": "编辑配置",
+      "edit": "编辑",
+      "deleteServer": "删除服务器",
+      "delete": "删除",
+      "cannotDeleteBuiltin": "内置 MCP 无法删除"
     },
     "stats": {
       "configured": "已配置 {count} 个 MCP 服务器"
@@ -959,10 +1005,16 @@
     }
   },
   "knowledgeBaseCard": {
+    "loading": "加载中...",
     "title": "数据库信息加载中",
     "copyId": "复制知识库ID",
     "noDescription": "暂无描述",
+    "buttons": {
+      "copyId": "复制ID",
+      "delete": "删除"
+    },
     "modal": {
+      "title": "知识库详情",
       "editTitle": "编辑知识库信息",
       "deleteDatabase": "删除数据库",
       "cancel": "取消",
@@ -991,6 +1043,11 @@
     "generating": "AI 正在生成思维导图...",
     "empty": "暂无思维导图",
     "generate": "生成思维导图",
+    "buttons": {
+      "generate": "生成思维导图",
+      "regenerate": "重新生成",
+      "fitView": "适应视图"
+    },
     "toolbar": {
       "regenerate": "重新生成",
       "fitView": "适应视图"
@@ -1004,17 +1061,27 @@
     }
   },
   "graphCanvas": {
+    "nodes": "节点",
+    "edges": "边",
     "stats": {
       "nodes": "节点",
       "edges": "边"
     }
   },
   "evaluationBenchmarks": {
+    "buttons": {
+      "refresh": "刷新",
+      "upload": "上传基准",
+      "generate": "自动生成"
+    },
     "header": {
       "count": "{count} 个基准",
       "refresh": "刷新",
       "upload": "上传基准",
       "generate": "自动生成"
+    },
+    "preview": {
+      "title": "预览基准"
     },
     "empty": {
       "title": "暂无评估基准",
@@ -1071,6 +1138,10 @@
       "loadFailed": "配置加载失败",
       "reload": "重新加载"
     },
+    "options": {
+      "enable": "启用",
+      "disable": "关闭"
+    },
     "form": {
       "enable": "启用",
       "disable": "关闭"
@@ -1085,6 +1156,8 @@
   },
   "modelSelector": {
     "placeholder": "请选择模型",
+    "checking": "检查中...",
+    "check": "检查",
     "status": {
       "checking": "检查中...",
       "check": "检查",

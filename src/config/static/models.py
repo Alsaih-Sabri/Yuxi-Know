@@ -117,6 +117,20 @@ DEFAULT_CHAT_MODEL_PROVIDERS: dict[str, ChatModelProvider] = {
             "doubao-seed-1-6-flash-250715",
         ],
     ),
+    "gemini": ChatModelProvider(
+        name="Google Gemini",
+        url="https://ai.google.dev/gemini-api/docs/models",
+        base_url="https://generativelanguage.googleapis.com/v1beta",
+        default="gemini-2.0-flash-exp",
+        env="GEMINI_API_KEY",
+        models=[
+            "gemini-3-pro-preview",
+            "gemini-3-flash-preview",
+            "gemini-2.0-flash-exp",
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+        ],
+    ),
     "openrouter": ChatModelProvider(
         name="OpenRouter",
         url="https://openrouter.ai/models",
@@ -158,6 +172,7 @@ DEFAULT_CHAT_MODEL_PROVIDERS: dict[str, ChatModelProvider] = {
 # ============================================================
 
 DEFAULT_EMBED_MODELS: dict[str, EmbedModelInfo] = {
+
     "siliconflow/BAAI/bge-m3": EmbedModelInfo(
         model_id="siliconflow/BAAI/bge-m3",
         name="BAAI/bge-m3",
@@ -207,6 +222,20 @@ DEFAULT_EMBED_MODELS: dict[str, EmbedModelInfo] = {
         base_url="https://dashscope.aliyuncs.com/compatible-mode/v1/embeddings",
         api_key="DASHSCOPE_API_KEY",
     ),
+    "voyageai/voyage-4-large": EmbedModelInfo(
+        model_id="voyageai/voyage-4-large",
+        name="voyage-4-large",
+        dimension=1024,
+        base_url="https://api.voyageai.com/v1/embeddings",
+        api_key="VOYAGE_API_KEY",
+    ),
+    "voyageai/voyage-code-3": EmbedModelInfo(
+        model_id="voyageai/voyage-code-3",
+        name="voyage-code-3",
+        dimension=1024,
+        base_url="https://api.voyageai.com/v1/embeddings",
+        api_key="VOYAGE_API_KEY",
+    ),
 }
 
 
@@ -239,5 +268,15 @@ DEFAULT_RERANKERS: dict[str, RerankerInfo] = {
         name="BAAI/bge-reranker-v2-m3",
         base_url="http://localhost:8000/v1/rerank",
         api_key="no_api_key",
+    ),
+    "voyageai/rerank-2.5": RerankerInfo(
+        name="rerank-2.5",
+        base_url="https://api.voyageai.com/v1/rerank",
+        api_key="VOYAGE_API_KEY",
+    ),
+    "voyageai/rerank-2.5-lite": RerankerInfo(
+        name="rerank-2.5-lite",
+        base_url="https://api.voyageai.com/v1/rerank",
+        api_key="VOYAGE_API_KEY",
     ),
 }

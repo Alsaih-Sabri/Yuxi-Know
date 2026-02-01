@@ -32,6 +32,15 @@ def load_chat_model(fully_specified_name: str, **kwargs) -> BaseChatModel:
         logger.debug(f"[offical] Loading model {model_spec} with kwargs {kwargs}")
         return init_chat_model(model_spec, **kwargs)
 
+    elif provider in ["gemini"]:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        return ChatGoogleGenerativeAI(
+            model=model,
+            google_api_key=SecretStr(api_key),
+            convert_system_message_to_human=True,
+        )
+
     elif provider in ["dashscope"]:
         from langchain_deepseek import ChatDeepSeek
 

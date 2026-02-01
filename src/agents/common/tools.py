@@ -30,7 +30,7 @@ def get_tavily_search():
     return _tavily_search_instance
 
 
-@tool(name_or_callable="计算器", description="可以对给定的2个数字选择进行 add, subtract, multiply, divide 运算")
+@tool(name_or_callable="Calculator", description="Perform add, subtract, multiply, divide operations on two given numbers")
 def calculator(a: float, b: float, operation: str) -> float:
     try:
         if operation == "add":
@@ -41,10 +41,10 @@ def calculator(a: float, b: float, operation: str) -> float:
             return a * b
         elif operation == "divide":
             if b == 0:
-                raise ZeroDivisionError("除数不能为零")
+                raise ZeroDivisionError("Divisor cannot be zero")
             return a / b
         else:
-            raise ValueError(f"不支持的运算类型: {operation}，仅支持 add, subtract, multiply, divide")
+            raise ValueError(f"Unsupported operation: {operation}, only supports add, subtract, multiply, divide")
     except Exception as e:
         logger.error(f"Calculator error: {e}")
         raise
@@ -87,53 +87,53 @@ async def text_to_img_demo(text: str) -> str:
     return image_url
 
 
-@tool(name_or_callable="人工审批工具(Debug)", description="请求人工审批工具，用于在执行重要操作前获得人类确认。")
+@tool(name_or_callable="Human Approval Tool (Debug)", description="Request human approval tool for obtaining human confirmation before executing important operations.")
 def get_approved_user_goal(
     operation_description: str,
 ) -> dict:
     """
-    请求人工审批，在执行重要操作前获得人类确认。
+    Request human approval before executing important operations.
 
     Args:
-        operation_description: 需要审批的操作描述，例如 "调用知识库工具"
+        operation_description: Description of the operation requiring approval, e.g., "Call knowledge base tool"
     Returns:
-        dict: 包含审批结果的字典，格式为 {"approved": bool, "message": str}
+        dict: Dictionary containing approval result, format: {"approved": bool, "message": str}
     """
-    # 构建详细的中断信息
+    # Build detailed interrupt info
     interrupt_info = {
-        "question": "是否批准以下操作？",
+        "question": "Approve the following operation?",
         "operation": operation_description,
     }
 
-    # 触发人工审批
+    # Trigger human approval
     is_approved = interrupt(interrupt_info)
 
-    # 返回审批结果
+    # Return approval result
     if is_approved:
         result = {
             "approved": True,
-            "message": f"✅ 操作已批准：{operation_description}",
+            "message": f"✅ Operation approved: {operation_description}",
         }
-        print(f"✅ 人工审批通过: {operation_description}")
+        print(f"✅ Human approval granted: {operation_description}")
     else:
         result = {
             "approved": False,
-            "message": f"❌ 操作被拒绝：{operation_description}",
+            "message": f"❌ Operation rejected: {operation_description}",
         }
-        print(f"❌ 人工审批被拒绝: {operation_description}")
+        print(f"❌ Human approval rejected: {operation_description}")
 
     return result
 
 
 KG_QUERY_DESCRIPTION = """
-使用这个工具可以查询知识图谱中包含的三元组信息。
-关键词（query），使用可能帮助回答这个问题的关键词进行查询，不要直接使用用户的原始输入去查询。
+Use this tool to query triple information contained in the knowledge graph.
+Keyword (query): Use keywords that may help answer the question for querying, do not directly use the user's raw input for querying.
 """
 
 
-@tool(name_or_callable="查询知识图谱", description=KG_QUERY_DESCRIPTION)
+@tool(name_or_callable="Query Knowledge Graph", description=KG_QUERY_DESCRIPTION)
 def query_knowledge_graph(query: Annotated[str, "The keyword to query knowledge graph."]) -> Any:
-    """使用这个工具可以查询知识图谱中包含的三元组信息。关键词（query），使用可能帮助回答这个问题的关键词进行查询，不要直接使用用户的原始输入去查询。"""
+    """Use this tool to query triple information contained in the knowledge graph. Keyword (query): Use keywords that may help answer the question for querying, do not directly use the user's raw input for querying."""
     try:
         logger.debug(f"Querying knowledge graph with: {query}")
         result = graph_base.query_node(query, hops=2, return_format="triples")
@@ -144,21 +144,21 @@ def query_knowledge_graph(query: Annotated[str, "The keyword to query knowledge 
         return result
     except Exception as e:
         logger.error(f"Knowledge graph query error: {e}, {traceback.format_exc()}")
-        return f"知识图谱查询失败: {str(e)}"
+        return f"Knowledge graph query failed: {str(e)}"
 
 
 class KnowledgeRetrieverModel(BaseModel):
     query_text: str = Field(
         description=(
-            "查询的关键词，查询的时候，应该尽量以可能帮助回答这个问题的关键词进行查询，不要直接使用用户的原始输入去查询。"
+            "Query keywords. When querying, use keywords that may help answer the question, do not directly use the user's raw input for querying."
         )
     )
     operation: str = Field(
         default="search",
         description=(
-            "操作类型：'search' 表示检索知识库内容，'get_mindmap' 表示获取知识库的思维导图结构。"
-            "当用户询问知识库的整体结构、文件分类、知识架构时，使用 'get_mindmap'。"
-            "当用户需要查询具体内容时，使用 'search'。"
+            "Operation type: 'search' means retrieve knowledge base content, 'get_mindmap' means get the knowledge base's mindmap structure. "
+            "Use 'get_mindmap' when the user asks about the overall structure, file classification, or knowledge architecture of the knowledge base. "
+            "Use 'search' when the user needs to query specific content."
         ),
     )
 
@@ -166,7 +166,7 @@ class KnowledgeRetrieverModel(BaseModel):
 class CommonKnowledgeRetriever(KnowledgeRetrieverModel):
     """Common knowledge retriever model."""
 
-    file_name: str = Field(description="限定文件名称，当操作类型为 'search' 时，可以指定文件名称，支持模糊匹配")
+    file_name: str = Field(description="Restrict to specific filename. When operation type is 'search', you can specify a filename, supports fuzzy matching")
 
 
 def get_kb_based_tools(db_names: list[str] | None = None) -> list:
@@ -187,31 +187,31 @@ def get_kb_based_tools(db_names: list[str] | None = None) -> list:
         ) -> Any:
             """异步检索器包装函数，支持检索和获取思维导图"""
 
-            # 获取思维导图
+            # Get mindmap
             if operation == "get_mindmap":
                 try:
                     logger.debug(f"Getting mindmap for database {db_id}")
 
-                    # 从知识库元数据中获取思维导图
+                    # Get mindmap from knowledge base metadata
                     if db_id not in knowledge_base.global_databases_meta:
-                        return f"知识库 {retriever_info['name']} 不存在"
+                        return f"Knowledge base {retriever_info['name']} does not exist"
 
                     db_meta = knowledge_base.global_databases_meta[db_id]
                     mindmap_data = db_meta.get("mindmap")
 
                     if not mindmap_data:
-                        return f"知识库 {retriever_info['name']} 还没有生成思维导图。"
+                        return f"Knowledge base {retriever_info['name']} has not generated a mindmap yet."
 
-                    # 将思维导图数据转换为文本格式，便于AI理解
+                    # Convert mindmap data to text format for AI understanding
                     def mindmap_to_text(node, level=0):
-                        """递归将思维导图JSON转换为层级文本"""
+                        """Recursively convert mindmap JSON to hierarchical text"""
                         indent = "  " * level
                         text = f"{indent}- {node.get('content', '')}\n"
                         for child in node.get("children", []):
                             text += mindmap_to_text(child, level + 1)
                         return text
 
-                    mindmap_text = f"知识库 {retriever_info['name']} 的思维导图结构：\n\n"
+                    mindmap_text = f"Mindmap structure of knowledge base {retriever_info['name']}:\n\n"
                     mindmap_text += mindmap_to_text(mindmap_data)
 
                     logger.debug(f"Successfully retrieved mindmap for {db_id}")
@@ -219,9 +219,9 @@ def get_kb_based_tools(db_names: list[str] | None = None) -> list:
 
                 except Exception as e:
                     logger.error(f"Error getting mindmap for {db_id}: {e}")
-                    return f"获取思维导图失败: {str(e)}"
+                    return f"Failed to get mindmap: {str(e)}"
 
-            # 默认：检索知识库
+            # Default: retrieve from knowledge base
             retriever = retriever_info["retriever"]
             try:
                 logger.debug(f"Retrieving from database {db_id} with query: {query_text}")
@@ -237,7 +237,7 @@ def get_kb_based_tools(db_names: list[str] | None = None) -> list:
                 return result
             except Exception as e:
                 logger.error(f"Error in retriever {db_id}: {e}")
-                return f"检索失败: {str(e)}"
+                return f"Retrieval failed: {str(e)}"
 
         return async_retriever_wrapper
 
@@ -246,16 +246,16 @@ def get_kb_based_tools(db_names: list[str] | None = None) -> list:
             continue
 
         try:
-            # 构建工具描述
+            # Build tool description
             description = (
-                f"使用 {retrieve_info['name']} 知识库的多功能工具。\n"
-                f"知识库描述：{retrieve_info['description'] or '没有描述。'}\n\n"
-                f"支持的操作：\n"
-                f"1. 'search' - 检索知识库内容：根据关键词查询相关文档片段\n"
-                f"2. 'get_mindmap' - 获取思维导图：查看知识库的整体结构和文件分类\n\n"
-                f"使用建议：\n"
-                f"- 需要查询具体内容时，使用 operation='search'\n"
-                f"- 想了解知识库结构、文件分类时，使用 operation='get_mindmap'"
+                f"Multi-functional tool for {retrieve_info['name']} knowledge base.\n"
+                f"Knowledge base description: {retrieve_info['description'] or 'No description.'}\n\n"
+                f"Supported operations:\n"
+                f"1. 'search' - Retrieve knowledge base content: Query relevant document fragments based on keywords\n"
+                f"2. 'get_mindmap' - Get mindmap: View the overall structure and file classification of the knowledge base\n\n"
+                f"Usage suggestions:\n"
+                f"- When you need to query specific content, use operation='search'\n"
+                f"- When you want to understand the knowledge base structure or file classification, use operation='get_mindmap'"
             )
 
             # 使用工厂函数创建检索器包装函数，避免闭包问题

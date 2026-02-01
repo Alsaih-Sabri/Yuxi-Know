@@ -92,8 +92,8 @@ export class ErrorHandler {
       delete: 'Delete conversation',
       rename: 'Rename conversation',
       load: 'Load conversation',
-      export: '导出对话',
-      stream: '流式处理'
+      export: 'Export conversation',
+      stream: 'Stream processing'
     }
 
     const context = contextMap[operation] || operation
@@ -101,11 +101,11 @@ export class ErrorHandler {
   }
 
   /**
-   * 处理验证错误
-   * @param {string} message - 验证错误消息
+   * Handle validation errors
+   * @param {string} message - Validation error message
    */
   static handleValidationError(message) {
-    return this.handleError(new Error(message), '输入验证', {
+    return this.handleError(new Error(message), 'Input validation', {
       severity: 'warning',
       customMessage: message
     })

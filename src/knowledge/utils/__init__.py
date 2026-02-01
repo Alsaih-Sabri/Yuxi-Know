@@ -1,8 +1,8 @@
-"""知识库工具模块
+"""Knowledge base utility module
 
-包含知识库相关的工具函数：
-- kb_utils: 知识库通用工具函数
-- indexing: 文件处理和索引相关功能
+Contains knowledge base related utility functions:
+- kb_utils: General knowledge base utility functions
+- indexing: File processing and indexing related functions
 """
 
 from .kb_utils import (

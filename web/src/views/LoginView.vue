@@ -56,6 +56,7 @@
                   ]"
                 >
                   <a-input
+                    id="admin-user-id"
                     v-model:value="adminForm.user_id"
                     :placeholder="$t('init.userIdPlaceholder')"
                     :maxlength="20"
@@ -80,6 +81,7 @@
                   ]"
                 >
                   <a-input
+                    id="admin-phone-number"
                     v-model:value="adminForm.phone_number"
                     :placeholder="$t('init.phoneOptionalHint')"
                     :max-length="11"
@@ -91,7 +93,7 @@
                   name="password"
                   :rules="[{ required: true, message: $t('auth.enterPassword') }]"
                 >
-                  <a-input-password v-model:value="adminForm.password" prefix-icon="lock" />
+                  <a-input-password id="admin-password" v-model:value="adminForm.password" prefix-icon="lock" />
                 </a-form-item>
 
                 <a-form-item
@@ -102,7 +104,7 @@
                     { validator: validateConfirmPassword }
                   ]"
                 >
-                  <a-input-password v-model:value="adminForm.confirmPassword" prefix-icon="lock" />
+                  <a-input-password id="admin-confirm-password" v-model:value="adminForm.confirmPassword" prefix-icon="lock" />
                 </a-form-item>
 
                 <a-form-item>
@@ -121,7 +123,7 @@
                   name="loginId"
                   :rules="[{ required: true, message: $t('auth.enterUserIdOrPhone') }]"
                 >
-                  <a-input v-model:value="loginForm.loginId" :placeholder="$t('auth.userIdOrPhone')">
+                  <a-input id="login-id" v-model:value="loginForm.loginId" :placeholder="$t('auth.userIdOrPhone')">
                     <template #prefix>
                       <user-outlined />
                     </template>
@@ -133,7 +135,7 @@
                   name="password"
                   :rules="[{ required: true, message: $t('auth.enterPassword') }]"
                 >
-                  <a-input-password v-model:value="loginForm.password">
+                  <a-input-password id="login-password" v-model:value="loginForm.password">
                     <template #prefix>
                       <lock-outlined />
                     </template>

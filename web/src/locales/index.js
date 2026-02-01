@@ -36,7 +36,9 @@ const i18n = createI18n({
   locale: initialLocale,
   fallbackLocale: 'en',
   messages,
-  sync: true
+  sync: true,
+  globalInjection: true,
+  warnHtmlMessage: false
 })
 
 export default i18n

@@ -1,6 +1,6 @@
 <template>
   <div class="agent-config-sidebar" :class="{ open: isOpen }">
-    <!-- 侧边栏头部 -->
+    <!-- Sidebar header -->
     <div class="sidebar-header">
       <div class="header-center">
         <a-segmented v-model:value="activeTab" :options="segmentedOptions" />
@@ -10,7 +10,7 @@
       </a-button>
     </div>
 
-    <!-- 侧边栏内容 -->
+    <!-- Sidebar content -->
     <div class="sidebar-content">
       <div class="agent-info" v-if="selectedAgent">
         <div class="agent-basic-info" @click="console.log(configurableItems)">
@@ -20,7 +20,7 @@
         <!-- <a-divider /> -->
 
         <div v-if="selectedAgentId && configurableItems" class="config-form-content">
-          <!-- 配置表单 -->
+          <!-- Configuration form -->
           <a-form :model="agentConfig" layout="vertical" class="config-form">
             <a-alert
               v-if="isEmptyConfig"
@@ -37,7 +37,7 @@
               class="config-alert"
             />
 
-            <!-- 统一显示所有配置项 -->
+            <!-- Display all configuration items -->
             <template v-for="(value, key) in configurableItems" :key="key">
               <a-form-item
                 v-if="shouldShowConfig(key, value)"
@@ -48,7 +48,7 @@
                 <p v-if="value.description" class="config-description">{{ value.description }}</p>
 
                 <!-- <div>{{ value }}</div> -->
-                <!-- 模型选择 -->
+                <!-- Model selection -->
                 <div v-if="value.template_metadata.kind === 'llm'" class="model-selector">
                   <ModelSelectorComponent
                     @select-model="(spec) => handleModelChange(key, spec)"
@@ -56,9 +56,9 @@
                   />
                 </div>
 
-                <!-- 系统提示词 -->
+                <!-- System prompt -->
                 <div v-else-if="key === 'system_prompt'" class="system-prompt-container">
-                  <!-- 编辑模式 -->
+                  <!-- Edit mode -->
                   <a-textarea
                     v-if="systemPromptEditMode"
                     :value="agentConfig[key]"
@@ -69,7 +69,7 @@
                     @blur="systemPromptEditMode = false"
                     ref="systemPromptTextarea"
                   />
-                  <!-- 显示模式 -->
+                  <!-- Display mode -->
                   <div v-else class="system-prompt-display" @click="enterEditMode">
                     <div
                       class="system-prompt-content"
@@ -81,7 +81,7 @@
                   </div>
                 </div>
 
-                <!-- 工具选择 -->
+                <!-- Tool selection -->
                 <div v-else-if="value.template_metadata.kind === 'tools'" class="tools-selector">
                   <div class="tools-summary">
                     <div class="tools-summary-info">
@@ -118,14 +118,14 @@
                   </div>
                 </div>
 
-                <!-- 布尔类型 -->
+                <!-- Boolean type -->
                 <a-switch
                   v-else-if="typeof agentConfig[key] === 'boolean'"
                   :checked="agentConfig[key]"
                   @update:checked="(val) => agentStore.updateAgentConfig({ [key]: val })"
                 />
 
-                <!-- 单选 -->
+                <!-- Single select -->
                 <a-select
                   v-else-if="
                     value?.options.length > 0 && (value?.type === 'str' || value?.type === 'select')
@@ -139,7 +139,7 @@
                   </a-select-option>
                 </a-select>
 
-                <!-- 多选 -->
+                <!-- Multi-select -->
                 <div
                   v-else-if="value?.options.length > 0 && value?.type === 'list'"
                   class="multi-select-cards"
@@ -178,7 +178,7 @@
                   </div>
                 </div>
 
-                <!-- 数字 -->
+                <!-- Number -->
                 <a-input-number
                   v-else-if="value?.type === 'number'"
                   :value="agentConfig[key]"
@@ -187,7 +187,7 @@
                   class="config-input-number"
                 />
 
-                <!-- 滑块 -->
+                <!-- Slider -->
                 <a-slider
                   v-else-if="value?.type === 'slider'"
                   :value="agentConfig[key]"
@@ -198,7 +198,7 @@
                   class="config-slider"
                 />
 
-                <!-- 其他类型 -->
+                <!-- Other types -->
                 <a-input
                   v-else
                   :value="agentConfig[key]"
@@ -213,7 +213,7 @@
       </div>
     </div>
 
-    <!-- 固定在底部的操作按钮 -->
+    <!-- Fixed action buttons at bottom -->
     <div class="sidebar-footer" v-if="!isEmptyConfig">
       <div class="form-actions">
         <a-button
@@ -226,7 +226,7 @@
       </div>
     </div>
 
-    <!-- 工具选择弹窗 -->
+    <!-- Tool selection modal -->
     <a-modal
       v-model:open="toolsModalOpen"
       :title="$t('agentConfig.modal.selectTools')"
@@ -310,14 +310,14 @@ const props = defineProps({
 // Emits
 const emit = defineEmits(['close'])
 
-// Store 管理
+// Store management
 const agentStore = useAgentStore()
 const { availableTools, selectedAgent, selectedAgentId, agentConfig, configurableItems } =
   storeToRefs(agentStore)
 
 // console.log(availableTools.value)
 
-// 本地状态
+// Local state
 const toolsModalOpen = ref(false)
 const selectedTools = ref([])
 const toolsSearchText = ref('')
@@ -331,9 +331,9 @@ const isEmptyConfig = computed(() => {
 const hasOtherConfigs = computed(() => {
   if (isEmptyConfig.value) return false
   return Object.entries(configurableItems.value).some(([key, value]) => {
-    // 检查是否属于 basic (System Prompt, LLM)
+    // Check if belongs to basic (System Prompt, LLM)
     const isBasic = key === 'system_prompt' || value.template_metadata?.kind === 'llm'
-    // 检查是否属于 tools (mcps, knowledges, tools)
+    // Check if belongs to tools (mcps, knowledges, tools)
     const isTools =
       key === 'mcps' ||
       key === 'knowledges' ||
@@ -369,13 +369,13 @@ const filteredTools = computed(() => {
   )
 })
 
-// 方法
+// Methods
 const shouldShowConfig = (key, value) => {
   if (activeTab.value === 'basic') {
-    // 基础：System Prompt, LLM Model
+    // Basic: System Prompt, LLM Model
     return key === 'system_prompt' || value.template_metadata?.kind === 'llm'
   } else if (activeTab.value === 'tools') {
-    // 工具：Tools, MCPs, Knowledges
+    // Tools: Tools, MCPs, Knowledges
     return (
       key === 'mcps' ||
       key === 'knowledges' ||
@@ -383,7 +383,7 @@ const shouldShowConfig = (key, value) => {
       key === 'tools'
     )
   } else {
-    // 其他：剩余所有配置
+    // Other: all remaining configurations
     const isBasic = key === 'system_prompt' || value.template_metadata?.kind === 'llm'
     const isTools =
       key === 'mcps' ||
@@ -431,7 +431,7 @@ const handleModelChange = (key, spec) => {
   })
 }
 
-// 多选相关方法
+// Multi-select related methods
 const ensureArray = (key) => {
   const config = agentConfig.value || {}
   if (!config[key] || !Array.isArray(config[key])) {
@@ -471,7 +471,7 @@ const clearSelection = (key) => {
   })
 }
 
-// 工具相关方法
+// Tool related methods
 const getToolNameById = (toolId) => {
   const toolsList = availableTools.value ? Object.values(availableTools.value) : []
   const tool = toolsList.find((t) => t.id === toolId)
@@ -481,15 +481,15 @@ const getToolNameById = (toolId) => {
 const openToolsModal = async () => {
   console.log('availableTools.value', availableTools.value)
   try {
-    // 强制刷新智能体详情以获取最新工具列表
+    // Force refresh agent details to get latest tool list
     if (selectedAgentId.value) {
       await agentStore.fetchAgentDetail(selectedAgentId.value, true)
     }
     selectedTools.value = [...(agentConfig.value?.tools || [])]
     toolsModalOpen.value = true
   } catch (error) {
-    console.error('打开工具选择弹窗失败:', error)
-    message.error('打开工具选择弹窗失败')
+    console.error('Failed to open tool selection modal:', error)
+    message.error('Failed to open tool selection modal')
   }
 }
 
@@ -527,10 +527,10 @@ const cancelToolsSelection = () => {
   selectedTools.value = []
 }
 
-// 系统提示词编辑相关方法
+// System prompt editing related methods
 const enterEditMode = () => {
   systemPromptEditMode.value = true
-  // 使用 nextTick 确保 DOM 更新后再聚焦
+  // Use nextTick to ensure DOM is updated before focusing
   nextTick(() => {
     const textarea = document.querySelector('.system-prompt-input')
     if (textarea) {
@@ -539,17 +539,17 @@ const enterEditMode = () => {
   })
 }
 
-// 验证和过滤配置项
+// Validate and filter configuration items
 const validateAndFilterConfig = () => {
   const validatedConfig = { ...agentConfig.value }
   const configItems = configurableItems.value
 
-  // 遍历所有配置项
+  // Iterate through all configuration items
   Object.keys(configItems).forEach((key) => {
     const configItem = configItems[key]
     const currentValue = validatedConfig[key]
 
-    // 检查工具配置
+    // Check tool configuration
     if (configItem.template_metadata?.kind === 'tools' && Array.isArray(currentValue)) {
       const availableToolIds = availableTools.value
         ? Object.values(availableTools.value).map((tool) => tool.id)
@@ -557,17 +557,17 @@ const validateAndFilterConfig = () => {
       validatedConfig[key] = currentValue.filter((toolId) => availableToolIds.includes(toolId))
 
       if (validatedConfig[key].length !== currentValue.length) {
-        console.warn(`工具配置 ${key} 中包含无效的工具ID，已自动过滤`)
+        console.warn(`Tool configuration ${key} contains invalid tool IDs, automatically filtered`)
       }
     }
 
-    // 检查多选配置项 (type === 'list' 且有 options)
+    // Check multi-select configuration items (type === 'list' with options)
     else if (configItem.type === 'list' && configItem.options && Array.isArray(currentValue)) {
       const validOptions = configItem.options
       validatedConfig[key] = currentValue.filter((value) => validOptions.includes(value))
 
       if (validatedConfig[key].length !== currentValue.length) {
-        console.warn(`配置项 ${key} 中包含无效的选项，已自动过滤`)
+        console.warn(`Configuration item ${key} contains invalid options, automatically filtered`)
       }
     }
   })
@@ -575,43 +575,43 @@ const validateAndFilterConfig = () => {
   return validatedConfig
 }
 
-// 配置保存和重置
+// Configuration save and reset
 const saveConfig = async () => {
   if (!selectedAgentId.value) {
-    message.error('没有选择智能体')
+    message.error('No agent selected')
     return
   }
 
   try {
-    // 验证和过滤配置
+    // Validate and filter configuration
     const validatedConfig = validateAndFilterConfig()
 
-    // 如果配置有变化，先更新到store
+    // If configuration has changed, update to store first
     if (JSON.stringify(validatedConfig) !== JSON.stringify(agentConfig.value)) {
       agentStore.updateAgentConfig(validatedConfig)
-      message.info('检测到无效配置项，已自动过滤')
+      message.info('Invalid configuration items detected, automatically filtered')
     }
 
     await agentStore.saveAgentConfig()
-    message.success('配置已保存到服务器')
+    message.success('Configuration saved to server')
   } catch (error) {
-    console.error('保存配置到服务器出错:', error)
-    message.error('保存配置到服务器失败')
+    console.error('Error saving configuration to server:', error)
+    message.error('Failed to save configuration to server')
   }
 }
 
 const resetConfig = async () => {
   if (!selectedAgentId.value) {
-    message.error('没有选择智能体')
+    message.error('No agent selected')
     return
   }
 
   try {
     agentStore.resetAgentConfig()
-    message.info('配置已重置')
+    message.info('Configuration reset')
   } catch (error) {
-    console.error('重置配置出错:', error)
-    message.error('重置配置失败')
+    console.error('Error resetting configuration:', error)
+    message.error('Failed to reset configuration')
   }
 }
 </script>
@@ -836,7 +836,7 @@ const resetConfig = async () => {
   }
 }
 
-// 工具选择器样式
+// Tool selector styles
 .tools-selector {
   .tools-summary {
     display: flex;
@@ -902,7 +902,7 @@ const resetConfig = async () => {
   }
 }
 
-// 多选卡片样式
+// Multi-select card styles
 .multi-select-cards {
   .multi-select-label {
     display: flex;
@@ -975,7 +975,7 @@ const resetConfig = async () => {
   }
 }
 
-// 工具选择弹窗样式
+// Tool selection modal styles
 .tools-modal {
   .tools-modal-content {
     .tools-search {
@@ -1018,7 +1018,7 @@ const resetConfig = async () => {
       border-radius: 8px;
       margin-bottom: 16px;
 
-      // 在小屏幕下调整为单列布局
+      // Adjust to single column layout on small screens
       @media (max-width: 480px) {
         grid-template-columns: 1fr;
       }
@@ -1084,6 +1084,7 @@ const resetConfig = async () => {
             line-height: 1.4;
             display: -webkit-box;
             -webkit-line-clamp: 2;
+            line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -1177,7 +1178,7 @@ const resetConfig = async () => {
   }
 }
 
-// 响应式适配
+// Responsive adaptation
 @media (max-width: 768px) {
   .agent-config-sidebar.open {
     width: 100%;

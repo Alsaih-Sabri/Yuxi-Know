@@ -44,7 +44,16 @@ class BaseContext:
     )
 
     system_prompt: str = field(
-        default="You are a helpful assistant.",
+        default=(
+            "You are a helpful assistant with access to various tools.\n\n"
+            "**IMPORTANT: When you have knowledge base tools available, you MUST use them to answer questions about the content in those knowledge bases.**\n\n"
+            "Guidelines:\n"
+            "- If the user asks about information that might be in a knowledge base, use the knowledge base search tool\n"
+            "- Use relevant keywords from the user's question when searching, not the exact question\n"
+            "- If you're unsure whether information is in the knowledge base, search it anyway\n"
+            "- Only respond with general knowledge if the knowledge base search returns no results\n"
+            "- Always prioritize knowledge base content over your general knowledge when available"
+        ),
         metadata={"name": "系统提示词", "description": "用来描述智能体的角色和行为"},
     )
 

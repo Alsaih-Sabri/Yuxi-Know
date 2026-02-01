@@ -15,11 +15,163 @@ from src import config, knowledge_base
 from src.knowledge.indexing import SUPPORTED_FILE_EXTENSIONS, is_supported_file_extension, process_file_to_markdown
 from src.knowledge.utils import calculate_content_hash
 from src.models.embed import test_all_embedding_models_status, test_embedding_model_status
+from src.models import select_model
 from src.storage.db.models import User
 from src.storage.minio.client import StorageError, aupload_file_to_minio, get_minio_client
 from src.utils import logger
 
 knowledge = APIRouter(prefix="/knowledge", tags=["knowledge"])
+
+
+# =============================================================================
+# === Helper Functions ===
+# =============================================================================
+
+async def _auto_generate_mindmap(db_id: str):
+    """
+    Auto-generate mindmap for a knowledge base in the background
+    
+    Args:
+        db_id: Database ID
+    """
+    try:
+        import json
+        
+        # Get database info
+        db_info = knowledge_base.get_database_info(db_id)
+        if not db_info:
+            logger.warning(f"Database {db_id} not found for mindmap generation")
+            return
+        
+        db_name = db_info.get("name", "Knowledge Base")
+        all_files = db_info.get("files", {})
+        
+        # Get file list (limit to 20 files)
+        file_ids = list(all_files.keys())[:20]
+        if not file_ids:
+            logger.info(f"No files to generate mindmap for database {db_id}")
+            return
+        
+        # Collect file info
+        files_info = []
+        for file_id in file_ids:
+            if file_id in all_files:
+                file_info = all_files[file_id]
+                files_info.append({
+                    "filename": file_info.get("filename", ""),
+                    "type": file_info.get("type", ""),
+                })
+        
+        if not files_info:
+            return
+        
+        # Build AI prompt
+        system_prompt = """You are a professional knowledge organization assistant.
+
+Your task is to analyze the provided file list and generate a clear hierarchical mindmap structure.
+
+**IMPORTANT: Generate all category names in ENGLISH. Only keep original filenames as they are.**
+
+**Core rule: Each filename can only appear once! No duplicates allowed!**
+
+Requirements:
+1. Clear hierarchical structure (2-4 levels)
+2. Root node is the knowledge base name (translate to English if needed)
+3. First level is main categories in ENGLISH (e.g., Technical Docs, Regulations, Data Resources)
+4. Second level is subcategories in ENGLISH
+5. **Leaf nodes must be specific filenames (keep original names)**
+6. **Each filename can only appear once in the entire mindmap!**
+7. If a file could belong to multiple categories, choose only the most appropriate one
+8. Use appropriate emoji icons for better readability
+9. Return JSON format following this structure:
+
+```json
+{
+  "content": "Knowledge Base Name",
+  "children": [
+    {
+      "content": "🎯 Main Category 1",
+      "children": [
+        {
+          "content": "Subcategory 1.1",
+          "children": [
+            {"content": "file1.txt", "children": []},
+            {"content": "file2.pdf", "children": []}
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Important constraints:**
+- Each filename can only appear once in the entire JSON
+- Don't classify by multiple dimensions causing file duplication
+- Choose the most appropriate classification dimension
+- Each leaf node's children must be an empty array []
+- Category names should be concise and clear
+- Use emojis to enhance visual effect"""
+        
+        files_text = "\n".join([f"- {f['filename']} ({f['type']})" for f in files_info])
+        user_message = f"""Please generate a mindmap structure for knowledge base "{db_name}".
+
+File list ({len(files_info)} files):
+{files_text}
+
+**Important reminder:**
+1. This knowledge base has {len(files_info)} files
+2. Each filename can only appear once in the mindmap
+3. Don't let the same file appear in multiple categories
+4. Choose the most appropriate unique category for each file
+5. **Generate ALL category names in ENGLISH** (only keep original filenames unchanged)
+
+Please generate a reasonable mindmap structure with English category names."""
+        
+        # Call AI to generate
+        logger.info(f"Generating mindmap for {db_name} with {len(files_info)} files")
+        
+        model = select_model()
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ]
+        response = await asyncio.to_thread(model.call, messages, stream=False)
+        
+        # Parse AI response
+        content = response.content if hasattr(response, "content") else str(response)
+        
+        # Extract JSON from markdown code block
+        if "```json" in content:
+            json_start = content.find("```json") + 7
+            json_end = content.find("```", json_start)
+            content = content[json_start:json_end].strip()
+        elif "```" in content:
+            json_start = content.find("```") + 3
+            json_end = content.find("```", json_start)
+            content = content[json_start:json_end].strip()
+        
+        mindmap_data = json.loads(content)
+        
+        # Validate structure
+        if not isinstance(mindmap_data, dict) or "content" not in mindmap_data:
+            logger.error("Invalid mindmap structure generated")
+            return
+        
+        # Save mindmap to knowledge base metadata
+        async with knowledge_base._metadata_lock:
+            if db_id in knowledge_base.global_databases_meta:
+                knowledge_base.global_databases_meta[db_id]["mindmap"] = mindmap_data
+                knowledge_base._save_global_metadata()
+                logger.info(f"Auto-generated mindmap saved for database {db_id}")
+        
+    except Exception as e:
+        logger.error(f"Failed to auto-generate mindmap for {db_id}: {e}")
+
+
+# =============================================================================
+# === API Endpoints ===
+# =============================================================================
 
 media_types = {
     ".pdf": "application/pdf",
@@ -378,6 +530,17 @@ async def add_documents(
         message = f"{item_type}处理完成，失败 {failed_count} 个" if failed_count else f"{item_type}处理完成"
         await context.set_result(summary | {"items": processed_items})
         await context.set_progress(100.0, message)
+        
+        # Auto-generate mindmap if files were successfully processed
+        success_count = len(processed_items) - failed_count
+        if success_count > 0:
+            try:
+                logger.info(f"Auto-generating mindmap for database {db_id} after processing {success_count} files")
+                asyncio.create_task(_auto_generate_mindmap(db_id))
+            except Exception as mindmap_error:
+                logger.warning(f"Failed to trigger auto mindmap generation: {mindmap_error}")
+                # Don't fail the main task if mindmap generation fails
+        
         return summary | {"items": processed_items}
 
     try:

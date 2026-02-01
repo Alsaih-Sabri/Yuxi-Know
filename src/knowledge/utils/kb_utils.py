@@ -15,45 +15,45 @@ from src.utils.datetime_utils import utc_isoformat
 
 def validate_file_path(file_path: str, db_id: str = None) -> str:
     """
-    验证文件路径安全性，防止路径遍历攻击 - 支持本地文件和MinIO URL
+    Validate file path security to prevent path traversal attacks - supports local files and MinIO URLs
 
     Args:
-        file_path: 要验证的文件路径或MinIO URL
-        db_id: 数据库ID，用于获取知识库特定的上传目录
+        file_path: File path or MinIO URL to validate
+        db_id: Database ID for getting knowledge base specific upload directory
 
     Returns:
-        str: 规范化后的安全路径
+        str: Normalized safe path
 
     Raises:
-        ValueError: 如果路径不安全
+        ValueError: If path is unsafe
     """
     try:
-        # 检测是否是MinIO URL，如果是则直接返回（不进行路径遍历检查）
+        # Detect if it's a MinIO URL, if so return directly (skip path traversal check)
         if is_minio_url(file_path):
             logger.debug(f"MinIO URL detected, skipping path validation: {file_path}")
             return file_path
 
-        # 规范化路径（仅对本地文件）
+        # Normalize path (only for local files)
         normalized_path = os.path.abspath(os.path.realpath(file_path))
 
-        # 获取允许的根目录
+        # Get allowed root directories
         from src.knowledge import knowledge_base
 
         allowed_dirs = [
             os.path.abspath(os.path.realpath(config.save_dir)),
         ]
 
-        # 如果指定了db_id，添加知识库特定的上传目录
+        # If db_id is specified, add knowledge base specific upload directory
         if db_id:
             try:
                 allowed_dirs.append(os.path.abspath(os.path.realpath(knowledge_base.get_db_upload_path(db_id))))
             except Exception:
-                # 如果无法获取db路径，使用通用上传目录
+                # If unable to get db path, use general upload directory
                 allowed_dirs.append(
                     os.path.abspath(os.path.realpath(os.path.join(config.save_dir, "database", "uploads")))
                 )
 
-        # 检查路径是否在允许的目录内
+        # Check if path is within allowed directories
         is_safe = False
         for allowed_dir in allowed_dirs:
             try:
@@ -75,14 +75,14 @@ def validate_file_path(file_path: str, db_id: str = None) -> str:
 
 
 def _unescape_separator(separator: str | None) -> str | None:
-    """将前端传入的字面量转义字符转换为实际字符
+    """Convert literal escape characters from frontend to actual characters
 
-    例如: "\\n\\n\\n" -> "\n\n\n"
+    Example: "\\n\\n\\n" -> "\n\n\n"
     """
     if not separator:
         return None
 
-    # 处理常见的转义序列
+    # Handle common escape sequences
     separator = separator.replace("\\n", "\n")
     separator = separator.replace("\\r", "\r")
     separator = separator.replace("\\t", "\t")
@@ -93,34 +93,34 @@ def _unescape_separator(separator: str | None) -> str | None:
 
 def split_text_into_chunks(text: str, file_id: str, filename: str, params: dict = {}) -> list[dict]:
     """
-    将文本分割成块，使用 LangChain 的 MarkdownTextSplitter 进行智能分割
+    Split text into chunks using LangChain's MarkdownTextSplitter for intelligent splitting
     """
     chunks = []
     chunk_size = params.get("chunk_size", 1000)
     chunk_overlap = params.get("chunk_overlap", 200)
 
-    # 获取分隔符并转换为实际字符
+    # Get separator and convert to actual characters
     separator = params.get("qa_separator")
     separator = _unescape_separator(separator)
 
-    # 向后兼容：如果旧配置设置了 use_qa_split=True 但未指定 separator，使用默认分隔符
+    # Backward compatibility: if old config set use_qa_split=True but no separator specified, use default separator
     use_qa_split = params.get("use_qa_split", False)
     if use_qa_split and not separator:
         separator = "\n\n\n"
-        logger.debug("启用了向后兼容模式：use_qa_split=True，使用默认分隔符 \\n\\n\\n")
+        logger.debug("Enabled backward compatibility mode: use_qa_split=True, using default separator \\n\\n\\n")
 
-    # 使用 MarkdownTextSplitter 进行智能分割
-    # MarkdownTextSplitter 会尝试沿着 Markdown 格式的标题进行分割
+    # Use MarkdownTextSplitter for intelligent splitting
+    # MarkdownTextSplitter attempts to split along Markdown format headers
     text_splitter = MarkdownTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )
 
-    # 如果设置了分隔符，先分割后以当前的分割逻辑处理
+    # If separator is set, pre-split then process with current splitting logic
     if separator:
-        # 转换分隔符为可视格式（换行符显示为 \n）
+        # Convert separator to visual format (newlines displayed as \n)
         separator_display = separator.replace("\n", "\\n").replace("\r", "\\r").replace("\t", "\\t")
-        logger.debug(f"启用预分割模式，使用分隔符: '{separator_display}'")
+        logger.debug(f"Enabled pre-split mode, using separator: '{separator_display}'")
         pre_chunks = text.split(separator)
         text_chunks = []
         for pre_chunk in pre_chunks:
@@ -129,9 +129,9 @@ def split_text_into_chunks(text: str, file_id: str, filename: str, params: dict 
     else:
         text_chunks = text_splitter.split_text(text)
 
-    # 转换为标准格式
+    # Convert to standard format
     for chunk_index, chunk_content in enumerate(text_chunks):
-        if chunk_content.strip():  # 跳过空块
+        if chunk_content.strip():  # Skip empty chunks
             chunks.append(
                 {
                     "id": f"{file_id}_chunk_{chunk_index}",
@@ -150,13 +150,13 @@ def split_text_into_chunks(text: str, file_id: str, filename: str, params: dict 
 
 async def calculate_content_hash(data: bytes | bytearray | str | os.PathLike[str] | Path) -> str:
     """
-    计算文件内容的 SHA-256 哈希值。
+    Calculate SHA-256 hash of file content.
 
     Args:
-        data: 文件内容的二进制数据或文件路径
+        data: Binary data of file content or file path
 
     Returns:
-        str: 十六进制哈希值
+        str: Hexadecimal hash value
     """
     sha256 = hashlib.sha256()
 
@@ -174,51 +174,51 @@ async def calculate_content_hash(data: bytes | bytearray | str | os.PathLike[str
 
         return sha256.hexdigest()
 
-    # 理论上不会执行到这里，但保留作为防御性编程
+    # Theoretically won't reach here, but kept as defensive programming
     raise TypeError(f"Unsupported data type for hashing: {type(data)!r}")  # type: ignore[unreachable]
 
 
 async def prepare_item_metadata(item: str, content_type: str, db_id: str, params: dict | None = None) -> dict:
     """
-    准备文件或URL的元数据 - 支持本地文件和MinIO文件
+    Prepare metadata for file or URL - supports local files and MinIO files
 
     Args:
-        item: 文件路径或MinIO URL
-        content_type: 内容类型 ("file" 或 "url")
-        db_id: 数据库ID
-        params: 处理参数，可选
+        item: File path or MinIO URL
+        content_type: Content type ("file" or "url")
+        db_id: Database ID
+        params: Processing parameters, optional
     """
     if content_type == "file":
-        # 检测是否是MinIO URL还是本地文件路径
+        # Detect if it's a MinIO URL or local file path
         if is_minio_url(item):
-            # MinIO文件处理
+            # MinIO file processing
             logger.debug(f"Processing MinIO file: {item}")
-            # 从MinIO URL中提取文件名
+            # Extract filename from MinIO URL
             if "?" in item:
-                # URL可能包含查询参数，去掉它们
+                # URL may contain query parameters, remove them
                 item_clean = item.split("?")[0]
             else:
                 item_clean = item
 
-            # 获取文件名（从路径的最后部分）
+            # Get filename (from last part of path)
             filename = item_clean.split("/")[-1]
 
-            # 如果文件名包含时间戳，提取原始文件名
+            # If filename contains timestamp, extract original filename
             import re
 
             timestamp_pattern = r"^(.+)_(\d{13})(\.[^.]+)$"
             match = re.match(timestamp_pattern, filename)
             if match:
                 original_filename = match.group(1) + match.group(3)
-                # 存储原始文件名用于显示
+                # Store original filename for display
                 filename_display = original_filename
             else:
                 filename_display = filename
 
             file_type = filename.split(".")[-1].lower() if "." in filename else ""
-            item_path = item  # 保持MinIO URL作为路径
+            item_path = item  # Keep MinIO URL as path
 
-            # 从 content_hashes 映射中获取 content_hash
+            # Get content_hash from content_hashes mapping
             content_hash = None
             if params and "content_hashes" in params and isinstance(params["content_hashes"], dict):
                 content_hash = params["content_hashes"].get(item)
@@ -227,7 +227,7 @@ async def prepare_item_metadata(item: str, content_type: str, db_id: str, params
                 raise ValueError(f"Missing content_hash for file: {item}")
 
         else:
-            # 本地文件处理
+            # Local file processing
             file_path = Path(item)
             file_type = file_path.suffix.lower().replace(".", "")
             filename = file_path.name
@@ -240,15 +240,15 @@ async def prepare_item_metadata(item: str, content_type: str, db_id: str, params
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"Failed to calculate content hash for {file_path}: {exc}")
 
-        # 生成文件ID
+        # Generate file ID
         file_id = f"file_{hashstr(str(item_path) + str(time.time()), 6)}"
 
     else:
-        raise ValueError("URL 元数据生成已禁用")
+        raise ValueError("URL metadata generation is disabled")
 
     metadata = {
         "database_id": db_id,
-        "filename": filename_display,  # 使用显示用的文件名
+        "filename": filename_display,  # Use display filename
         "path": item_path,
         "file_type": file_type,
         "status": "processing",
@@ -258,7 +258,7 @@ async def prepare_item_metadata(item: str, content_type: str, db_id: str, params
         "parent_id": params.get("parent_id") if params else None,
     }
 
-    # 保存处理参数到元数据
+    # Save processing parameters to metadata
     if params:
         metadata["processing_params"] = params.copy()
 
@@ -267,22 +267,22 @@ async def prepare_item_metadata(item: str, content_type: str, db_id: str, params
 
 def merge_processing_params(metadata_params: dict | None, request_params: dict | None) -> dict:
     """
-    合并处理参数：优先使用请求参数，缺失时使用元数据中的参数
+    Merge processing parameters: prioritize request parameters, use metadata parameters when missing
 
     Args:
-        metadata_params: 元数据中保存的参数
-        request_params: 请求中提供的参数
+        metadata_params: Parameters saved in metadata
+        request_params: Parameters provided in request
 
     Returns:
-        dict: 合并后的参数
+        dict: Merged parameters
     """
     merged_params = {}
 
-    # 首先使用元数据中的参数作为默认值
+    # First use parameters from metadata as default values
     if metadata_params:
         merged_params.update(metadata_params)
 
-    # 然后使用请求参数覆盖（如果提供）
+    # Then override with request parameters (if provided)
     if request_params:
         merged_params.update(request_params)
 
@@ -292,16 +292,16 @@ def merge_processing_params(metadata_params: dict | None, request_params: dict |
 
 def get_embedding_config(embed_info: dict) -> dict:
     """
-    获取嵌入模型配置
+    Get embedding model configuration
 
     Args:
-        embed_info: 嵌入信息字典
+        embed_info: Embedding information dictionary
 
     Returns:
-        dict: 标准化的嵌入配置
+        dict: Standardized embedding configuration
     """
     try:
-        # 使用最新配置
+        # Use latest configuration
         assert isinstance(embed_info, dict), f"embed_info must be a dict, got {type(embed_info)}"
         assert "model_id" in embed_info, f"embed_info must contain 'model_id', got {embed_info}"
         logger.warning(f"Using model_id: {embed_info['model_id']}")
@@ -312,14 +312,14 @@ def get_embedding_config(embed_info: dict) -> dict:
     except AssertionError as e:
         logger.error(f"AssertionError in get_embedding_config: {e}, embed_info={embed_info}")
 
-    # 兼容性检查：旧版配置字段
+    # Compatibility check: legacy configuration fields
     try:
-        # 1. 检查 embed_info 是否有效
+        # 1. Check if embed_info is valid
         if not embed_info or ("model" not in embed_info and "name" not in embed_info):
             logger.error(f"Invalid embed_info: {embed_info}, using default embedding model config")
             raise ValueError("Invalid embed_info: must be a non-empty dictionary")
 
-        # 2. 检查是否是 EmbedModelInfo 对象（在某些情况下可能直接传入对象）
+        # 2. Check if it's an EmbedModelInfo object (may be passed directly in some cases)
         if hasattr(embed_info, "name") and isinstance(embed_info, EmbedModelInfo):
             logger.debug(f"Using EmbedModelInfo object: {embed_info.name}, {traceback.format_exc()}")
             config_dict = embed_info.model_dump()
@@ -330,7 +330,7 @@ def get_embedding_config(embed_info: dict) -> dict:
 
     except Exception as e:
         logger.error(f"Error in get_embedding_config: {e}, embed_info={embed_info}")
-        # 返回默认配置作为fallback
+        # Return default configuration as fallback
         logger.warning("Falling back to default embedding model config")
         try:
             config_dict = config.embed_model_names[config.embed_model].model_dump()
@@ -343,56 +343,56 @@ def get_embedding_config(embed_info: dict) -> dict:
 
 def is_minio_url(file_path: str) -> bool:
     """
-    检测是否是MinIO URL
+    Detect if it's a MinIO URL
 
     Args:
-        file_path: 文件路径或URL
+        file_path: File path or URL
 
     Returns:
-        bool: 是否是MinIO URL
+        bool: Whether it's a MinIO URL
     """
     return file_path.startswith(("http://", "https://", "s3://")) or "minio" in file_path.lower()
 
 
 def parse_minio_url(file_path: str) -> tuple[str, str]:
     """
-    解析MinIO URL，提取bucket名称和对象名称
+    Parse MinIO URL to extract bucket name and object name
 
-    支持标准 HTTP/HTTPS URL 格式：
+    Supports standard HTTP/HTTPS URL format:
     - http(s)://host/bucket-name/path/to/object
 
     Args:
-        file_path: MinIO文件URL (http:// 或 https://)
+        file_path: MinIO file URL (http:// or https://)
 
     Returns:
         tuple[str, str]: (bucket_name, object_name)
 
     Raises:
-        ValueError: 如果无法解析URL
+        ValueError: If URL cannot be parsed
     """
     try:
         from urllib.parse import urlparse
 
-        # 解析URL
+        # Parse URL
         parsed_url = urlparse(file_path)
 
-        # 对于 minio:// 协议，bucket名称在netloc中
+        # For minio:// protocol, bucket name is in netloc
         if parsed_url.scheme == "minio":
             bucket_name = parsed_url.netloc
             object_name = parsed_url.path.lstrip("/")
         else:
-            # 对于 http/https 协议，bucket名称在path的第一部分
+            # For http/https protocol, bucket name is in first part of path
             object_name = parsed_url.path.lstrip("/")
             path_parts = object_name.split("/", 1)
             if len(path_parts) > 1:
                 bucket_name = path_parts[0]
                 object_name = path_parts[1]
             else:
-                raise ValueError(f"无法解析MinIO URL中的bucket名称: {file_path}")
+                raise ValueError(f"Cannot parse bucket name from MinIO URL: {file_path}")
 
         logger.debug(f"Parsed MinIO URL: bucket_name={bucket_name}, object_name={object_name}")
         return bucket_name, object_name
 
     except Exception as e:
         logger.error(f"Failed to parse MinIO URL {file_path}: {e}")
-        raise ValueError(f"无法解析MinIO URL: {file_path}")
+        raise ValueError(f"Cannot parse MinIO URL: {file_path}")

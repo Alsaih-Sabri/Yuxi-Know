@@ -345,6 +345,7 @@ import { message } from 'ant-design-vue'
 import { queryApi } from '@/apis/knowledge_api'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import { Braces, Tags, Network, Link, FileText, ArrowRight } from 'lucide-vue-next'
+import { useDatabaseStore } from '@/stores/database'
 
 const { t } = useI18n()
 

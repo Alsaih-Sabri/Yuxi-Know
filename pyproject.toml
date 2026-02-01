@@ -16,6 +16,7 @@ dependencies = [
     "fastapi>=0.121",
     "langchain-community>=0.4",
     "langchain-deepseek>=1.0",
+    "langchain-google-genai>=2.0.8",
     "langchain-mcp-adapters>=0.1.9",
     "langchain-openai>=1.0.2",
     "langchain-tavily>=0.2.13",

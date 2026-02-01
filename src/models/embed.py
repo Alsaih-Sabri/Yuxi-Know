@@ -151,6 +151,74 @@ class OllamaEmbedding(BaseEmbeddingModel):
                 raise ValueError(f"Ollama Embedding async request failed: {e}, {payload}, {self.base_url=}")
 
 
+class VoyageAIEmbedding(BaseEmbeddingModel):
+    """VoyageAI Embedding Model - supports voyage-3-large, voyage-code-3, etc."""
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+
+    def build_payload(self, message: list[str] | str, input_type: str | None = "document") -> dict:
+        payload = {"model": self.model, "input": message}
+        if input_type:
+            payload["input_type"] = input_type
+        return payload
+
+    def encode(self, message: list[str] | str) -> list[list[float]]:
+        payload = self.build_payload(message, input_type="document")
+        try:
+            response = requests.post(self.base_url, json=payload, headers=self.headers, timeout=60)
+            response.raise_for_status()
+            result = response.json()
+            if not isinstance(result, dict) or "data" not in result:
+                raise ValueError(f"VoyageAI Embedding failed: Invalid response format {result}")
+            return [item["embedding"] for item in result["data"]]
+        except (requests.RequestException, json.JSONDecodeError) as e:
+            logger.error(f"VoyageAI Embedding request failed: {e}, {payload}")
+            raise ValueError(f"VoyageAI Embedding request failed: {e}")
+
+    async def aencode(self, message: list[str] | str) -> list[list[float]]:
+        payload = self.build_payload(message, input_type="document")
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(self.base_url, json=payload, headers=self.headers, timeout=60)
+                response.raise_for_status()
+                result = response.json()
+                if not isinstance(result, dict) or "data" not in result:
+                    raise ValueError(f"VoyageAI Embedding failed: Invalid response format {result}")
+                return [item["embedding"] for item in result["data"]]
+            except (httpx.RequestError, json.JSONDecodeError) as e:
+                raise ValueError(f"VoyageAI Embedding async request failed: {e}, {payload}, {self.base_url=}")
+
+    def encode_queries(self, queries: list[str] | str) -> list[list[float]]:
+        """Encode queries with input_type='query' for better retrieval"""
+        payload = self.build_payload(queries, input_type="query")
+        try:
+            response = requests.post(self.base_url, json=payload, headers=self.headers, timeout=60)
+            response.raise_for_status()
+            result = response.json()
+            if not isinstance(result, dict) or "data" not in result:
+                raise ValueError(f"VoyageAI Embedding failed: Invalid response format {result}")
+            return [item["embedding"] for item in result["data"]]
+        except (requests.RequestException, json.JSONDecodeError) as e:
+            logger.error(f"VoyageAI Embedding request failed: {e}, {payload}")
+            raise ValueError(f"VoyageAI Embedding request failed: {e}")
+
+    async def aencode_queries(self, queries: list[str] | str) -> list[list[float]]:
+        """Async encode queries with input_type='query' for better retrieval"""
+        payload = self.build_payload(queries, input_type="query")
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.post(self.base_url, json=payload, headers=self.headers, timeout=60)
+                response.raise_for_status()
+                result = response.json()
+                if not isinstance(result, dict) or "data" not in result:
+                    raise ValueError(f"VoyageAI Embedding failed: Invalid response format {result}")
+                return [item["embedding"] for item in result["data"]]
+            except (httpx.RequestError, json.JSONDecodeError) as e:
+                raise ValueError(f"VoyageAI Embedding async request failed: {e}, {payload}, {self.base_url=}")
+
+
 class OtherEmbedding(BaseEmbeddingModel):
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
@@ -260,6 +328,8 @@ def select_embedding_model(model_id):
 
     if provider == "ollama":
         model = OllamaEmbedding(**embed_config)
+    elif provider == "voyageai":
+        model = VoyageAIEmbedding(**embed_config)
     else:
         model = OtherEmbedding(**embed_config)
 

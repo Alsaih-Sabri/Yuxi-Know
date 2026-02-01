@@ -67,20 +67,22 @@ let resizeObserver = null
 let renderTimeout = null
 let retryCount = 0
 const MAX_RETRIES = 5
+let isDragging = false
 
 const defaultLayout = {
   type: 'd3-force',
   preventOverlap: true,
-  alphaDecay: 0.1,
-  alphaMin: 0.01,
-  velocityDecay: 0.6,
-  iterations: 150,
+  alphaDecay: 0.2,
+  alphaMin: 0.001,
+  velocityDecay: 0.9,
+  iterations: 80,
+  animated: false,
   force: {
-    center: { x: 0.5, y: 0.5, strength: 0.1 },
-    charge: { strength: -400, distanceMax: 600 },
-    link: { distance: 100, strength: 0.8 }
+    center: { x: 0.5, y: 0.5, strength: 0.01 },
+    charge: { strength: -500, distanceMax: 800 },
+    link: { distance: 150, strength: 0.4 }
   },
-  collide: { radius: 40, strength: 0.8, iterations: 3 }
+  collide: { radius: 50, strength: 0.8, iterations: 2 }
 }
 
 // CSS 变量解析工具函数
@@ -245,6 +247,22 @@ function initGraph() {
     if (!evt.target) {
       emit('canvas-click')
     }
+  })
+
+  // 优化拖拽性能：拖拽时停止布局模拟
+  graphInstance.on('node:dragstart', (evt) => {
+    isDragging = true
+    if (graphInstance.getLayout) {
+      const layout = graphInstance.getLayout()
+      if (layout && layout.stop) {
+        layout.stop()
+      }
+    }
+  })
+
+  graphInstance.on('node:dragend', () => {
+    isDragging = false
+    // 拖拽结束后不重新启动布局，保持节点位置
   })
 
   emit('ready', graphInstance)
@@ -436,7 +454,9 @@ onMounted(() => {
       if (!container.value || !graphInstance) return
       const width = container.value.offsetWidth
       const height = container.value.offsetHeight
-      graphInstance.changeSize(width, height)
+      if (graphInstance.setSize) {
+        graphInstance.setSize(width, height)
+      }
     })
     if (container.value) resizeObserver.observe(container.value)
   }

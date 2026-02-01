@@ -2,6 +2,7 @@
   "common": {
     "confirm": "Confirm",
     "cancel": "Cancel",
+    "actions": "Actions",
     "save": "Save",
     "delete": "Delete",
     "edit": "Edit",
@@ -839,7 +840,13 @@
       "label": "Examples:",
       "generating": "AI generating...",
       "loading": "Loading...",
-      "empty": "No questions, click left button to generate"
+      "empty": "No questions, click left button to generate",
+      "generateTooltip": "Click to generate sample questions",
+      "noQuestions": "No sample questions available"
+    },
+    "actions": {
+      "showRaw": "Show Raw Data",
+      "showFormatted": "Show Formatted"
     },
     "tooltips": {
       "generateQuestions": "Click to manually generate test questions",
@@ -849,6 +856,7 @@
     "metadata": {
       "queryMode": "Query Mode:",
       "stats": "Stats:",
+      "statistics": "Statistics",
       "found": "Found",
       "entities": "entities",
       "relations": "relations",
@@ -856,6 +864,10 @@
       "used": "used",
       "highLevelKeywords": "High-level Keywords:",
       "lowLevelKeywords": "Low-level Keywords:"
+    },
+    "results": {
+      "entities": "Entities",
+      "description": "Description"
     },
     "collapse": {
       "entities": "Entities",
@@ -886,6 +898,8 @@
       "notRequired": "(not required for current benchmark)"
     },
     "empty": {
+      "selectBenchmark": "Please select a benchmark to start evaluation",
+      "goToBenchmarks": "Go to Benchmarks",
       "selectOrManage": "Please select a benchmark above or go to benchmark management",
       "goToManagement": "Go to Benchmark Management"
     },
@@ -942,6 +956,19 @@
     }
   },
   "agentConfig": {
+    "systemPrompt": "System Prompt",
+    "llmModel": "LLM Model",
+    "toolsLabel": "Tools",
+    "knowledges": "Knowledge Bases",
+    "defaultValue": "(Default: {value})",
+    "tabs": {
+      "basic": "Basic",
+      "tools": "Tools",
+      "other": "Other"
+    },
+    "hints": {
+      "clickToEdit": "Click to edit"
+    },
     "alerts": {
       "noConfig": "This agent has no configuration items",
       "noCheckpointer": "This agent has no Checkpointer configured, functionality may not work properly"
@@ -964,7 +991,20 @@
       "other": "Other"
     },
     "buttons": {
-      "saveAndReload": "Save Configuration and Reload"
+      "saveAndReload": "Save Configuration and Reload",
+      "selectTools": "Select Tools",
+      "clear": "Clear"
+    },
+    "tools": {
+      "selected": "Selected"
+    },
+    "multiSelect": {
+      "selected": "selected"
+    },
+    "modal": {
+      "selectTools": "Select Tools",
+      "searchPlaceholder": "Search tools...",
+      "selectedCount": "Selected {count} tools"
     },
     "toolsModal": {
       "title": "Select Tools",
@@ -975,12 +1015,23 @@
     }
   },
   "mcpServers": {
+    "title": "MCP Server Management",
+    "description": "Manage MCP (Model Context Protocol) server configurations. Add, edit, or delete MCP servers to extend AI capabilities.",
     "header": {
       "title": "MCP Server Management",
       "description": "Manage MCP (Model Context Protocol) server configurations. Add, edit, or delete MCP servers to extend AI capabilities."
     },
     "buttons": {
-      "addServer": "Add Server"
+      "addServer": "Add Server",
+      "viewDetails": "View Details",
+      "details": "Details",
+      "testConnection": "Test Connection",
+      "test": "Test",
+      "editConfig": "Edit Configuration",
+      "edit": "Edit",
+      "deleteServer": "Delete Server",
+      "delete": "Delete",
+      "cannotDeleteBuiltin": "Built-in MCP cannot be deleted"
     },
     "stats": {
       "configured": "Configured {count} MCP servers"
@@ -1025,10 +1076,16 @@
     }
   },
   "knowledgeBaseCard": {
+    "loading": "Loading...",
     "title": "Database info loading",
     "copyId": "Copy knowledge base ID",
     "noDescription": "No description",
+    "buttons": {
+      "copyId": "Copy ID",
+      "delete": "Delete"
+    },
     "modal": {
+      "title": "Knowledge Base Details",
       "editTitle": "Edit Knowledge Base Info",
       "deleteDatabase": "Delete Database",
       "cancel": "Cancel",
@@ -1057,6 +1114,11 @@
     "generating": "AI is generating mind map...",
     "empty": "No mind map",
     "generate": "Generate Mind Map",
+    "buttons": {
+      "generate": "Generate Mind Map",
+      "regenerate": "Regenerate",
+      "fitView": "Fit View"
+    },
     "toolbar": {
       "regenerate": "Regenerate",
       "fitView": "Fit View"
@@ -1070,17 +1132,27 @@
     }
   },
   "graphCanvas": {
+    "nodes": "Nodes",
+    "edges": "Edges",
     "stats": {
       "nodes": "Nodes",
       "edges": "Edges"
     }
   },
   "evaluationBenchmarks": {
+    "buttons": {
+      "refresh": "Refresh",
+      "upload": "Upload Benchmark",
+      "generate": "Auto Generate"
+    },
     "header": {
       "count": "{count} benchmarks",
       "refresh": "Refresh",
       "upload": "Upload Benchmark",
       "generate": "Auto Generate"
+    },
+    "preview": {
+      "title": "Preview Benchmark"
     },
     "empty": {
       "title": "No evaluation benchmarks",
@@ -1137,6 +1209,10 @@
       "loadFailed": "Configuration load failed",
       "reload": "Reload"
     },
+    "options": {
+      "enable": "Enable",
+      "disable": "Disable"
+    },
     "form": {
       "enable": "Enable",
       "disable": "Disable"
@@ -1151,6 +1227,8 @@
   },
   "modelSelector": {
     "placeholder": "Select model",
+    "checking": "Checking...",
+    "check": "Check",
     "status": {
       "checking": "Checking...",
       "check": "Check",

@@ -153,6 +153,23 @@ class DashscopeReranker(BaseReranker):
         return list(result.get("output", {}).get("results", []))
 
 
+class VoyageAIReranker(BaseReranker):
+    """VoyageAI Reranker - supports rerank-2.5 and rerank-2.5-lite models"""
+
+    def _build_payload(self, query: str, documents: list[str], max_length: int) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "query": query,
+            "documents": documents,
+            "top_k": len(documents),
+            "truncation": True,
+        }
+
+    def _extract_results(self, result: dict[str, Any]) -> list[dict[str, Any]]:
+        # VoyageAI returns {"data": [{"index": 0, "relevance_score": 0.94}, ...]}
+        return list(result.get("data", []))
+
+
 def get_reranker(model_id, **kwargs):
     support_rerankers = config.reranker_names.keys()
     assert model_id in support_rerankers, f"Unsupported Reranker: {model_id}, only support {support_rerankers}"
@@ -166,4 +183,6 @@ def get_reranker(model_id, **kwargs):
         return OpenAIReranker(model_name=model_info.name, api_key=api_key, base_url=base_url, **kwargs)
     if provider == "dashscope":
         return DashscopeReranker(model_name=model_info.name, api_key=api_key, base_url=base_url, **kwargs)
+    if provider == "voyageai":
+        return VoyageAIReranker(model_name=model_info.name, api_key=api_key, base_url=base_url, **kwargs)
     return OpenAIReranker(model_name=model_info.name, api_key=api_key, base_url=base_url, **kwargs)
