@@ -81,6 +81,8 @@ const shortDescription = computed(() => {
 }
 
 .task-description {
+  padding: 12px;
+  background: var(--gray-100);
   border-radius: 8px;
   font-size: 13px;
   color: var(--gray-800);

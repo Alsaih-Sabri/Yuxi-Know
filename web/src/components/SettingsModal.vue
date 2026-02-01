@@ -1,7 +1,7 @@
 <template>
   <a-modal
     v-model:open="visible"
-    title="系统设置"
+    :title="$t('settingsModal.title')"
     width="90%"
     :style="{ maxWidth: '980px', minWidth: '320px', top: '10%' }"
     :footer="null"
@@ -20,7 +20,7 @@
           v-if="userStore.isSuperAdmin"
         >
           <SettingOutlined class="icon" />
-          <span>基本设置</span>
+          <span>{{ $t('settingsModal.basicSettings') }}</span>
         </div>
         <div
           class="sider-item"
@@ -29,7 +29,7 @@
           v-if="userStore.isSuperAdmin"
         >
           <CodeOutlined class="icon" />
-          <span>模型配置</span>
+          <span>{{ $t('settingsModal.modelConfig') }}</span>
         </div>
         <div
           class="sider-item"
@@ -38,7 +38,7 @@
           v-if="userStore.isAdmin"
         >
           <UserOutlined class="icon" />
-          <span>用户管理</span>
+          <span>{{ $t('settingsModal.userManagement') }}</span>
         </div>
         <div
           class="sider-item"
@@ -47,7 +47,7 @@
           v-if="userStore.isSuperAdmin"
         >
           <TeamOutlined class="icon" />
-          <span>部门管理</span>
+          <span>{{ $t('settingsModal.departmentManagement') }}</span>
         </div>
         <div
           class="sider-item"
@@ -56,7 +56,7 @@
           v-if="userStore.isSuperAdmin"
         >
           <ApiOutlined class="icon" />
-          <span>MCP 管理</span>
+          <span>{{ $t('settingsModal.mcpManagement') }}</span>
         </div>
       </div>
 
@@ -68,7 +68,7 @@
           @click="activeTab = 'base'"
           v-if="userStore.isSuperAdmin"
         >
-          基本设置
+          {{ $t('settingsModal.basicSettings') }}
         </div>
         <div
           class="nav-item"
@@ -76,7 +76,7 @@
           @click="activeTab = 'model'"
           v-if="userStore.isSuperAdmin"
         >
-          模型配置
+          {{ $t('settingsModal.modelConfig') }}
         </div>
         <div
           class="nav-item"
@@ -84,7 +84,7 @@
           @click="activeTab = 'user'"
           v-if="userStore.isAdmin"
         >
-          用户管理
+          {{ $t('settingsModal.userManagement') }}
         </div>
         <div
           class="nav-item"
@@ -92,7 +92,7 @@
           @click="activeTab = 'mcp'"
           v-if="userStore.isSuperAdmin"
         >
-          MCP 管理
+          {{ $t('settingsModal.mcpManagement') }}
         </div>
         <div
           class="nav-item"
@@ -100,7 +100,7 @@
           @click="activeTab = 'department'"
           v-if="userStore.isSuperAdmin"
         >
-          部门管理
+          {{ $t('settingsModal.departmentManagement') }}
         </div>
       </div>
 

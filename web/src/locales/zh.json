@@ -1,0 +1,1173 @@
+{
+  "common": {
+    "confirm": "确认",
+    "cancel": "取消",
+    "save": "保存",
+    "delete": "删除",
+    "edit": "编辑",
+    "add": "添加",
+    "search": "搜索",
+    "loading": "加载中...",
+    "success": "成功",
+    "error": "错误",
+    "warning": "警告",
+    "yes": "是",
+    "no": "否",
+    "back": "返回",
+    "next": "下一步",
+    "previous": "上一步",
+    "submit": "提交",
+    "reset": "重置",
+    "close": "关闭",
+    "refresh": "刷新",
+    "retry": "重试",
+    "more": "更多",
+    "less": "收起",
+    "all": "全部",
+    "none": "无",
+    "select": "选择",
+    "upload": "上传",
+    "download": "下载",
+    "export": "导出",
+    "import": "导入",
+    "copy": "复制",
+    "paste": "粘贴",
+    "cut": "剪切",
+    "undo": "撤销",
+    "redo": "重做",
+    "filename": "文件名",
+    "createdAt": "创建时间",
+    "status": "状态",
+    "viewInfo": "查看信息",
+    "required": "需配置"
+  },
+  "auth": {
+    "login": "登录",
+    "logout": "退出登录",
+    "register": "注册",
+    "welcome": "欢迎登录",
+    "userId": "用户ID",
+    "username": "用户名",
+    "password": "密码",
+    "confirmPassword": "确认密码",
+    "phoneNumber": "手机号",
+    "rememberMe": "记住我",
+    "forgotPassword": "忘记密码?",
+    "loginAccount": "登录账号",
+    "userIdOrPhone": "用户ID或手机号",
+    "enterUserId": "请输入用户ID",
+    "enterPassword": "请输入密码",
+    "enterUserIdOrPhone": "请输入用户ID或手机号",
+    "loginSuccess": "登录成功",
+    "loginFailed": "登录失败，请检查用户名和密码",
+    "accountLocked": "账户已锁定",
+    "accountLockedTime": "由于多次登录失败，账户已被锁定 {time}",
+    "waitAndRetry": "账户被锁定，请等待 {time}",
+    "otherLoginMethods": "其他登录方式",
+    "wechatLogin": "微信登录",
+    "enterpriseWechat": "企业微信登录",
+    "feishuLogin": "飞书登录",
+    "featureInDev": "该功能正在开发中，敬请期待！",
+    "backToHome": "返回首页",
+    "contactUs": "联系我们",
+    "help": "使用帮助",
+    "privacyPolicy": "隐私政策",
+    "serverConnectionFailed": "服务端连接失败",
+    "systemError": "系统出错，请稍后重试"
+  },
+  "init": {
+    "title": "系统初始化，请创建超级管理员",
+    "createAdmin": "创建管理员账户",
+    "adminCreated": "管理员账户创建成功",
+    "initFailed": "初始化失败，请重试",
+    "alreadyInitialized": "系统已经初始化，无法再次创建初始管理员",
+    "userIdFormat": "用户ID只能包含字母、数字和下划线",
+    "userIdLength": "用户ID长度必须在3-20个字符之间",
+    "userIdPlaceholder": "请输入用户ID（3-20个字符）",
+    "phoneOptional": "手机号（可选）",
+    "phoneOptionalHint": "可用于登录，可不填写",
+    "phoneFormat": "请输入正确的手机号格式",
+    "passwordMismatch": "两次输入的密码不一致",
+    "confirmPasswordRequired": "请确认密码"
+  },
+  "nav": {
+    "home": "首页",
+    "agent": "智能体",
+    "database": "知识库",
+    "graph": "图谱",
+    "dashboard": "仪表盘",
+    "settings": "设置",
+    "taskCenter": "任务中心",
+    "welcomeStar": "在 GitHub 上给我们点赞",
+    "debugPanel": "调试面板"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "theme": "主题",
+    "darkMode": "深色模式",
+    "lightMode": "浅色模式",
+    "systemTheme": "跟随系统"
+  },
+  "agent": {
+    "title": "智能体",
+    "create": "创建智能体",
+    "edit": "编辑智能体",
+    "delete": "删除智能体",
+    "name": "名称",
+    "description": "描述",
+    "model": "模型",
+    "systemPrompt": "系统提示词",
+    "temperature": "温度",
+    "maxTokens": "最大令牌数",
+    "chat": "对话",
+    "newChat": "新对话",
+    "clearChat": "清空对话",
+    "sendMessage": "发送消息",
+    "inputPlaceholder": "输入消息...",
+    "thinking": "思考中...",
+    "generating": "生成中...",
+    "selectAgent": "选择智能体",
+    "config": "配置",
+    "shareChat": "分享对话",
+    "viewFeedback": "查看反馈",
+    "previewPage": "预览页面",
+    "setAsDefault": "设为默认",
+    "setDefaultSuccess": "已将当前智能体设为默认",
+    "setDefaultError": "设置默认智能体失败",
+    "loadConfigError": "加载配置失败",
+    "noExportContent": "当前没有可导出的对话内容",
+    "startChatFirst": "当前对话暂无内容可导出，请先进行对话",
+    "exportSuccess": "对话已导出为HTML文件: {filename}"
+  },
+  "database": {
+    "title": "文档知识库",
+    "create": "创建知识库",
+    "edit": "编辑知识库",
+    "delete": "删除知识库",
+    "name": "名称",
+    "description": "描述",
+    "files": "文件",
+    "uploadFile": "上传文件",
+    "fileCount": "文件数量",
+    "totalSize": "总大小",
+    "lastUpdated": "最后更新",
+    "processing": "处理中",
+    "ready": "就绪",
+    "failed": "失败",
+    "newDatabase": "新建知识库",
+    "createDatabase": "创建知识库",
+    "databaseType": "知识库类型",
+    "databaseName": "知识库名称",
+    "databaseNamePlaceholder": "新建知识库名称",
+    "embeddingModel": "嵌入模型",
+    "selectEmbeddingModel": "请选择嵌入模型",
+    "language": "语言",
+    "languageModel": "语言模型 (LLM)",
+    "languageModelHint": "可以在设置中配置语言模型",
+    "selectModel": "请选择模型",
+    "descriptionHint": "在智能体流程中，这里的描述会作为工具的描述。智能体会根据知识库的标题和描述来选择合适的工具。所以这里描述的越详细，智能体越容易选择到合适的工具。",
+    "descriptionPlaceholder": "新建知识库描述",
+    "privacySettings": "隐私设置",
+    "private": "私有",
+    "public": "公开",
+    "setAsPrivate": "设置为私有知识库",
+    "privacyHint": "当前未使用此属性。在部分智能体的设计中，可以根据隐私标志来决定启用什么模型和策略。",
+    "cancel": "取消",
+    "loading": "正在加载知识库...",
+    "empty": "暂无知识库",
+    "emptyHint": "创建您的第一个知识库，开始管理文档和知识",
+    "noDescription": "暂无描述",
+    "createdToday": "今天创建",
+    "createdYesterday": "昨天创建",
+    "createdDaysAgo": "{n} 天前创建",
+    "createdWeeksAgo": "{n} 周前创建",
+    "createdMonthsAgo": "{n} 个月前创建",
+    "createdYearsAgo": "{n} 年前创建",
+    "privateDatabase": "私有知识库",
+    "pendingParse": "{count} 个文件待解析，点击解析",
+    "pendingIndex": "{count} 个文件待入库，点击入库",
+    "searchConfig": "检索配置",
+    "knowledgeGraph": "知识图谱",
+    "queryTest": "检索测试",
+    "mindMap": "知识导图",
+    "ragEvaluation": "RAG评估",
+    "evaluationBenchmarks": "评估基准",
+    "milvusOnly": "仅支持 Milvus 类型的知识库",
+    "batchParse": "批量解析",
+    "batchIndex": "批量入库",
+    "confirmBatchParse": "确定要解析 {count} 个文件吗？",
+    "confirmBatchIndex": "确定要入库 {count} 个文件吗？",
+    "status": {
+      "uploaded": "已上传",
+      "parsing": "解析中",
+      "parsed": "已解析",
+      "errorParsing": "解析失败",
+      "indexing": "入库中",
+      "indexed": "已入库",
+      "errorIndexing": "入库失败",
+      "done": "已入库",
+      "failed": "入库失败",
+      "processing": "处理中",
+      "waiting": "等待中"
+    }
+  },
+  "graph": {
+    "title": "图数据库",
+    "nodes": "节点",
+    "edges": "边",
+    "search": "搜索节点",
+    "filter": "筛选",
+    "layout": "布局",
+    "zoom": "缩放",
+    "reset": "重置视图",
+    "enableHint": "点击右上角用户头像中的\u201c系统设置\u201d来启用知识图谱。",
+    "knowledgeBase": "知识库",
+    "selectOrInputKbId": "选择或输入KB ID",
+    "uploadFile": "上传文件",
+    "indexNodes": "为{count}个节点添加索引",
+    "searchPlaceholder": "输入要查询的实体 (*为全部)",
+    "queryCount": "查询数量",
+    "exportData": "导出数据",
+    "uploadFileTitle": "上传文件",
+    "addToGraph": "添加到图数据库",
+    "cancel": "取消",
+    "uploadNote": "上传的文件内容参考 test/data/A_Dream_of_Red_Mansions_tiny.jsonl 中的格式：",
+    "embeddingModel": "嵌入模型",
+    "batchSize": "批处理大小",
+    "batchSizeHint": "默认值: 40，范围: 1-1000",
+    "modelNotChangeable": "* 图数据库已有数据或已设定模型，不可更改",
+    "dragOrClickUpload": "点击或者把文件拖拽到这里上传",
+    "jsonlOnly": "目前仅支持上传 jsonl 文件。",
+    "uploadTipTitle": "文件上传说明",
+    "goToDatabase": "前往知识库详情页",
+    "uploadTipNonNeo4j": "如需上传文档到当前选中的知识库，请前往对应的知识库详情页面进行操作：",
+    "loading": "加载中",
+    "connected": "已连接",
+    "closed": "已关闭",
+    "loadGraphFailed": "加载图数据库信息失败",
+    "waitUpload": "请先等待文件上传完成",
+    "selectEmbedModel": "请选择嵌入模型",
+    "filePathFailed": "文件路径获取失败，请重新上传文件",
+    "loadNodesFailed": "加载节点失败",
+    "pleaseWait": "请稍后再试",
+    "noEntitiesFound": "未找到相关实体",
+    "queryError": "查询出错：",
+    "uploadFailed": "文件上传失败: ",
+    "uploadSuccess": "文件上传成功: ",
+    "addFileFailed": "添加文件失败",
+    "modelMismatch": "向量模型不匹配，无法添加索引，当前向量模型为 {current}，图数据库向量模型为 {graph}",
+    "processingWait": "后台正在处理，请稍后再试",
+    "indexSuccess": "索引添加成功",
+    "indexFailed": "添加索引失败",
+    "dataExported": "图谱数据已导出",
+    "neo4jUploadTip": "Neo4j 图数据库支持通过上传 JSONL 格式文件直接导入实体和关系数据。",
+    "kbUploadTip": "当前选择的是 {type} 类型的知识库\u201c{name}\u201d，该类型知识库需要在文档知识库页面上传文档，系统会自动从中提取知识图谱。"
+  },
+  "user": {
+    "profile": "个人资料",
+    "avatar": "头像",
+    "changePassword": "修改密码",
+    "currentPassword": "当前密码",
+    "newPassword": "新密码",
+    "confirmNewPassword": "确认新密码",
+    "role": "角色",
+    "department": "部门",
+    "createdAt": "创建时间",
+    "lastLogin": "最后登录"
+  },
+  "roles": {
+    "superadmin": "超级管理员",
+    "admin": "管理员",
+    "user": "普通用户"
+  },
+  "time": {
+    "seconds": "{n}秒",
+    "minutes": "{n}分钟",
+    "hours": "{n}小时",
+    "days": "{n}天",
+    "justNow": "刚刚",
+    "minutesAgo": "{n}分钟前",
+    "hoursAgo": "{n}小时前",
+    "daysAgo": "{n}天前",
+    "yesterday": "昨天"
+  },
+  "dashboard": {
+    "title": "仪表盘",
+    "conversationRecords": "对话记录",
+    "conversationTitle": "对话标题",
+    "user": "用户",
+    "messageCount": "消息数",
+    "status": "状态",
+    "updatedAt": "更新时间",
+    "actions": "操作",
+    "details": "详情",
+    "refresh": "刷新",
+    "feedbackDetails": "反馈详情",
+    "userId": "用户ID",
+    "active": "活跃",
+    "deleted": "已删除",
+    "all": "全部",
+    "unnamedConversation": "未命名对话",
+    "dataLoadSuccess": "数据加载成功",
+    "dataLoadFailed": "加载统计数据失败",
+    "detailedDataFailed": "详细数据加载失败，仅显示基础统计",
+    "noDataAvailable": "暂无数据",
+    "conversationLoadFailed": "加载对话列表失败",
+    "detailLoadFailed": "获取对话详情失败",
+    "userActivity": "用户活跃度分析",
+    "totalUsers": "总用户",
+    "active24h": "24h活跃",
+    "active30d": "30天活跃",
+    "activityTrend": "活跃度趋势",
+    "last7Days": "最近7天",
+    "activeUsers": "活跃用户数",
+    "toolMonitoring": "工具调用监控",
+    "totalCalls": "总调用次数",
+    "failedCalls": "失败调用",
+    "successRate": "成功率",
+    "mostUsedTools": "最常用工具 TOP 10",
+    "toolErrorAnalysis": "工具错误分析",
+    "errorDistribution": "错误分布图",
+    "toolName": "工具名称",
+    "errorCount": "错误次数",
+    "callCount": "调用次数",
+    "knowledgeUsage": "知识库使用情况",
+    "totalDatabases": "知识库总数",
+    "totalFiles": "文件总数",
+    "storageCapacity": "存储容量",
+    "typeDistribution": "类型分布",
+    "fileTypeDistribution": "文件类型分布",
+    "fileType": "文件类型",
+    "unknown": "未知",
+    "agentAnalysis": "AI智能体分析",
+    "totalAgents": "智能体总数",
+    "totalConversations": "总对话数",
+    "totalToolCalls": "工具调用总数",
+    "conversationToolDist": "对话/工具调用分布 (TOP 3)",
+    "conversations": "对话数",
+    "toolCalls": "工具调用数",
+    "topPerformers": "表现最佳智能体 TOP 5",
+    "rank": "排名",
+    "agentId": "智能体ID",
+    "satisfactionRate": "满意度",
+    "conversationCount": "对话数",
+    "callStats": "调用统计",
+    "times": "次",
+    "items": "个"
+  },
+  "statusBar": {
+    "systemStatus": "系统状态",
+    "allNormal": "所有系统正常",
+    "hasIssues": "检测到一些问题",
+    "apiStatus": "API状态",
+    "dbStatus": "数据库状态",
+    "online": "在线",
+    "offline": "离线",
+    "checking": "检查中..."
+  },
+  "feedback": {
+    "title": "用户反馈详情",
+    "positive": "正面",
+    "negative": "负面",
+    "comment": "评论",
+    "noFeedback": "暂无反馈",
+    "all": "全部",
+    "like": "点赞",
+    "dislike": "点踩",
+    "unknownUser": "未知用户",
+    "conversationTitle": "标题：",
+    "agent": "智能体:",
+    "expand": "展开",
+    "collapse": "收起",
+    "expandAll": "展开全部",
+    "loadFailed": "加载反馈列表失败，请稍后重试",
+    "noData": "暂无反馈数据"
+  },
+  "callStats": {
+    "last14Hours": "近14小时",
+    "last14Days": "近14天",
+    "last14Weeks": "近14周",
+    "modelCalls": "模型调用",
+    "agentCalls": "智能体调用",
+    "tokenUsage": "Token消耗",
+    "toolCalls": "工具调用",
+    "week": "第",
+    "unknownModel": "未知模型",
+    "total": "总计"
+  },
+  "statsOverview": {
+    "totalConversations": "总对话数",
+    "activeConversations": "活跃对话",
+    "totalMessages": "总消息数",
+    "totalUsers": "用户数",
+    "totalFeedbacks": "总反馈数",
+    "satisfactionRate": "满意度"
+  },
+  "userInfo": {
+    "docCenter": "文档中心",
+    "switchToLight": "切换到浅色模式",
+    "switchToDark": "切换到深色模式 (Beta)",
+    "systemSettings": "系统设置",
+    "logout": "退出登录",
+    "login": "登录",
+    "profile": "个人资料",
+    "changeAvatar": "更换头像",
+    "uploadAvatar": "上传头像",
+    "avatarTips": "支持 JPG、PNG 格式，文件不超过 5MB",
+    "username": "用户名",
+    "userId": "用户ID",
+    "phoneNumber": "手机号",
+    "role": "角色",
+    "department": "部门",
+    "defaultDepartment": "默认部门",
+    "notSet": "未设置",
+    "editProfile": "编辑资料",
+    "close": "关闭",
+    "save": "保存",
+    "cancel": "取消",
+    "usernamePlaceholder": "请输入用户名（2-20个字符）",
+    "phonePlaceholder": "请输入手机号",
+    "usernameLength": "用户名长度必须在 2-20 个字符之间",
+    "phoneFormat": "请输入正确的手机号格式",
+    "profileUpdated": "个人资料更新成功！",
+    "updateFailed": "更新失败：",
+    "avatarUploaded": "头像上传成功！",
+    "avatarUploadFailed": "头像上传失败：",
+    "imageOnly": "只能上传图片文件！",
+    "fileTooLarge": "图片大小不能超过 5MB！",
+    "loggedOut": "已退出登录"
+  },
+  "taskCenter": {
+    "title": "任务中心",
+    "refresh": "刷新",
+    "loadFailed": "加载任务信息失败",
+    "all": "全部",
+    "inProgress": "进行中",
+    "completed": "已完成",
+    "failed": "失败",
+    "noTasks": "暂无任务",
+    "noTasksHint": "当你提交知识库导入或其他后台任务时，会在这里展示实时进度（仅展示最近的 100 个任务）。",
+    "details": "详情",
+    "cancel": "取消",
+    "started": "开始",
+    "finished": "完成",
+    "created": "创建",
+    "status": "状态",
+    "progress": "进度",
+    "updatedAt": "更新时间",
+    "description": "描述",
+    "error": "错误",
+    "pending": "等待中",
+    "queued": "已排队",
+    "running": "进行中",
+    "success": "已完成",
+    "cancelled": "已取消",
+    "knowledgeIngest": "知识库导入",
+    "knowledgeRechunks": "文档重新分块",
+    "graphTask": "图谱处理",
+    "agentJob": "智能体任务",
+    "backgroundTask": "后台任务",
+    "hours": "小时",
+    "minutes": "分钟",
+    "seconds": "秒",
+    "lessThan1Second": "小于1秒"
+  },
+  "settingsModal": {
+    "title": "系统设置",
+    "basicSettings": "基本设置",
+    "modelConfig": "模型配置",
+    "userManagement": "用户管理",
+    "departmentManagement": "部门管理",
+    "mcpManagement": "MCP 管理"
+  },
+  "userManagement": {
+    "title": "用户管理",
+    "description": "管理系统用户，请谨慎操作。删除用户后该用户将无法登录系统。",
+    "addUser": "添加用户",
+    "editUser": "编辑用户",
+    "deleteUser": "删除用户",
+    "noUsers": "暂无用户数据",
+    "phoneNumber": "手机号:",
+    "createdAt": "创建时间:",
+    "lastLogin": "最后登录:",
+    "edit": "编辑",
+    "delete": "删除",
+    "username": "用户名",
+    "usernamePlaceholder": "请输入用户名（2-20个字符）",
+    "userId": "用户ID",
+    "autoGenerated": "自动生成",
+    "existingId": "已存在ID",
+    "loginId": "登录ID",
+    "userIdHint": "此ID将用于登录，根据用户名自动生成",
+    "userIdEditHint": "编辑模式下不能修改用户ID",
+    "phoneNumberLabel": "手机号",
+    "phoneNumberPlaceholder": "请输入手机号（可选，可用于登录）",
+    "changePassword": "修改密码",
+    "password": "密码",
+    "passwordPlaceholder": "请输入密码",
+    "confirmPassword": "确认密码",
+    "confirmPasswordPlaceholder": "请再次输入密码",
+    "role": "角色",
+    "normalUser": "普通用户",
+    "admin": "管理员",
+    "superAdmin": "超级管理员",
+    "department": "部门",
+    "selectDepartment": "请选择部门",
+    "cancel": "取消",
+    "confirm": "确认",
+    "usernameRequired": "请输入用户名",
+    "usernameLength": "用户名长度必须在 2-20 个字符之间",
+    "passwordRequired": "请输入密码",
+    "passwordMismatch": "两次输入的密码不一致",
+    "phoneFormat": "请输入正确的手机号格式",
+    "loadUsersFailed": "加载用户列表失败",
+    "addUserSuccess": "用户添加成功",
+    "addUserFailed": "添加用户失败",
+    "updateUserSuccess": "用户更新成功",
+    "updateUserFailed": "更新用户失败",
+    "deleteUserConfirm": "确定要删除用户 {username} 吗？",
+    "deleteUserSuccess": "用户删除成功",
+    "deleteUserFailed": "删除用户失败",
+    "getDepartmentsFailed": "获取部门列表失败",
+    "checkUserIdFailed": "检查用户ID可用性失败",
+    "userIdExists": "用户ID已存在",
+    "usernameExists": "用户名已存在",
+    "phoneExists": "手机号已存在",
+    "operationFailed": "操作失败",
+    "deleteSelfFailed": "不能删除自己",
+    "deleteUserDescription": "删除后该用户将无法登录系统，此操作不可恢复。"
+  },
+  "departmentManagement": {
+    "title": "部门管理",
+    "description": "管理部门和组织架构",
+    "addDepartment": "添加部门",
+    "editDepartment": "编辑部门",
+    "deleteDepartment": "删除部门",
+    "noDepartments": "暂无部门",
+    "departmentName": "部门名称",
+    "departmentNamePlaceholder": "请输入部门名称",
+    "deptDescription": "描述",
+    "descriptionPlaceholder": "请输入部门描述（可选）",
+    "memberCount": "成员",
+    "createdAt": "创建时间:",
+    "edit": "编辑",
+    "delete": "删除",
+    "cancel": "取消",
+    "confirm": "确认",
+    "nameRequired": "请输入部门名称",
+    "loadDepartmentsFailed": "加载部门列表失败",
+    "addDepartmentSuccess": "部门添加成功",
+    "addDepartmentFailed": "添加部门失败",
+    "updateDepartmentSuccess": "部门更新成功",
+    "updateDepartmentFailed": "更新部门失败",
+    "deleteDepartmentConfirm": "确定要删除部门 {name} 吗？",
+    "deleteDepartmentSuccess": "部门删除成功",
+    "deleteDepartmentFailed": "删除部门失败"
+  },
+  "modelProviders": {
+    "title": "模型提供商",
+    "description": "配置 AI 模型提供商和 API 密钥",
+    "addProvider": "添加提供商",
+    "editProvider": "编辑提供商",
+    "deleteProvider": "删除提供商",
+    "providerName": "提供商名称",
+    "apiKey": "API 密钥",
+    "baseUrl": "基础 URL",
+    "models": "模型",
+    "status": "状态",
+    "active": "活跃",
+    "inactive": "非活跃",
+    "headers": {
+      "modelConfig": "模型配置",
+      "customProviders": "自定义供应商",
+      "builtinProviders": "系统内置供应商"
+    },
+    "descriptions": {
+      "envConfig": "请在 .env 文件中配置对应的 APIKEY，并重新启动服务",
+      "customProviderInfo": "添加自定义的LLM供应商，支持OpenAI兼容的API格式。API密钥支持直接配置或使用环境变量名。"
+    },
+    "buttons": {
+      "addCustomProvider": "添加自定义供应商",
+      "testConnection": "测试连接",
+      "edit": "编辑",
+      "delete": "删除",
+      "confirmDelete": "确定要删除这个自定义供应商吗？",
+      "confirm": "确定",
+      "cancel": "取消"
+    },
+    "details": {
+      "apiUrl": "API地址:",
+      "defaultModel": "默认模型:",
+      "availableModels": "可用模型:",
+      "none": "无"
+    },
+    "empty": {
+      "noCustomProviders": "暂无自定义供应商"
+    },
+    "stats": {
+      "available": "{count} 可用",
+      "notConfigured": "{count} 未配置"
+    },
+    "modal": {
+      "configTitle": "配置{provider}模型",
+      "save": "保存配置",
+      "cancel": "取消",
+      "loadingModels": "正在获取模型列表...",
+      "selectModelsInfo": "勾选您希望在系统中启用的模型，请注意，列表中可能包含非对话模型，请仔细甄别。"
+    },
+    "warnings": {
+      "unsupportedModels": "检测到配置中包含当前供应商列表中不存在的模型。以下模型可能已失效或被供应商移除：",
+      "removeAllUnsupported": "一键移除所有失效模型"
+    },
+    "search": {
+      "placeholder": "搜索模型...",
+      "selected": "已选择 {count} 个模型",
+      "filtered": "（当前筛选显示 {count} 个）"
+    }
+  },
+  "home": {
+    "nav": {
+      "agent": "智能体",
+      "graph": "知识图谱",
+      "database": "知识库"
+    },
+    "hero": {
+      "startChat": "开始对话",
+      "viewDocs": "查看文档"
+    }
+  },
+  "agentSingle": {
+    "modal": {
+      "selectAgent": "选择智能体",
+      "title": "选择智能体"
+    },
+    "actions": {
+      "share": "分享",
+      "selectAgent": "选择智能体"
+    },
+    "status": {
+      "loading": "智能体加载中……",
+      "unknown": "未知智能体"
+    },
+    "messages": {
+      "setDefaultSuccess": "已设置为默认智能体",
+      "noExportContent": "当前没有可导出的对话内容",
+      "noContentYet": "当前对话暂无内容可导出，请先进行对话",
+      "exportSuccess": "对话已导出为HTML文件: {filename}"
+    }
+  },
+  "fileTable": {
+    "actions": {
+      "upload": "上传",
+      "uploadFile": "上传文件",
+      "uploadFolder": "上传文件夹",
+      "newFolder": "新建文件夹",
+      "search": "搜索",
+      "sort": "排序",
+      "filter": "筛选状态",
+      "refresh": "刷新",
+      "multiSelect": "多选",
+      "autoRefresh": "自动刷新文件状态",
+      "togglePanel": "切换右侧面板"
+    },
+    "batch": {
+      "parse": "批量解析",
+      "index": "批量入库",
+      "delete": "批量删除",
+      "selected": "{count} 项"
+    },
+    "modal": {
+      "indexConfig": "入库/重新入库参数配置",
+      "newFolder": "新建文件夹",
+      "folderPlaceholder": "请输入文件夹名称"
+    },
+    "buttons": {
+      "cancel": "取消",
+      "confirm": "确定"
+    },
+    "fileInfo": {
+      "status": "状态:",
+      "time": "时间:",
+      "error": "错误:",
+      "newSubfolder": "新建子文件夹",
+      "deleteFolder": "删除文件夹",
+      "downloadFile": "下载文件",
+      "parseFile": "解析文件",
+      "retryParse": "重试解析",
+      "index": "入库",
+      "retryIndex": "重试入库",
+      "reindex": "重新入库",
+      "deleteFile": "删除文件"
+    },
+    "status": {
+      "all": "全部状态"
+    }
+  },
+  "fileUpload": {
+    "title": "添加文件",
+    "buttons": {
+      "docHelp": "文档处理说明",
+      "cancel": "取消",
+      "addToKb": "添加到知识库"
+    },
+    "settings": {
+      "storageLocation": "存储位置",
+      "ocrEngine": "OCR 引擎",
+      "autoIndex": "上传后自动入库",
+      "selectFolder": "选择目标文件夹（默认为根目录）",
+      "folderDescription": "选择文件保存的目标文件夹",
+      "checkStatus": "检查服务状态"
+    },
+    "uploadMode": {
+      "file": "上传文件",
+      "folder": "上传文件夹"
+    },
+    "uploadArea": {
+      "dragText": "点击或将文件拖拽到此处",
+      "supportedTypes": "支持类型:"
+    },
+    "alerts": {
+      "pdfOcrSuggestion": "检测到PDF或图片文件，建议启用 OCR 以提取文本内容",
+      "duplicateFiles": "已存在同名文件 ({count})"
+    },
+    "ocr": {
+      "disabled": "不启用 OCR，仅处理文本文件",
+      "healthy": "服务正常",
+      "checkStatus": "点击刷新图标检查服务状态",
+      "unhealthy": "服务异常"
+    },
+    "lightrag": {
+      "autoIndexTip": "LightRAG 将使用默认参数自动入库"
+    }
+  },
+  "fileDetail": {
+    "title": "文件详情",
+    "viewInfo": {
+      "chunks": "{count} 个片段",
+      "characters": "{count} 字符"
+    },
+    "buttons": {
+      "download": "下载",
+      "downloadOriginal": "下载原文",
+      "downloadMarkdown": "下载 Markdown"
+    },
+    "loading": "正在加载文档内容...",
+    "empty": {
+      "noContent": "暂无文件内容",
+      "noChunks": "暂无分块信息"
+    },
+    "messages": {
+      "incompleteInfo": "文件信息不完整",
+      "noDatabaseId": "无法获取数据库ID，请刷新页面后重试",
+      "downloadSuccess": "下载成功",
+      "downloadFailed": "下载文件失败",
+      "noMarkdownContent": "没有可下载的 Markdown 内容"
+    }
+  },
+  "querySection": {
+    "input": {
+      "placeholder": "输入查询内容..."
+    },
+    "examples": {
+      "label": "示例:",
+      "generating": "AI生成中...",
+      "loading": "加载中...",
+      "empty": "暂无问题，请点击左侧按钮生成"
+    },
+    "tooltips": {
+      "generateQuestions": "点击手动生成测试问题",
+      "switchToFormatted": "切换至格式化显示",
+      "switchToRaw": "切换至原始数据"
+    },
+    "metadata": {
+      "queryMode": "查询模式:",
+      "stats": "统计:",
+      "found": "找到",
+      "entities": "个实体",
+      "relations": "个关系",
+      "chunks": "个文档块",
+      "used": "使用",
+      "highLevelKeywords": "高级关键词:",
+      "lowLevelKeywords": "低级关键词:"
+    },
+    "collapse": {
+      "entities": "实体",
+      "relationships": "关系",
+      "chunks": "文档块",
+      "sources": "来源"
+    },
+    "info": {
+      "description": "描述:",
+      "source": "来源:",
+      "viewFile": "查看文件",
+      "weight": "权重:",
+      "keywords": "关键词"
+    }
+  },
+  "ragEvaluation": {
+    "toolbar": {
+      "benchmark": "评估基准",
+      "selectBenchmark": "请选择评估基准",
+      "questions": "{count} 个问题",
+      "refreshBenchmarks": "刷新评估基准列表",
+      "retrievalConfig": "检索配置",
+      "startEvaluation": "开始评估"
+    },
+    "modelConfig": {
+      "answerGeneration": "答案生成模型",
+      "answerJudgment": "答案评判模型",
+      "notRequired": "（当前基准无需）"
+    },
+    "empty": {
+      "selectOrManage": "请在顶部选择评估基准或前往基准管理",
+      "goToManagement": "前往基准管理"
+    },
+    "history": {
+      "title": "历史评估记录",
+      "refresh": "刷新",
+      "viewResults": "查看结果",
+      "delete": "删除",
+      "confirmDelete": "确定要删除这条评估记录吗？",
+      "deleteWarning": "删除后将无法恢复",
+      "confirm": "确定",
+      "cancel": "取消"
+    },
+    "resultModal": {
+      "title": "评估结果",
+      "loading": "正在加载评估结果...",
+      "basicInfo": "基本信息",
+      "taskId": "任务ID",
+      "status": "状态",
+      "overallScore": "总体评分",
+      "totalQuestions": "总问题数",
+      "completed": "完成数",
+      "totalDuration": "总耗时"
+    },
+    "report": {
+      "retrievalConfig": "检索配置",
+      "overallReport": "整体评估报告",
+      "retrievalMetrics": "检索指标",
+      "answerAccuracy": "答案准确性",
+      "correctAnswers": "正确答案数：",
+      "accuracy": "准确率："
+    }
+  },
+  "agentChat": {
+    "actions": {
+      "newChat": "新对话",
+      "selectAgent": "选择智能体",
+      "state": "状态",
+      "viewState": "查看工作状态",
+      "noState": "暂无工作状态"
+    },
+    "loading": {
+      "messages": "正在加载消息...",
+      "generating": "正在生成回复..."
+    },
+    "greeting": "您好，我是{agentName}！",
+    "input": {
+      "placeholder": "输入问题..."
+    },
+    "note": "请注意辨别内容的可靠性",
+    "agent": {
+      "default": "智能体",
+      "loading": "智能体加载中……"
+    }
+  },
+  "agentConfig": {
+    "alerts": {
+      "noConfig": "该智能体没有配置项",
+      "noCheckpointer": "该智能体没有配置 Checkpointer，功能无法正常使用"
+    },
+    "labels": {
+      "modelSelection": "模型选择",
+      "systemPrompt": "系统提示词",
+      "clickToEdit": "点击编辑",
+      "toolSelection": "工具选择",
+      "selected": "已选择",
+      "tools": "个工具",
+      "clear": "清空",
+      "selectTools": "选择工具",
+      "boolean": "布尔类型",
+      "singleSelect": "单选",
+      "multiSelect": "多选",
+      "items": "项",
+      "number": "数字",
+      "slider": "滑块",
+      "other": "其他类型"
+    },
+    "buttons": {
+      "saveAndReload": "保存配置并重新加载"
+    },
+    "toolsModal": {
+      "title": "选择工具",
+      "searchPlaceholder": "搜索工具...",
+      "selectedCount": "已选择 {count} 个工具",
+      "cancel": "取消",
+      "confirm": "确认"
+    }
+  },
+  "mcpServers": {
+    "header": {
+      "title": "MCP 服务器管理",
+      "description": "管理 MCP（Model Context Protocol）服务器配置。添加、编辑或删除 MCP 服务器以扩展 AI 的能力。"
+    },
+    "buttons": {
+      "addServer": "添加服务器"
+    },
+    "stats": {
+      "configured": "已配置 {count} 个 MCP 服务器"
+    },
+    "empty": {
+      "noServers": "暂无 MCP 服务器配置"
+    },
+    "actions": {
+      "viewDetails": "查看详情",
+      "details": "详情",
+      "testConnection": "测试连接",
+      "test": "测试",
+      "editConfig": "编辑配置",
+      "edit": "编辑",
+      "deleteServer": "删除服务器",
+      "delete": "删除",
+      "cannotDeleteBuiltin": "内置 MCP 无法删除"
+    },
+    "modal": {
+      "addTitle": "添加 MCP 服务器",
+      "editTitle": "编辑 MCP 服务器",
+      "formMode": "表单模式",
+      "jsonMode": "JSON 模式"
+    },
+    "form": {
+      "serverName": "服务器名称",
+      "serverNamePlaceholder": "请输入服务器名称（唯一标识）",
+      "description": "描述",
+      "descriptionPlaceholder": "请输入服务器描述",
+      "transportType": "传输类型",
+      "icon": "图标",
+      "iconPlaceholder": "输入 emoji，如 🧠",
+      "serverUrl": "服务器 URL",
+      "httpHeaders": "HTTP 请求头",
+      "httpTimeout": "HTTP 超时（秒）",
+      "sseReadTimeout": "SSE 读取超时（秒）",
+      "command": "命令",
+      "args": "参数",
+      "argsPlaceholder": "输入参数后回车添加，如：-m",
+      "tags": "标签",
+      "tagsPlaceholder": "输入标签后回车添加"
+    }
+  },
+  "knowledgeBaseCard": {
+    "title": "数据库信息加载中",
+    "copyId": "复制知识库ID",
+    "noDescription": "暂无描述",
+    "modal": {
+      "editTitle": "编辑知识库信息",
+      "deleteDatabase": "删除数据库",
+      "cancel": "取消",
+      "confirm": "确定"
+    },
+    "form": {
+      "name": "知识库名称",
+      "namePlaceholder": "请输入知识库名称",
+      "description": "知识库描述",
+      "descriptionPlaceholder": "请输入知识库描述",
+      "autoGenerate": "自动生成问题",
+      "enable": "开启",
+      "disable": "关闭",
+      "autoGenerateHint": "上传文件后自动生成测试问题",
+      "llmModel": "语言模型 (LLM)",
+      "selectModel": "请选择模型"
+    },
+    "messages": {
+      "idEmpty": "知识库ID为空",
+      "idCopied": "知识库ID已复制到剪贴板",
+      "nameRequired": "请输入知识库名称"
+    }
+  },
+  "mindMap": {
+    "loading": "加载中...",
+    "generating": "AI 正在生成思维导图...",
+    "empty": "暂无思维导图",
+    "generate": "生成思维导图",
+    "toolbar": {
+      "regenerate": "重新生成",
+      "fitView": "适应视图"
+    },
+    "messages": {
+      "loadingContent": "正在加载文档内容...",
+      "loadFailed": "加载思维导图失败",
+      "generateSuccess": "思维导图生成成功！",
+      "generateFailed": "生成失败",
+      "renderFailed": "渲染失败：无法找到SVG容器"
+    }
+  },
+  "graphCanvas": {
+    "stats": {
+      "nodes": "节点",
+      "edges": "边"
+    }
+  },
+  "evaluationBenchmarks": {
+    "header": {
+      "count": "{count} 个基准",
+      "refresh": "刷新",
+      "upload": "上传基准",
+      "generate": "自动生成"
+    },
+    "empty": {
+      "title": "暂无评估基准",
+      "description": "上传或生成评估基准开始使用"
+    },
+    "noDescription": "暂无描述",
+    "types": {
+      "both": "检索 + 问答",
+      "retrieval": "检索评估",
+      "answer": "问答评估",
+      "query": "仅查询"
+    },
+    "tags": {
+      "goldChunk": "黄金Chunk",
+      "goldAnswer": "黄金答案"
+    },
+    "footer": {
+      "questions": "{count} 个问题"
+    },
+    "modal": {
+      "title": "评估基准详情",
+      "questionCount": "问题数:",
+      "goldChunk": "黄金Chunk:",
+      "goldAnswer": "黄金答案:",
+      "yes": "有",
+      "no": "无",
+      "questionList": "问题列表 (共{count}条)",
+      "more": "...等{count}个"
+    },
+    "table": {
+      "number": "#",
+      "question": "问题",
+      "goldChunk": "黄金Chunk",
+      "goldAnswer": "黄金答案"
+    },
+    "pagination": {
+      "range": "第 {start}-{end} 条，共 {total} 条"
+    },
+    "messages": {
+      "formatError": "响应格式不符合预期",
+      "dataFormatError": "基准数据格式错误",
+      "loadFailed": "加载评估基准失败",
+      "uploadSuccess": "基准上传成功"
+    }
+  },
+  "searchConfig": {
+    "title": "检索配置",
+    "buttons": {
+      "save": "保存",
+      "cancel": "取消"
+    },
+    "loading": "加载配置参数中...",
+    "error": {
+      "loadFailed": "配置加载失败",
+      "reload": "重新加载"
+    },
+    "form": {
+      "enable": "启用",
+      "disable": "关闭"
+    },
+    "messages": {
+      "resetSuccess": "已重置为默认配置",
+      "saveError": "无法保存配置：缺少知识库ID",
+      "saveSuccess": "配置已保存",
+      "saveFailed": "保存失败",
+      "saveToKbFailed": "保存配置到知识库失败"
+    }
+  },
+  "modelSelector": {
+    "placeholder": "请选择模型",
+    "status": {
+      "checking": "检查中...",
+      "check": "检查",
+      "unknown": "状态未知",
+      "available": "可用",
+      "unavailable": "不可用",
+      "error": "错误",
+      "noDetails": "无详细信息"
+    }
+  },
+  "benchmarkGenerate": {
+    "title": "自动生成评估基准",
+    "form": {
+      "name": "基准名称",
+      "namePlaceholder": "请输入评估基准名称",
+      "description": "描述",
+      "descriptionPlaceholder": "请输入评估基准描述（可选）",
+      "params": "生成参数",
+      "questionCount": "问题数量",
+      "questionCountPlaceholder": "生成问题数量",
+      "neighborsCount": "相似chunks数量",
+      "neighborsCountPlaceholder": "每次选取的相似chunks数量",
+      "llmConfig": "LLM配置",
+      "configParams": "配置参数",
+      "llmModel": "LLM模型配置",
+      "selectLlm": "请选择LLM模型",
+      "embeddingModel": "Embedding模型",
+      "selectEmbedding": "请选择Embedding模型",
+      "llmPlaceholder": "选择用于生成问题的LLM模型",
+      "embeddingPlaceholder": "请选择用于相似度计算的Embedding模型",
+      "temperature": "Temperature",
+      "temperaturePlaceholder": "控制生成内容的随机性",
+      "maxTokens": "Max Tokens",
+      "maxTokensPlaceholder": "生成内容的最大长度"
+    },
+    "validation": {
+      "nameRequired": "请输入基准名称",
+      "nameLength": "基准名称长度应在2-100个字符之间",
+      "questionCountRequired": "请输入生成问题数量",
+      "llmRequired": "请选择LLM模型",
+      "embeddingRequired": "请选择Embedding模型"
+    },
+    "extra": {
+      "learnMore": "需要了解评估基准生成原理？查看",
+      "documentation": "使用说明"
+    },
+    "messages": {
+      "taskSubmitted": "生成任务已提交，请稍后查看结果",
+      "generateFailed": "生成失败"
+    }
+  },
+  "benchmarkUpload": {
+    "title": "上传评估基准",
+    "form": {
+      "name": "基准名称",
+      "namePlaceholder": "请输入评估基准名称",
+      "description": "描述",
+      "descriptionPlaceholder": "请输入评估基准描述（可选）",
+      "file": "基准文件"
+    },
+    "upload": {
+      "dragText": "点击或拖拽文件到此区域上传",
+      "hint": "仅支持 JSONL 格式文件（.jsonl）"
+    },
+    "validation": {
+      "nameRequired": "请输入基准名称",
+      "nameLength": "基准名称长度应在2-100个字符之间",
+      "fileRequired": "请选择基准文件"
+    },
+    "extra": {
+      "learnMore": "需要了解评估基准格式？查看",
+      "documentation": "使用说明"
+    },
+    "messages": {
+      "jsonlOnly": "仅支持 JSONL 格式文件",
+      "fileTooLarge": "文件大小不能超过 100MB",
+      "readFailed": "文件读取失败",
+      "fileEmpty": "文件不能为空",
+      "formatError": "文件格式错误，请检查JSONL格式",
+      "validationFailed": "文件验证失败",
+      "selectFile": "请选择基准文件",
+      "uploadSuccess": "上传成功",
+      "uploadFailed": "上传失败"
+    }
+  }
+}

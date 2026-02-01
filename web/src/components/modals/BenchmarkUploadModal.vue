@@ -1,26 +1,26 @@
 <template>
   <a-modal
     v-model:open="visible"
-    title="上传评估基准"
+    :title="$t('benchmarkUpload.title')"
     width="600px"
     :confirmLoading="uploading"
     @ok="handleUpload"
     @cancel="handleCancel"
   >
     <a-form ref="formRef" :model="formState" :rules="rules" layout="vertical">
-      <a-form-item label="基准名称" name="name">
-        <a-input v-model:value="formState.name" placeholder="请输入评估基准名称" />
+      <a-form-item :label="$t('benchmarkUpload.form.name')" name="name">
+        <a-input v-model:value="formState.name" :placeholder="$t('benchmarkUpload.form.namePlaceholder')" />
       </a-form-item>
 
-      <a-form-item label="描述" name="description">
+      <a-form-item :label="$t('benchmarkUpload.form.description')" name="description">
         <a-textarea
           v-model:value="formState.description"
-          placeholder="请输入评估基准描述（可选）"
+          :placeholder="$t('benchmarkUpload.form.descriptionPlaceholder')"
           :rows="3"
         />
       </a-form-item>
 
-      <a-form-item label="基准文件" name="file" :extra="extraText">
+      <a-form-item :label="$t('benchmarkUpload.form.file')" name="file" :extra="extraText">
         <a-upload-dragger
           v-model:fileList="fileList"
           name="file"
@@ -31,9 +31,9 @@
         >
           <p class="ant-upload-text">
             <FileTextOutlined />
-            点击或拖拽文件到此区域上传
+            {{ $t('benchmarkUpload.upload.dragText') }}
           </p>
-          <p class="ant-upload-hint">仅支持 JSONL 格式文件（.jsonl）</p>
+          <p class="ant-upload-hint">{{ $t('benchmarkUpload.upload.hint') }}</p>
         </a-upload-dragger>
       </a-form-item>
     </a-form>
@@ -42,7 +42,10 @@
 
 <script setup>
 import { ref, reactive, computed, watch, h } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
+
+const { t } = useI18n()
 import { FileTextOutlined } from '@ant-design/icons-vue'
 import { evaluationApi } from '@/apis/knowledge_api'
 
@@ -73,10 +76,10 @@ const formState = reactive({
 // 表单验证规则
 const rules = {
   name: [
-    { required: true, message: '请输入基准名称', trigger: 'blur' },
-    { min: 2, max: 100, message: '基准名称长度应在2-100个字符之间', trigger: 'blur' }
+    { required: true, message: t('benchmarkUpload.validation.nameRequired'), trigger: 'blur' },
+    { min: 2, max: 100, message: t('benchmarkUpload.validation.nameLength'), trigger: 'blur' }
   ],
-  file: [{ required: true, message: '请选择基准文件', trigger: 'change' }]
+  file: [{ required: true, message: t('benchmarkUpload.validation.fileRequired'), trigger: 'change' }]
 }
 
 // 双向绑定visible

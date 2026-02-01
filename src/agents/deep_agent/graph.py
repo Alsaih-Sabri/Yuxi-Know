@@ -4,17 +4,14 @@ from deepagents.middleware.filesystem import FilesystemMiddleware
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from deepagents.middleware.subagents import SubAgentMiddleware
 from langchain.agents import create_agent
-from langchain.agents.middleware import (
-    SummarizationMiddleware,
-    TodoListMiddleware,
-)
+from langchain.agents.middleware import ModelRequest, SummarizationMiddleware, TodoListMiddleware, dynamic_prompt
 
 from src.agents.common import BaseAgent, load_chat_model
-from src.agents.common.middlewares import RuntimeConfigMiddleware, inject_attachment_context
+from src.agents.common.middlewares import inject_attachment_context
 from src.agents.common.tools import get_tavily_search
-from src.services.mcp_service import get_tools_from_all_servers
 
 from .context import DeepContext
+from .prompts import DEEP_PROMPT
 
 
 def _get_research_sub_agent(search_tools: list) -> dict:
@@ -54,9 +51,15 @@ critique_sub_agent = {
 }
 
 
+@dynamic_prompt
+def context_aware_prompt(request: ModelRequest) -> str:
+    """从 runtime context 动态生成系统提示词"""
+    return DEEP_PROMPT + "\n\n\n" + request.runtime.context.system_prompt
+
+
 class DeepAgent(BaseAgent):
-    name = "深度分析智能体"
-    description = "具备规划、深度分析和子智能体协作能力的智能体，可以处理复杂的多步骤任务"
+    name = "Deep Analysis Agent"
+    description = "An intelligent agent with planning, deep analysis, and sub-agent collaboration capabilities, capable of handling complex multi-step tasks"
     context_schema = DeepContext
     capabilities = [
         "file_upload",
@@ -85,42 +88,40 @@ class DeepAgent(BaseAgent):
 
     async def get_graph(self, **kwargs):
         """构建 Deep Agent 的图"""
+        if self.graph:
+            return self.graph
+
         # 获取上下文配置
         context = self.context_schema.from_file(module_name=self.module_name)
 
         model = load_chat_model(context.model)
         sub_model = load_chat_model(context.subagents_model)
-        search_tools = await self.get_tools()
-        all_mcp_tools = await get_tools_from_all_servers()
-        # 合并搜索工具和 MCP 工具
+        tools = await self.get_tools()
 
         # Build subagents with search tools
-        research_sub_agent = _get_research_sub_agent(search_tools)
+        research_sub_agent = _get_research_sub_agent(tools)
 
         # 使用 create_deep_agent 创建深度智能体
         graph = create_agent(
             model=model,
+            tools=tools,
             system_prompt=context.system_prompt,
             middleware=[
+                context_aware_prompt,  # 动态系统提示词
                 inject_attachment_context,  # 附件上下文注入
-                RuntimeConfigMiddleware(extra_tools=all_mcp_tools),
                 TodoListMiddleware(),
-                FilesystemMiddleware(tool_token_limit_before_evict=5000),
+                FilesystemMiddleware(),
                 SubAgentMiddleware(
                     default_model=sub_model,
-                    default_tools=search_tools,
+                    default_tools=tools,
                     subagents=[critique_sub_agent, research_sub_agent],
                     default_middleware=[
-                        FilesystemMiddleware(),
-                        RuntimeConfigMiddleware(
-                            model_context_name="subagents_model",
-                            enable_model_override=True,
-                            enable_system_prompt_override=False,
-                            enable_tools_override=False,
-                        ),
+                        TodoListMiddleware(),  # 子智能体也有 todo 列表
+                        FilesystemMiddleware(),  # 当前的两个文件系统是隔离的
                         SummarizationMiddleware(
                             model=sub_model,
                             trigger=("tokens", 110000),
+                            keep=("messages", 10),
                             trim_tokens_to_summarize=None,
                         ),
                         PatchToolCallsMiddleware(),
@@ -130,6 +131,7 @@ class DeepAgent(BaseAgent):
                 SummarizationMiddleware(
                     model=model,
                     trigger=("tokens", 110000),
+                    keep=("messages", 10),
                     trim_tokens_to_summarize=None,
                 ),
                 PatchToolCallsMiddleware(),
@@ -137,4 +139,5 @@ class DeepAgent(BaseAgent):
             checkpointer=await self._get_checkpointer(),
         )
 
+        self.graph = graph
         return graph

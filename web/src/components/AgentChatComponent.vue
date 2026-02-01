@@ -44,138 +44,125 @@
               class="nav-btn-icon loading-icon"
               size="18"
             />
-            <MessageCirclePlus v-else class="nav-btn-icon" size="16" />
-            <span class="text">新对话</span>
+            <MessageCirclePlus v-else class="nav-btn-icon" size="18" />
+            <span class="text">{{ $t('agentChat.actions.newChat') }}</span>
           </div>
           <div v-if="!props.singleMode" class="agent-nav-btn" @click="openAgentModal">
-            <LoaderCircle v-if="!currentAgent" class="nav-btn-icon loading-icon" size="18" />
-            <Bot v-else :size="18" class="nav-btn-icon" />
-            <span class="text hide-text">
-              {{ currentAgentName || '选择智能体' }}
-            </span>
+            <span class="text">{{ currentAgentName || $t('agentChat.actions.selectAgent') }}</span>
             <ChevronDown size="16" class="switch-icon" />
           </div>
         </div>
         <div class="header__right">
-          <!-- AgentState 显示按钮已移动到输入框底部 -->
+          <!-- AgentState 显示按钮 - 只在智能体支持 todo 或 files 能力时显示 -->
+          <AgentPopover
+            v-if="hasAgentStateContent"
+            v-model:visible="agentStatePopoverVisible"
+            :agent-state="currentAgentState"
+            @refresh="handleAgentStateRefresh"
+          >
+            <div
+              class="agent-nav-btn agent-state-btn"
+              :class="{ 'has-content': hasAgentStateContent }"
+              :title="hasAgentStateContent ? $t('agentChat.actions.viewState') : $t('agentChat.actions.noState')"
+            >
+              <FolderDotIcon class="nav-btn-icon" size="18" />
+              <span v-if="hasAgentStateContent" class="text">{{ $t('agentChat.actions.state') }}</span>
+            </div>
+          </AgentPopover>
           <slot name="header-right"></slot>
         </div>
       </div>
 
-      <div class="chat-content-container">
-        <!-- Main Chat Area -->
-        <div class="chat-main" ref="chatMainContainer">
-          <!-- 加载状态：加载消息 -->
-          <div v-if="isLoadingMessages" class="chat-loading">
-            <div class="loading-spinner"></div>
-            <span>正在加载消息...</span>
-          </div>
+      <!-- 加载状态：加载消息 -->
+      <div v-if="isLoadingMessages" class="chat-loading">
+        <div class="loading-spinner"></div>
+        <span>{{ $t('agentChat.loading.messages') }}</span>
+      </div>
 
-          <div v-else-if="!conversations.length" class="chat-examples">
-            <div style="margin-bottom: 150px"></div>
-            <h1>您好，我是{{ currentAgentName }}！</h1>
-          </div>
-          <div class="chat-box" ref="messagesContainer">
-            <div class="conv-box" v-for="(conv, index) in conversations" :key="index">
-              <AgentMessageComponent
-                v-for="(message, msgIndex) in conv.messages"
-                :message="message"
-                :key="msgIndex"
-                :is-processing="
-                  isProcessing &&
-                  conv.status === 'streaming' &&
-                  msgIndex === conv.messages.length - 1
-                "
-                :show-refs="showMsgRefs(message)"
-                @retry="retryMessage(message)"
-              >
-              </AgentMessageComponent>
-              <!-- 显示对话最后一个消息使用的模型 -->
-              <RefsComponent
-                v-if="shouldShowRefs(conv)"
-                :message="getLastMessage(conv)"
-                :show-refs="['model', 'copy']"
-                :is-latest-message="false"
-              />
-            </div>
-
-            <!-- 生成中的加载状态 - 增强条件支持主聊天和resume流程 -->
-            <div class="generating-status" v-if="isProcessing && conversations.length > 0">
-              <div class="generating-indicator">
-                <div class="loading-dots">
-                  <div></div>
-                  <div></div>
-                  <div></div>
-                </div>
-                <span class="generating-text">正在生成回复...</span>
-              </div>
-            </div>
-          </div>
-          <div class="bottom" :class="{ 'start-screen': !conversations.length }">
-            <!-- 人工审批弹窗 - 放在输入框上方 -->
-            <HumanApprovalModal
-              :visible="approvalState.showModal"
-              :question="approvalState.question"
-              :operation="approvalState.operation"
-              @approve="handleApprove"
-              @reject="handleReject"
-            />
-
-            <div class="message-input-wrapper">
-              <AgentInputArea
-                ref="messageInputRef"
-                v-model="userInput"
-                :is-loading="isProcessing"
-                :disabled="!currentAgent"
-                :send-button-disabled="(!userInput || !currentAgent) && !isProcessing"
-                placeholder="输入问题..."
-                :supports-file-upload="supportsFileUpload"
-                :agent-id="currentAgentId"
-                :thread-id="currentChatId"
-                :ensure-thread="ensureActiveThread"
-                :has-state-content="hasAgentStateContent"
-                :is-panel-open="isAgentPanelOpen"
-                @send="handleSendOrStop"
-                @attachment-changed="handleAgentStateRefresh"
-                @toggle-panel="toggleAgentPanel"
-              />
-
-              <!-- 示例问题 -->
-              <div
-                class="example-questions"
-                v-if="!conversations.length && exampleQuestions.length > 0"
-              >
-                <div class="example-chips">
-                  <div
-                    v-for="question in exampleQuestions"
-                    :key="question.id"
-                    class="example-chip"
-                    @click="handleExampleClick(question.text)"
-                  >
-                    {{ question.text }}
-                  </div>
-                </div>
-              </div>
-
-              <div class="bottom-actions" v-else>
-                <p class="note">请注意辨别内容的可靠性</p>
-              </div>
-            </div>
-          </div>
+      <div v-else-if="!conversations.length" class="chat-examples">
+        <div style="margin-bottom: 150px"></div>
+        <h1>{{ $t('agentChat.greeting', { agentName: currentAgentName }) }}</h1>
+      </div>
+      <div class="chat-box" ref="messagesContainer">
+        <div class="conv-box" v-for="(conv, index) in conversations" :key="index">
+          <AgentMessageComponent
+            v-for="(message, msgIndex) in conv.messages"
+            :message="message"
+            :key="msgIndex"
+            :is-processing="
+              isProcessing && conv.status === 'streaming' && msgIndex === conv.messages.length - 1
+            "
+            :show-refs="showMsgRefs(message)"
+            @retry="retryMessage(message)"
+          >
+          </AgentMessageComponent>
+          <!-- 显示对话最后一个消息使用的模型 -->
+          <RefsComponent
+            v-if="shouldShowRefs(conv)"
+            :message="getLastMessage(conv)"
+            :show-refs="['model', 'copy']"
+            :is-latest-message="false"
+          />
         </div>
 
-        <!-- Agent Panel Area -->
-
-        <transition name="panel-slide">
-          <div class="agent-panel-wrapper" v-if="isAgentPanelOpen && hasAgentStateContent">
-            <AgentPanel
-              :agent-state="currentAgentState"
-              :thread-id="currentChatId"
-              @refresh="handleAgentStateRefresh"
-              @close="toggleAgentPanel"
-            />
+        <!-- 生成中的加载状态 - 增强条件支持主聊天和resume流程 -->
+        <div class="generating-status" v-if="isProcessing && conversations.length > 0">
+          <div class="generating-indicator">
+            <div class="loading-dots">
+              <div></div>
+              <div></div>
+              <div></div>
+            </div>
+            <span class="generating-text">{{ $t('agentChat.loading.generating') }}</span>
           </div>
-        </transition>
+        </div>
+      </div>
+      <div class="bottom" :class="{ 'start-screen': !conversations.length }">
+        <!-- 人工审批弹窗 - 放在输入框上方 -->
+        <HumanApprovalModal
+          :visible="approvalState.showModal"
+          :question="approvalState.question"
+          :operation="approvalState.operation"
+          @approve="handleApprove"
+          @reject="handleReject"
+        />
+
+        <div class="message-input-wrapper">
+          <AgentInputArea
+            ref="messageInputRef"
+            v-model="userInput"
+            :is-loading="isProcessing"
+            :disabled="!currentAgent"
+            :send-button-disabled="(!userInput || !currentAgent) && !isProcessing"
+            :placeholder="$t('agentChat.input.placeholder')"
+            :supports-file-upload="supportsFileUpload"
+            :agent-id="currentAgentId"
+            :thread-id="currentChatId"
+            :ensure-thread="ensureActiveThread"
+            @send="handleSendOrStop"
+          />
+
+          <!-- 示例问题 -->
+          <div
+            class="example-questions"
+            v-if="!conversations.length && exampleQuestions.length > 0"
+          >
+            <div class="example-chips">
+              <div
+                v-for="question in exampleQuestions"
+                :key="question.id"
+                class="example-chip"
+                @click="handleExampleClick(question.text)"
+              >
+                {{ question.text }}
+              </div>
+            </div>
+          </div>
+
+          <div class="bottom-actions" v-else>
+            <p class="note">{{ $t('agentChat.note') }}</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -183,12 +170,21 @@
 
 <script setup>
 import { ref, reactive, onMounted, watch, nextTick, computed, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import AgentInputArea from '@/components/AgentInputArea.vue'
+
+const { t } = useI18n()
 import AgentMessageComponent from '@/components/AgentMessageComponent.vue'
 import ChatSidebarComponent from '@/components/ChatSidebarComponent.vue'
 import RefsComponent from '@/components/RefsComponent.vue'
-import { PanelLeftOpen, MessageCirclePlus, LoaderCircle, ChevronDown, Bot } from 'lucide-vue-next'
+import {
+  PanelLeftOpen,
+  MessageCirclePlus,
+  LoaderCircle,
+  FolderDotIcon,
+  ChevronDown
+} from 'lucide-vue-next'
 import { handleChatError, handleValidationError } from '@/utils/errorHandler'
 import { ScrollController } from '@/utils/scrollController'
 import { AgentValidator } from '@/utils/agentValidator'
@@ -200,7 +196,7 @@ import { agentApi, threadApi } from '@/apis'
 import HumanApprovalModal from '@/components/HumanApprovalModal.vue'
 import { useApproval } from '@/composables/useApproval'
 import { useAgentStreamHandler } from '@/composables/useAgentStreamHandler'
-import AgentPanel from '@/components/AgentPanel.vue'
+import AgentPopover from '@/components/AgentPopover.vue'
 
 // ==================== PROPS & EMITS ====================
 const props = defineProps({
@@ -212,7 +208,7 @@ const emit = defineEmits(['open-config', 'open-agent-modal'])
 // ==================== STORE MANAGEMENT ====================
 const agentStore = useAgentStore()
 const chatUIStore = useChatUIStore()
-const { agents, selectedAgentId, defaultAgentId, selectedAgentConfigId } = storeToRefs(agentStore)
+const { agents, selectedAgentId, defaultAgentId } = storeToRefs(agentStore)
 
 // ==================== LOCAL CHAT & UI STATE ====================
 const userInput = ref('')
@@ -255,8 +251,8 @@ const localUIState = reactive({
   isInitialRender: true
 })
 
-// Agent Panel State
-const isAgentPanelOpen = ref(false)
+// AgentState Popover 状态
+const agentStatePopoverVisible = ref(false)
 
 // ==================== COMPUTED PROPERTIES ====================
 const currentAgentId = computed(() => {
@@ -268,8 +264,12 @@ const currentAgentId = computed(() => {
 })
 
 const currentAgentName = computed(() => {
-  const agent = currentAgent.value
-  return agent ? agent.name : '智能体'
+  const agentId = currentAgentId.value
+  if (agentId && agents.value && agents.value.length > 0) {
+    const agent = agents.value.find((a) => a.id === agentId)
+    return agent ? agent.name : t('agentChat.agent.default')
+  }
+  return t('agentChat.agent.loading')
 })
 
 const currentAgent = computed(() => {
@@ -320,8 +320,7 @@ const hasAgentStateContent = computed(() => {
   if (!s) return false
   const todoCount = Array.isArray(s.todos) ? s.todos.length : 0
   const fileCount = countFiles(s.files)
-  const attachmentCount = Array.isArray(s.attachments) ? s.attachments.length : 0
-  return todoCount > 0 || fileCount > 0 || attachmentCount > 0
+  return todoCount > 0 || fileCount > 0
 })
 
 const currentThreadMessages = computed(() => threadMessages.value[currentChatId.value] || [])
@@ -385,15 +384,13 @@ const isStreaming = computed(() => {
 const isProcessing = computed(() => isStreaming.value)
 
 // ==================== SCROLL & RESIZE HANDLING ====================
-// Update scroll controller to target .chat-main
-const scrollController = new ScrollController('.chat-main')
+const scrollController = new ScrollController('.chat')
 
 onMounted(() => {
   nextTick(() => {
-    // Update event listener to target .chat-main
-    const chatMainContainer = document.querySelector('.chat-main')
-    if (chatMainContainer) {
-      chatMainContainer.addEventListener('scroll', scrollController.handleScroll, { passive: true })
+    const chatContainer = document.querySelector('.chat')
+    if (chatContainer) {
+      chatContainer.addEventListener('scroll', scrollController.handleScroll, { passive: true })
     }
   })
   setTimeout(() => {
@@ -483,7 +480,7 @@ const fetchThreads = async (agentId = null) => {
 }
 
 // 创建新线程
-const createThread = async (agentId, title = '新的对话') => {
+const createThread = async (agentId, title = 'New Conversation') => {
   if (!agentId) return null
 
   chatState.isCreatingThread = true
@@ -576,10 +573,10 @@ const fetchAgentState = async (agentId, threadId) => {
   } catch (error) {}
 }
 
-const ensureActiveThread = async (title = '新的对话') => {
+const ensureActiveThread = async (title = 'New Conversation') => {
   if (currentChatId.value) return currentChatId.value
   try {
-    const newThread = await createThread(currentAgentId.value, title || '新的对话')
+    const newThread = await createThread(currentAgentId.value, title || 'New Conversation')
     if (newThread) {
       chatState.currentThreadId = newThread.id
       return newThread.id
@@ -619,7 +616,7 @@ const sendMessage = async ({
     return Promise.reject(error)
   }
 
-  // 如果是新对话，用消息内容作为标题
+  // If it's a new conversation, use message content as title
   if ((threadMessages.value[threadId] || []).length === 0) {
     updateThread(threadId, text)
   }
@@ -627,8 +624,7 @@ const sendMessage = async ({
   const requestData = {
     query: text,
     config: {
-      thread_id: threadId,
-      ...(selectedAgentConfigId.value ? { agent_config_id: selectedAgentConfigId.value } : {})
+      thread_id: threadId
     }
   }
 
@@ -665,23 +661,23 @@ const switchToFirstChatIfEmpty = async () => {
 
 const createNewChat = async () => {
   if (
-    !AgentValidator.validateAgentId(currentAgentId.value, '创建对话') ||
+    !AgentValidator.validateAgentId(currentAgentId.value, 'Create conversation') ||
     chatUIStore.creatingNewChat
   )
     return
 
-  // 如果第一个对话为空，直接切换到第一个对话而不是创建新对话
+  // If the first conversation is empty, switch to it instead of creating a new one
   if (await switchToFirstChatIfEmpty()) return
 
-  // 只有当当前对话是第一个对话且为空时，才阻止创建新对话
+  // Only prevent creating new conversation if current is the first and empty
   const currentThreadIndex = threads.value.findIndex((thread) => thread.id === currentChatId.value)
   if (currentChatId.value && conversations.value.length === 0 && currentThreadIndex === 0) return
 
   chatUIStore.creatingNewChat = true
   try {
-    const newThread = await createThread(currentAgentId.value, '新的对话')
+    const newThread = await createThread(currentAgentId.value, 'New Conversation')
     if (newThread) {
-      // 中断之前线程的流式输出（如果存在）
+      // Interrupt previous thread's streaming output (if exists)
       const previousThreadId = chatState.currentThreadId
       if (previousThreadId) {
         const previousThreadState = getThreadState(previousThreadId)
@@ -750,10 +746,10 @@ const deleteChat = async (chatId) => {
     await deleteThread(chatId)
     if (chatState.currentThreadId === chatId) {
       chatState.currentThreadId = null
-      // 如果删除的是当前对话，自动创建新对话
+      // If deleting current conversation, automatically create new one
       await createNewChat()
     } else if (chatsList.value.length > 0) {
-      // 如果删除的不是当前对话，选择第一个可用对话
+      // If not deleting current conversation, select first available one
       await selectChat(chatsList.value[0].id)
     }
   } catch (error) {
@@ -789,7 +785,7 @@ const handleSendMessage = async ({ image } = {}) => {
   if (!threadId) {
     threadId = await ensureActiveThread(text)
     if (!threadId) {
-      message.error('创建对话失败，请重试')
+      message.error('Failed to create conversation, please try again')
       return
     }
   }
@@ -878,11 +874,7 @@ const handleApprovalWithStream = async (approved) => {
 
   try {
     // 使用审批 composable 处理审批
-    const response = await handleApproval(
-      approved,
-      currentAgentId.value,
-      selectedAgentConfigId.value
-    )
+    const response = await handleApproval(approved, currentAgentId.value)
 
     if (!response) return // 如果 handleApproval 抛出错误，这里不会执行
 
@@ -943,8 +935,8 @@ const buildExportPayload = () => {
   }
 
   const payload = {
-    chatTitle: currentThread.value?.title || '新对话',
-    agentName: currentAgentName.value || currentAgent.value?.name || '智能助手',
+    chatTitle: currentThread.value?.title || 'New Conversation',
+    agentName: currentAgentName.value || currentAgent.value?.name || 'AI Assistant',
     agentDescription: agentDescription || currentAgent.value?.description || '',
     messages: conversations.value ? JSON.parse(JSON.stringify(conversations.value)) : [],
     onGoingMessages: onGoingConvMessages.value
@@ -967,10 +959,6 @@ const openAgentModal = () => emit('open-agent-modal')
 const handleAgentStateRefresh = async () => {
   if (!currentAgentId.value || !currentChatId.value) return
   await fetchAgentState(currentAgentId.value, currentChatId.value)
-}
-
-const toggleAgentPanel = () => {
-  isAgentPanelOpen.value = !isAgentPanelOpen.value
 }
 
 // ==================== HELPER FUNCTIONS ====================
@@ -1099,22 +1087,22 @@ watch(
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* Changed from overflow-x: hidden to overflow: hidden */
+  overflow-x: hidden;
   position: relative;
   box-sizing: border-box;
+  overflow-y: scroll;
   transition: all 0.3s ease;
 
   .chat-header {
     user-select: none;
-    // position: sticky; // Not needed if .chat is flex col and header is fixed height item
-    // top: 0;
+    position: sticky;
+    top: 0;
     z-index: 10;
     height: var(--header-height);
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 1rem 8px;
-    flex-shrink: 0; /* Prevent header from shrinking */
 
     .header__left,
     .header__right {
@@ -1131,56 +1119,6 @@ watch(
       color: var(--main-500);
     }
   }
-}
-
-.chat-content-container {
-  flex: 1;
-  display: flex;
-  flex-direction: row;
-  overflow: hidden;
-  position: relative;
-  width: 100%;
-}
-
-.chat-main {
-  flex: 4;
-  display: flex;
-  flex-direction: column;
-  overflow-y: auto; /* Scroll is here now */
-  position: relative;
-  transition: flex 0.4s ease;
-  min-width: 0; /* Prevent flex item from overflowing */
-}
-
-.agent-panel-wrapper {
-  flex: 3; /* 4:3 ratio with chat-main */
-  height: calc(100% - 32px);
-  overflow: hidden;
-  z-index: 20;
-  margin: 16px;
-  margin-left: 0;
-  background: var(--gray-0);
-  border-radius: 12px;
-  box-shadow: 0 4px 20px var(--shadow-1);
-  border: 1px solid var(--gray-200);
-  min-width: 0; /* Prevent flex item from overflowing */
-}
-
-/* Workbench transition animations */
-.panel-slide-enter-active,
-.panel-slide-leave-active {
-  transition:
-    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
-    opacity 0.15s ease,
-    flex 0.2s ease;
-}
-
-.panel-slide-enter-from,
-.panel-slide-leave-to {
-  transform: translateX(20px) scale(0.98);
-  opacity: 0;
-  flex: 0 0 0; /* Shrink to zero width during transition */
-  margin-left: -16px; /* Compensate for margin during close */
 }
 
 .chat-examples {
@@ -1280,7 +1218,7 @@ watch(
   max-width: 800px;
   margin: 0 auto;
   flex-grow: 1;
-  padding: 1rem 1.25rem;
+  padding: 1rem 2rem;
   display: flex;
   flex-direction: column;
 }
@@ -1296,7 +1234,7 @@ watch(
   bottom: 0;
   width: 100%;
   margin: 0 auto;
-  padding: 4px 1rem 0 1rem;
+  padding: 4px 2rem 0 2rem;
   background: var(--gray-0);
   z-index: 1000;
 
@@ -1428,12 +1366,12 @@ watch(
 <style lang="less">
 .agent-nav-btn {
   display: flex;
-  gap: 6px;
+  gap: 10px;
   padding: 6px 8px;
   height: 32px;
   justify-content: center;
   align-items: center;
-  border-radius: 6px;
+  border-radius: 8px;
   color: var(--gray-900);
   cursor: pointer;
   width: auto;
@@ -1461,23 +1399,8 @@ watch(
   }
 }
 
-.hide-text {
-  display: none;
-}
-
-@media (min-width: 769px) {
-  .hide-text {
-    display: inline;
-  }
-}
-
 /* AgentState 按钮有内容时的样式 */
 .agent-nav-btn.agent-state-btn.has-content:hover:not(.is-disabled) {
-  color: var(--main-700);
-  background-color: var(--main-20);
-}
-
-.agent-nav-btn.agent-state-btn.active {
   color: var(--main-700);
   background-color: var(--main-20);
 }

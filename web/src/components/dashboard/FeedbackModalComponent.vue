@@ -1,6 +1,6 @@
 <template>
   <!-- 反馈列表模态框 -->
-  <a-modal v-model:open="modalVisible" title="用户反馈详情" width="1200px" :footer="null">
+  <a-modal v-model:open="modalVisible" :title="$t('feedback.title')" width="1200px" :footer="null">
     <a-space style="margin-bottom: 16px">
       <a-segmented
         v-model:value="feedbackFilter"
@@ -23,7 +23,7 @@
               {{ feedback.username ? feedback.username.charAt(0).toUpperCase() : 'U' }}
             </a-avatar>
             <div class="user-details">
-              <div class="username">{{ feedback.username || '未知用户' }}</div>
+              <div class="username">{{ feedback.username || $t('feedback.unknownUser') }}</div>
             </div>
           </div>
           <a-tag
@@ -35,7 +35,7 @@
               <LikeOutlined v-if="feedback.rating === 'like'" />
               <DislikeOutlined v-else />
             </template>
-            {{ feedback.rating === 'like' ? '点赞' : '点踩' }}
+            {{ feedback.rating === 'like' ? $t('feedback.like') : $t('feedback.dislike') }}
           </a-tag>
         </div>
 
@@ -49,7 +49,7 @@
                   class="conversation-title"
                   :class="{ collapsed: !expandedStates.get(`${feedback.id}-conversation`) }"
                 >
-                  标题：{{ feedback.conversation_title }}
+                  {{ $t('feedback.conversationTitle') }}{{ feedback.conversation_title }}
                 </span>
                 <a-button
                   v-if="shouldShowConversationExpandButton(feedback.conversation_title)"
@@ -58,11 +58,11 @@
                   @click="toggleConversationExpand(feedback.id)"
                   class="expand-button-inline"
                 >
-                  {{ expandedStates.get(`${feedback.id}-conversation`) ? '收起' : '展开' }}
+                  {{ expandedStates.get(`${feedback.id}-conversation`) ? $t('feedback.collapse') : $t('feedback.expand') }}
                 </a-button>
               </div>
               <div class="info-item" v-if="!props.agentId">
-                <span class="label">智能体:</span>
+                <span class="label">{{ $t('feedback.agent') }}</span>
                 <span class="value">{{ feedback.agent_id }}</span>
               </div>
             </div>
@@ -83,7 +83,7 @@
               @click="toggleExpand(feedback.id)"
               class="expand-button"
             >
-              {{ expandedStates.get(`${feedback.id}-message`) ? '收起' : '展开全部' }}
+              {{ expandedStates.get(`${feedback.id}-message`) ? $t('feedback.collapse') : $t('feedback.expandAll') }}
             </a-button>
           </div>
 
@@ -104,18 +104,21 @@
 
       <!-- 空状态 -->
       <div v-if="feedbacks.length === 0" class="empty-state">
-        <a-empty description="暂无反馈数据" />
+        <a-empty :description="$t('feedback.noData')" />
       </div>
     </div>
   </a-modal>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { LikeOutlined, DislikeOutlined, ClockCircleOutlined } from '@ant-design/icons-vue'
 import { dashboardApi } from '@/apis/dashboard_api'
 import { formatFullDateTime } from '@/utils/time'
+
+const { t } = useI18n()
 
 // 常量配置
 const CONFIG = {
@@ -140,11 +143,11 @@ const modalVisible = ref(false)
 const feedbacks = ref([])
 const loadingFeedbacks = ref(false)
 const feedbackFilter = ref('all')
-const feedbackOptions = [
-  { label: '全部', value: 'all' },
-  { label: '点赞', value: 'like' },
-  { label: '点踩', value: 'dislike' }
-]
+const feedbackOptions = computed(() => [
+  { label: t('feedback.all'), value: 'all' },
+  { label: t('feedback.like'), value: 'like' },
+  { label: t('feedback.dislike'), value: 'dislike' }
+])
 
 // 展开状态映射（使用 Map 避免直接修改对象）
 const expandedStates = ref(new Map())
@@ -204,7 +207,7 @@ const loadFeedbacks = async () => {
     expandedStates.value.clear()
   } catch (error) {
     console.error('加载反馈列表失败:', error)
-    message.error('加载反馈列表失败，请稍后重试')
+    message.error(t('feedback.loadFailed'))
     feedbacks.value = []
   } finally {
     loadingFeedbacks.value = false

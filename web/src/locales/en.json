@@ -1,0 +1,1239 @@
+{
+  "common": {
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "search": "Search",
+    "loading": "Loading...",
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "yes": "Yes",
+    "no": "No",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "submit": "Submit",
+    "reset": "Reset",
+    "close": "Close",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "more": "More",
+    "less": "Less",
+    "all": "All",
+    "none": "None",
+    "select": "Select",
+    "upload": "Upload",
+    "download": "Download",
+    "export": "Export",
+    "import": "Import",
+    "copy": "Copy",
+    "paste": "Paste",
+    "cut": "Cut",
+    "undo": "Undo",
+    "redo": "Redo",
+    "filename": "Filename",
+    "createdAt": "Created At",
+    "status": "Status",
+    "viewInfo": "View Info",
+    "required": "Required"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "register": "Register",
+    "welcome": "Welcome",
+    "userId": "User ID",
+    "username": "Username",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "phoneNumber": "Phone Number",
+    "rememberMe": "Remember me",
+    "forgotPassword": "Forgot password?",
+    "loginAccount": "Login Account",
+    "userIdOrPhone": "User ID or Phone Number",
+    "enterUserId": "Please enter User ID",
+    "enterPassword": "Please enter password",
+    "enterUserIdOrPhone": "Please enter User ID or Phone Number",
+    "loginSuccess": "Login successful",
+    "loginFailed": "Login failed, please check your credentials",
+    "accountLocked": "Account locked",
+    "accountLockedTime": "Account locked due to multiple failed attempts. Please wait {time}",
+    "waitAndRetry": "Account locked, please wait {time}",
+    "otherLoginMethods": "Other login methods",
+    "wechatLogin": "WeChat Login",
+    "enterpriseWechat": "Enterprise WeChat Login",
+    "feishuLogin": "Feishu Login",
+    "featureInDev": "This feature is under development, stay tuned!",
+    "backToHome": "Back to Home",
+    "contactUs": "Contact Us",
+    "help": "Help",
+    "privacyPolicy": "Privacy Policy",
+    "serverConnectionFailed": "Server connection failed",
+    "systemError": "System error, please try again later"
+  },
+  "init": {
+    "title": "System Initialization - Create Super Admin",
+    "createAdmin": "Create Admin Account",
+    "adminCreated": "Admin account created successfully",
+    "initFailed": "Initialization failed, please retry",
+    "alreadyInitialized": "System already initialized",
+    "userIdFormat": "User ID can only contain letters, numbers and underscores",
+    "userIdLength": "User ID must be 3-20 characters",
+    "userIdPlaceholder": "Enter User ID (3-20 characters)",
+    "phoneOptional": "Phone Number (Optional)",
+    "phoneOptionalHint": "Can be used for login, optional",
+    "phoneFormat": "Please enter a valid phone number",
+    "passwordMismatch": "Passwords do not match",
+    "confirmPasswordRequired": "Please confirm your password"
+  },
+  "nav": {
+    "home": "Home",
+    "agent": "Agent",
+    "database": "Knowledge Base",
+    "graph": "Graph",
+    "dashboard": "Dashboard",
+    "settings": "Settings",
+    "taskCenter": "Task Center",
+    "welcomeStar": "Star us on GitHub",
+    "debugPanel": "Debug Panel"
+  },
+  "statusBar": {
+    "taskCenter": "Task Center",
+    "guest": "Guest",
+    "timeFormat": "YYYY-MM-DD HH:mm:ss",
+    "greeting": {
+      "morning": "Good morning",
+      "noon": "Good noon",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening",
+      "night": "Late night"
+    }
+  },
+  "chatSidebar": {
+    "newChat": "New Chat",
+    "newConversation": "New Conversation",
+    "rename": "Rename",
+    "delete": "Delete",
+    "noHistory": "No conversation history"
+  },
+  "basicSettings": {
+    "retrievalConfig": "Retrieval Configuration",
+    "defaultChatModel": "Default Chat Model",
+    "selectDefaultModel": "Select default model",
+    "selectModel": "Select model",
+    "selectRerankerModel": "Select reranker model",
+    "contentGuardConfig": "Content Guard Configuration",
+    "serviceLinks": "Service Links",
+    "serviceDescription": "Quick access to system-related external services. Replace localhost with the actual IP address.",
+    "visit": "Visit",
+    "services": {
+      "neo4j": {
+        "title": "Neo4j Browser",
+        "description": "Graph database management interface"
+      },
+      "api": {
+        "title": "API Documentation",
+        "description": "System API documentation and debugging tools"
+      },
+      "minio": {
+        "title": "MinIO Object Storage",
+        "description": "File storage management console"
+      },
+      "milvus": {
+        "title": "Milvus WebUI",
+        "description": "Vector database management interface"
+      },
+      "sqlite": {
+        "title": "SQLite WebUI",
+        "description": "SQLite database management interface"
+      }
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "darkMode": "Dark Mode",
+    "lightMode": "Light Mode",
+    "systemTheme": "System"
+  },
+  "agent": {
+    "title": "Agent",
+    "create": "Create Agent",
+    "edit": "Edit Agent",
+    "delete": "Delete Agent",
+    "agentConfig": {
+      "title": "Agent Configuration",
+      "systemPrompt": "System Prompt",
+      "llmModel": "LLM Model",
+      "toolsLabel": "Tools",
+      "knowledges": "Knowledge Bases",
+      "defaultValue": "(Default: {value})",
+      "systemPromptPlaceholder": "Enter system prompt...",
+      "temperature": "Temperature",
+      "maxTokens": "Max Tokens",
+      "chat": "Chat",
+      "newChat": "New Chat",
+      "clearChat": "Clear Chat",
+      "sendMessage": "Send Message",
+      "inputPlaceholder": "Type a message...",
+      "thinking": "Thinking...",
+      "generating": "Generating...",
+      "selectAgent": "Select Agent",
+      "config": "Config",
+      "shareChat": "Share Chat",
+      "viewFeedback": "View Feedback",
+      "previewPage": "Preview Page",
+      "setAsDefault": "Set as Default",
+      "setDefaultSuccess": "Agent set as default",
+      "setDefaultError": "Failed to set default agent",
+      "loadConfigError": "Failed to load config",
+      "noExportContent": "No content to export",
+      "startChatFirst": "Please start a conversation first",
+      "exportSuccess": "Chat exported as HTML: {filename}"
+    },
+    "name": "Name",
+    "description": "Description",
+    "model": "Model",
+    "sendMessage": "Send Message",
+    "inputPlaceholder": "Type a message...",
+    "thinking": "Thinking...",
+    "generating": "Generating...",
+    "selectAgent": "Select Agent",
+    "config": "Config",
+    "shareChat": "Share Chat",
+    "viewFeedback": "View Feedback",
+    "previewPage": "Preview Page",
+    "setAsDefault": "Set as Default",
+    "setDefaultSuccess": "Agent set as default",
+    "setDefaultError": "Failed to set default agent",
+    "loadConfigError": "Failed to load config",
+    "noExportContent": "No content to export",
+    "startChatFirst": "Please start a conversation first",
+    "exportSuccess": "Chat exported as HTML: {filename}"
+  },
+  "database": {
+    "title": "Document Knowledge Base",
+    "create": "Create Knowledge Base",
+    "edit": "Edit Knowledge Base",
+    "delete": "Delete Knowledge Base",
+    "name": "Name",
+    "description": "Description",
+    "files": "files",
+    "uploadFile": "Upload File",
+    "fileCount": "File Count",
+    "totalSize": "Total Size",
+    "lastUpdated": "Last Updated",
+    "processing": "Processing",
+    "ready": "Ready",
+    "failed": "Failed",
+    "newDatabase": "New Knowledge Base",
+    "createDatabase": "Create Knowledge Base",
+    "databaseType": "Knowledge Base Type",
+    "databaseName": "Knowledge Base Name",
+    "databaseNamePlaceholder": "Enter knowledge base name",
+    "embeddingModel": "Embedding Model",
+    "selectEmbeddingModel": "Select embedding model",
+    "language": "Language",
+    "languageModel": "Language Model (LLM)",
+    "languageModelHint": "You can configure language models in settings",
+    "selectModel": "Select model",
+    "descriptionHint": "In agent workflows, this description serves as the tool description. The agent selects appropriate tools based on the knowledge base title and description. The more detailed the description, the easier it is for the agent to select the right tool.",
+    "descriptionPlaceholder": "Enter knowledge base description",
+    "privacySettings": "Privacy Settings",
+    "private": "Private",
+    "public": "Public",
+    "setAsPrivate": "Set as private knowledge base",
+    "privacyHint": "This property is not currently used. In some agent designs, privacy flags can determine which models and strategies to enable.",
+    "cancel": "Cancel",
+    "loading": "Loading knowledge bases...",
+    "empty": "No Knowledge Bases",
+    "emptyHint": "Create your first knowledge base to start managing documents and knowledge",
+    "noDescription": "No description",
+    "createdToday": "Created today",
+    "createdYesterday": "Created yesterday",
+    "createdDaysAgo": "Created {n} days ago",
+    "createdWeeksAgo": "Created {n} weeks ago",
+    "createdMonthsAgo": "Created {n} months ago",
+    "createdYearsAgo": "Created {n} years ago",
+    "privateDatabase": "Private Knowledge Base",
+    "pendingParse": "{count} files pending parse, click to parse",
+    "pendingIndex": "{count} files pending index, click to index",
+    "searchConfig": "Search Config",
+    "knowledgeGraph": "Knowledge Graph",
+    "queryTest": "Query Test",
+    "mindMap": "Mind Map",
+    "ragEvaluation": "RAG Evaluation",
+    "evaluationBenchmarks": "Evaluation Benchmarks",
+    "milvusOnly": "Only supports Milvus type knowledge bases",
+    "batchParse": "Batch Parse",
+    "batchIndex": "Batch Index",
+    "confirmBatchParse": "Are you sure you want to parse {count} files?",
+    "confirmBatchIndex": "Are you sure you want to index {count} files?",
+    "status": {
+      "uploaded": "Uploaded",
+      "parsing": "Parsing",
+      "parsed": "Parsed",
+      "errorParsing": "Parse Failed",
+      "indexing": "Indexing",
+      "indexed": "Indexed",
+      "errorIndexing": "Index Failed",
+      "done": "Done",
+      "failed": "Failed",
+      "processing": "Processing",
+      "waiting": "Waiting"
+    }
+  },
+  "graph": {
+    "title": "Graph Database",
+    "nodes": "Nodes",
+    "edges": "Edges",
+    "search": "Search nodes",
+    "filter": "Filter",
+    "layout": "Layout",
+    "zoom": "Zoom",
+    "reset": "Reset View",
+    "enableHint": "Click the user avatar in the top right corner and go to 'System Settings' to enable Knowledge Graph.",
+    "knowledgeBase": "Knowledge Base",
+    "selectOrInputKbId": "Select or input KB ID",
+    "uploadFile": "Upload File",
+    "indexNodes": "Index {count} nodes",
+    "searchPlaceholder": "Enter entity to search (* for all)",
+    "queryCount": "Query count",
+    "exportData": "Export Data",
+    "uploadFileTitle": "Upload File",
+    "addToGraph": "Add to Graph Database",
+    "cancel": "Cancel",
+    "uploadNote": "Upload file content should follow the format in test/data/A_Dream_of_Red_Mansions_tiny.jsonl:",
+    "embeddingModel": "Embedding Model",
+    "batchSize": "Batch Size",
+    "batchSizeHint": "Default: 40, Range: 1-1000",
+    "modelNotChangeable": "* Graph database already has data or model set, cannot change",
+    "dragOrClickUpload": "Click or drag file here to upload",
+    "jsonlOnly": "Currently only supports JSONL files.",
+    "uploadTipTitle": "File Upload Instructions",
+    "goToDatabase": "Go to Knowledge Base Details",
+    "uploadTipNonNeo4j": "To upload documents to the selected knowledge base, please go to the corresponding knowledge base details page:",
+    "loading": "Loading",
+    "connected": "Connected",
+    "closed": "Closed",
+    "loadGraphFailed": "Failed to load graph database info",
+    "waitUpload": "Please wait for file upload to complete",
+    "selectEmbedModel": "Please select embedding model",
+    "filePathFailed": "Failed to get file path, please re-upload",
+    "loadNodesFailed": "Failed to load nodes",
+    "pleaseWait": "Please wait and try again",
+    "noEntitiesFound": "No related entities found",
+    "queryError": "Query error: ",
+    "uploadFailed": "File upload failed: ",
+    "uploadSuccess": "File uploaded successfully: ",
+    "addFileFailed": "Failed to add file",
+    "modelMismatch": "Vector model mismatch, cannot add index. Current model: {current}, Graph model: {graph}",
+    "processingWait": "Processing in background, please wait",
+    "indexSuccess": "Index added successfully",
+    "indexFailed": "Failed to add index",
+    "dataExported": "Graph data exported",
+    "neo4jUploadTip": "Neo4j graph database supports importing entity and relationship data directly via JSONL format files.",
+    "kbUploadTip": "The selected knowledge base '{name}' is of type {type}. This type requires uploading documents in the Document Knowledge Base page, and the system will automatically extract the knowledge graph from them."
+  },
+  "user": {
+    "profile": "Profile",
+    "avatar": "Avatar",
+    "changePassword": "Change Password",
+    "currentPassword": "Current Password",
+    "newPassword": "New Password",
+    "confirmNewPassword": "Confirm New Password",
+    "role": "Role",
+    "department": "Department",
+    "createdAt": "Created At",
+    "lastLogin": "Last Login"
+  },
+  "roles": {
+    "superadmin": "Super Admin",
+    "admin": "Admin",
+    "user": "User"
+  },
+  "time": {
+    "seconds": "{n} seconds",
+    "minutes": "{n} minutes",
+    "hours": "{n} hours",
+    "days": "{n} days",
+    "justNow": "Just now",
+    "minutesAgo": "{n} minutes ago",
+    "hoursAgo": "{n} hours ago",
+    "daysAgo": "{n} days ago",
+    "yesterday": "Yesterday"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "conversationRecords": "Conversation Records",
+    "conversationTitle": "Title",
+    "user": "User",
+    "messageCount": "Messages",
+    "status": "Status",
+    "updatedAt": "Updated",
+    "actions": "Actions",
+    "details": "Details",
+    "refresh": "Refresh",
+    "feedbackDetails": "Feedback Details",
+    "userId": "User ID",
+    "active": "Active",
+    "deleted": "Deleted",
+    "all": "All",
+    "unnamedConversation": "Unnamed Conversation",
+    "dataLoadSuccess": "Data loaded successfully",
+    "dataLoadFailed": "Failed to load statistics",
+    "detailedDataFailed": "Detailed data load failed, showing basic stats only",
+    "noDataAvailable": "No data available",
+    "conversationLoadFailed": "Failed to load conversations",
+    "detailLoadFailed": "Failed to load conversation details",
+    "userActivity": "User Activity Analysis",
+    "totalUsers": "Total Users",
+    "active24h": "24h Active",
+    "active30d": "30d Active",
+    "activityTrend": "Activity Trend",
+    "last7Days": "Last 7 days",
+    "activeUsers": "Active Users",
+    "toolMonitoring": "Tool Call Monitoring",
+    "totalCalls": "Total Calls",
+    "failedCalls": "Failed Calls",
+    "successRate": "Success Rate",
+    "mostUsedTools": "Most Used Tools TOP 10",
+    "toolErrorAnalysis": "Tool Error Analysis",
+    "errorDistribution": "Error Distribution",
+    "toolName": "Tool Name",
+    "errorCount": "Error Count",
+    "callCount": "Call Count",
+    "knowledgeUsage": "Knowledge Base Usage",
+    "totalDatabases": "Total Databases",
+    "totalFiles": "Total Files",
+    "storageCapacity": "Storage Capacity",
+    "typeDistribution": "Type Distribution",
+    "fileTypeDistribution": "File Type Distribution",
+    "fileType": "File Type",
+    "unknown": "Unknown",
+    "agentAnalysis": "AI Agent Analysis",
+    "totalAgents": "Total Agents",
+    "totalConversations": "Total Conversations",
+    "totalToolCalls": "Total Tool Calls",
+    "conversationToolDist": "Conversation/Tool Distribution (TOP 3)",
+    "conversations": "Conversations",
+    "toolCalls": "Tool Calls",
+    "topPerformers": "Top Performing Agents TOP 5",
+    "rank": "Rank",
+    "agentId": "Agent ID",
+    "satisfactionRate": "Satisfaction",
+    "conversationCount": "Conversations",
+    "callStats": "Call Statistics",
+    "times": "times",
+    "items": "items"
+  },
+  "feedback": {
+    "title": "User Feedback Details",
+    "positive": "Positive",
+    "negative": "Negative",
+    "comment": "Comment",
+    "noFeedback": "No feedback yet",
+    "all": "All",
+    "like": "Like",
+    "dislike": "Dislike",
+    "unknownUser": "Unknown User",
+    "conversationTitle": "Title: ",
+    "agent": "Agent:",
+    "expand": "Expand",
+    "collapse": "Collapse",
+    "expandAll": "Expand All",
+    "loadFailed": "Failed to load feedback list, please try again later",
+    "noData": "No feedback data"
+  },
+  "callStats": {
+    "last14Hours": "Last 14 Hours",
+    "last14Days": "Last 14 Days",
+    "last14Weeks": "Last 14 Weeks",
+    "modelCalls": "Model Calls",
+    "agentCalls": "Agent Calls",
+    "tokenUsage": "Token Usage",
+    "toolCalls": "Tool Calls",
+    "week": "Week ",
+    "unknownModel": "Unknown Model",
+    "total": "Total"
+  },
+  "statsOverview": {
+    "totalConversations": "Total Conversations",
+    "activeConversations": "Active Conversations",
+    "totalMessages": "Total Messages",
+    "totalUsers": "Users",
+    "totalFeedbacks": "Total Feedbacks",
+    "satisfactionRate": "Satisfaction"
+  },
+  "userInfo": {
+    "docCenter": "Documentation",
+    "switchToLight": "Switch to Light Mode",
+    "switchToDark": "Switch to Dark Mode (Beta)",
+    "systemSettings": "System Settings",
+    "logout": "Logout",
+    "login": "Login",
+    "profile": "Profile",
+    "changeAvatar": "Change Avatar",
+    "uploadAvatar": "Upload Avatar",
+    "avatarTips": "Supports JPG, PNG formats, max 5MB",
+    "username": "Username",
+    "userId": "User ID",
+    "phoneNumber": "Phone Number",
+    "role": "Role",
+    "department": "Department",
+    "defaultDepartment": "Default Department",
+    "notSet": "Not set",
+    "editProfile": "Edit Profile",
+    "close": "Close",
+    "save": "Save",
+    "cancel": "Cancel",
+    "usernamePlaceholder": "Enter username (2-20 characters)",
+    "phonePlaceholder": "Enter phone number",
+    "usernameLength": "Username must be 2-20 characters",
+    "phoneFormat": "Please enter a valid phone number",
+    "profileUpdated": "Profile updated successfully!",
+    "updateFailed": "Update failed: ",
+    "avatarUploaded": "Avatar uploaded successfully!",
+    "avatarUploadFailed": "Avatar upload failed: ",
+    "imageOnly": "Only image files are allowed!",
+    "fileTooLarge": "Image size cannot exceed 5MB!",
+    "loggedOut": "Logged out"
+  },
+  "taskCenter": {
+    "title": "Task Center",
+    "refresh": "Refresh",
+    "loadFailed": "Failed to load task info",
+    "all": "All",
+    "inProgress": "In Progress",
+    "completed": "Completed",
+    "failed": "Failed",
+    "noTasks": "No Tasks",
+    "noTasksHint": "When you submit knowledge base imports or other background tasks, real-time progress will be shown here (showing last 100 tasks).",
+    "details": "Details",
+    "cancel": "Cancel",
+    "started": "Started",
+    "finished": "Finished",
+    "created": "Created",
+    "status": "Status",
+    "progress": "Progress",
+    "updatedAt": "Updated",
+    "description": "Description",
+    "error": "Error",
+    "pending": "Pending",
+    "queued": "Queued",
+    "running": "Running",
+    "success": "Completed",
+    "cancelled": "Cancelled",
+    "knowledgeIngest": "Knowledge Import",
+    "knowledgeRechunks": "Document Re-chunking",
+    "graphTask": "Graph Processing",
+    "agentJob": "Agent Task",
+    "backgroundTask": "Background Task",
+    "hours": "hours",
+    "minutes": "minutes",
+    "seconds": "seconds",
+    "lessThan1Second": "Less than 1 second"
+  },
+  "settingsModal": {
+    "title": "System Settings",
+    "basicSettings": "Basic Settings",
+    "modelConfig": "Model Config",
+    "userManagement": "User Management",
+    "departmentManagement": "Department Management",
+    "mcpManagement": "MCP Management"
+  },
+  "userManagement": {
+    "title": "User Management",
+    "description": "Manage system users. Please operate with caution. Users will not be able to log in after deletion.",
+    "addUser": "Add User",
+    "editUser": "Edit User",
+    "deleteUser": "Delete User",
+    "noUsers": "No user data",
+    "phoneNumber": "Phone Number:",
+    "createdAt": "Created:",
+    "lastLogin": "Last Login:",
+    "edit": "Edit",
+    "delete": "Delete",
+    "username": "Username",
+    "usernamePlaceholder": "Enter username (2-20 characters)",
+    "userId": "User ID",
+    "autoGenerated": "Auto-generated",
+    "existingId": "Existing ID",
+    "loginId": "Login ID",
+    "userIdHint": "This ID will be used for login, auto-generated from username",
+    "userIdEditHint": "User ID cannot be modified in edit mode",
+    "phoneNumberLabel": "Phone Number",
+    "phoneNumberPlaceholder": "Enter phone number (optional, can be used for login)",
+    "changePassword": "Change Password",
+    "password": "Password",
+    "passwordPlaceholder": "Enter password",
+    "confirmPassword": "Confirm Password",
+    "confirmPasswordPlaceholder": "Enter password again",
+    "role": "Role",
+    "normalUser": "Normal User",
+    "admin": "Admin",
+    "superAdmin": "Super Admin",
+    "department": "Department",
+    "selectDepartment": "Select department",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "usernameRequired": "Please enter username",
+    "usernameLength": "Username must be 2-20 characters",
+    "passwordRequired": "Please enter password",
+    "passwordMismatch": "Passwords do not match",
+    "phoneFormat": "Please enter a valid phone number",
+    "loadUsersFailed": "Failed to load user list",
+    "addUserSuccess": "User added successfully",
+    "addUserFailed": "Failed to add user",
+    "updateUserSuccess": "User updated successfully",
+    "updateUserFailed": "Failed to update user",
+    "deleteUserConfirm": "Are you sure you want to delete user {username}?",
+    "deleteUserSuccess": "User deleted successfully",
+    "deleteUserFailed": "Failed to delete user",
+    "getDepartmentsFailed": "Failed to get department list",
+    "checkUserIdFailed": "Failed to check user ID availability",
+    "userIdExists": "User ID already exists",
+    "usernameExists": "Username already exists",
+    "phoneExists": "Phone number already exists",
+    "operationFailed": "Operation failed",
+    "deleteSelfFailed": "You cannot delete yourself",
+    "deleteUserDescription": "Users will not be able to log in after deletion. This operation cannot be undone."
+  },
+  "departmentManagement": {
+    "title": "Department Management",
+    "description": "Manage departments and organizational structure",
+    "addDepartment": "Add Department",
+    "editDepartment": "Edit Department",
+    "deleteDepartment": "Delete Department",
+    "noDepartments": "No departments",
+    "departmentName": "Department Name",
+    "departmentNamePlaceholder": "Enter department name",
+    "deptDescription": "Description",
+    "descriptionPlaceholder": "Enter department description (optional)",
+    "memberCount": "Members",
+    "createdAt": "Created:",
+    "edit": "Edit",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "nameRequired": "Please enter department name",
+    "loadDepartmentsFailed": "Failed to load department list",
+    "addDepartmentSuccess": "Department added successfully",
+    "addDepartmentFailed": "Failed to add department",
+    "updateDepartmentSuccess": "Department updated successfully",
+    "updateDepartmentFailed": "Failed to update department",
+    "deleteDepartmentConfirm": "Are you sure you want to delete department {name}?",
+    "deleteDepartmentSuccess": "Department deleted successfully",
+    "deleteDepartmentFailed": "Failed to delete department"
+  },
+  "modelProviders": {
+    "title": "Model Providers",
+    "description": "Configure AI model providers and API keys",
+    "addProvider": "Add Provider",
+    "editProvider": "Edit Provider",
+    "deleteProvider": "Delete Provider",
+    "providerName": "Provider Name",
+    "apiKey": "API Key",
+    "baseUrl": "Base URL",
+    "models": "Models",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "headers": {
+      "modelConfig": "Model Configuration",
+      "customProviders": "Custom Providers",
+      "builtinProviders": "Built-in Providers"
+    },
+    "descriptions": {
+      "envConfig": "Please configure the corresponding APIKEY in the .env file and restart the service",
+      "customProviderInfo": "Add custom LLM providers that support OpenAI-compatible API format. API keys support direct configuration or environment variable names."
+    },
+    "buttons": {
+      "addCustomProvider": "Add Custom Provider",
+      "testConnection": "Test Connection",
+      "edit": "Edit",
+      "delete": "Delete",
+      "confirmDelete": "Are you sure you want to delete this custom provider?",
+      "confirm": "Confirm",
+      "cancel": "Cancel"
+    },
+    "details": {
+      "apiUrl": "API URL:",
+      "defaultModel": "Default Model:",
+      "availableModels": "Available Models:",
+      "none": "None"
+    },
+    "empty": {
+      "noCustomProviders": "No custom providers"
+    },
+    "stats": {
+      "available": "{count} Available",
+      "notConfigured": "{count} Not Configured"
+    },
+    "modal": {
+      "configTitle": "Configure {provider} Models",
+      "save": "Save Configuration",
+      "cancel": "Cancel",
+      "loadingModels": "Loading model list...",
+      "selectModelsInfo": "Select the models you want to enable in the system. Note that the list may contain non-chat models, please verify carefully."
+    },
+    "warnings": {
+      "unsupportedModels": "Detected models in configuration that don't exist in current provider list. The following models may be deprecated or removed by the provider:",
+      "removeAllUnsupported": "Remove all deprecated models"
+    },
+    "search": {
+      "placeholder": "Search models...",
+      "selected": "Selected {count} models",
+      "filtered": "(currently showing {count} filtered)"
+    }
+  },
+  "home": {
+    "nav": {
+      "agent": "Agent",
+      "graph": "Knowledge Graph",
+      "database": "Knowledge Base"
+    },
+    "hero": {
+      "startChat": "Start Chat",
+      "viewDocs": "View Documentation"
+    }
+  },
+  "agentSingle": {
+    "modal": {
+      "selectAgent": "Select Agent",
+      "title": "Select Agent"
+    },
+    "actions": {
+      "share": "Share",
+      "selectAgent": "Select Agent"
+    },
+    "status": {
+      "loading": "Loading agent...",
+      "unknown": "Unknown agent"
+    },
+    "messages": {
+      "setDefaultSuccess": "Set as default agent successfully",
+      "noExportContent": "No conversation content to export",
+      "noContentYet": "No content to export yet, please start a conversation",
+      "exportSuccess": "Conversation exported as HTML file: {filename}"
+    }
+  },
+  "fileTable": {
+    "actions": {
+      "upload": "Upload",
+      "uploadFile": "Upload File",
+      "uploadFolder": "Upload Folder",
+      "newFolder": "New Folder",
+      "search": "Search",
+      "sort": "Sort",
+      "filter": "Filter Status",
+      "refresh": "Refresh",
+      "multiSelect": "Multi-select",
+      "autoRefresh": "Auto-refresh file status",
+      "togglePanel": "Toggle right panel"
+    },
+    "batch": {
+      "parse": "Batch Parse",
+      "index": "Batch Index",
+      "delete": "Batch Delete",
+      "selected": "{count} items"
+    },
+    "modal": {
+      "indexConfig": "Index Configuration",
+      "newFolder": "New Folder",
+      "folderPlaceholder": "Enter folder name"
+    },
+    "buttons": {
+      "cancel": "Cancel",
+      "confirm": "Confirm"
+    },
+    "fileInfo": {
+      "status": "Status:",
+      "time": "Time:",
+      "error": "Error:",
+      "newSubfolder": "New Subfolder",
+      "deleteFolder": "Delete Folder",
+      "downloadFile": "Download File",
+      "parseFile": "Parse File",
+      "retryParse": "Retry Parse",
+      "index": "Index",
+      "retryIndex": "Retry Index",
+      "reindex": "Re-index",
+      "deleteFile": "Delete File"
+    },
+    "status": {
+      "all": "All Status"
+    }
+  },
+  "fileUpload": {
+    "title": "Add Files",
+    "buttons": {
+      "docHelp": "Document Processing Guide",
+      "cancel": "Cancel",
+      "addToKb": "Add to Knowledge Base"
+    },
+    "settings": {
+      "storageLocation": "Storage Location",
+      "ocrEngine": "OCR Engine",
+      "autoIndex": "Auto-index after upload",
+      "selectFolder": "Select target folder (default: root)",
+      "folderDescription": "Select the target folder to save files",
+      "checkStatus": "Check service status"
+    },
+    "uploadMode": {
+      "file": "Upload File",
+      "folder": "Upload Folder"
+    },
+    "uploadArea": {
+      "dragText": "Click or drag files here",
+      "supportedTypes": "Supported types:"
+    },
+    "alerts": {
+      "pdfOcrSuggestion": "PDF or image files detected, OCR is recommended to extract text",
+      "duplicateFiles": "Duplicate files exist ({count})"
+    },
+    "ocr": {
+      "disabled": "OCR disabled, text files only",
+      "healthy": "Service healthy",
+      "checkStatus": "Click refresh icon to check status",
+      "unhealthy": "Service unhealthy"
+    },
+    "lightrag": {
+      "autoIndexTip": "LightRAG will use default parameters for auto-indexing"
+    }
+  },
+  "fileDetail": {
+    "title": "File Details",
+    "viewInfo": {
+      "chunks": "{count} chunks",
+      "characters": "{count} characters"
+    },
+    "buttons": {
+      "download": "Download",
+      "downloadOriginal": "Download Original",
+      "downloadMarkdown": "Download Markdown"
+    },
+    "loading": "Loading document content...",
+    "empty": {
+      "noContent": "No file content",
+      "noChunks": "No chunk information"
+    },
+    "messages": {
+      "incompleteInfo": "Incomplete file information",
+      "noDatabaseId": "Unable to get database ID, please refresh the page",
+      "downloadSuccess": "Download successful",
+      "downloadFailed": "Download failed",
+      "noMarkdownContent": "No Markdown content to download"
+    }
+  },
+  "querySection": {
+    "input": {
+      "placeholder": "Enter query content..."
+    },
+    "examples": {
+      "label": "Examples:",
+      "generating": "AI generating...",
+      "loading": "Loading...",
+      "empty": "No questions, click left button to generate"
+    },
+    "tooltips": {
+      "generateQuestions": "Click to manually generate test questions",
+      "switchToFormatted": "Switch to formatted display",
+      "switchToRaw": "Switch to raw data"
+    },
+    "metadata": {
+      "queryMode": "Query Mode:",
+      "stats": "Stats:",
+      "found": "Found",
+      "entities": "entities",
+      "relations": "relations",
+      "chunks": "document chunks",
+      "used": "used",
+      "highLevelKeywords": "High-level Keywords:",
+      "lowLevelKeywords": "Low-level Keywords:"
+    },
+    "collapse": {
+      "entities": "Entities",
+      "relationships": "Relationships",
+      "chunks": "Document Chunks",
+      "sources": "Sources"
+    },
+    "info": {
+      "description": "Description:",
+      "source": "Source:",
+      "viewFile": "View File",
+      "weight": "Weight:",
+      "keywords": "Keywords"
+    }
+  },
+  "ragEvaluation": {
+    "toolbar": {
+      "benchmark": "Evaluation Benchmark",
+      "selectBenchmark": "Please select evaluation benchmark",
+      "questions": "{count} questions",
+      "refreshBenchmarks": "Refresh benchmark list",
+      "retrievalConfig": "Retrieval Configuration",
+      "startEvaluation": "Start Evaluation"
+    },
+    "modelConfig": {
+      "answerGeneration": "Answer Generation Model",
+      "answerJudgment": "Answer Judgment Model",
+      "notRequired": "(not required for current benchmark)"
+    },
+    "empty": {
+      "selectOrManage": "Please select a benchmark above or go to benchmark management",
+      "goToManagement": "Go to Benchmark Management"
+    },
+    "history": {
+      "title": "Evaluation History",
+      "refresh": "Refresh",
+      "viewResults": "View Results",
+      "delete": "Delete",
+      "confirmDelete": "Are you sure you want to delete this evaluation record?",
+      "deleteWarning": "Cannot be recovered after deletion",
+      "confirm": "Confirm",
+      "cancel": "Cancel"
+    },
+    "resultModal": {
+      "title": "Evaluation Results",
+      "loading": "Loading evaluation results...",
+      "basicInfo": "Basic Information",
+      "taskId": "Task ID",
+      "status": "Status",
+      "overallScore": "Overall Score",
+      "totalQuestions": "Total Questions",
+      "completed": "Completed",
+      "totalDuration": "Total Duration"
+    },
+    "report": {
+      "retrievalConfig": "Retrieval Configuration",
+      "overallReport": "Overall Evaluation Report",
+      "retrievalMetrics": "Retrieval Metrics",
+      "answerAccuracy": "Answer Accuracy",
+      "correctAnswers": "Correct Answers:",
+      "accuracy": "Accuracy:"
+    }
+  },
+  "agentChat": {
+    "actions": {
+      "newChat": "New Chat",
+      "selectAgent": "Select Agent",
+      "state": "State",
+      "viewState": "View work state",
+      "noState": "No work state"
+    },
+    "loading": {
+      "messages": "Loading messages...",
+      "generating": "Generating reply..."
+    },
+    "greeting": "Hello, I am {agentName}!",
+    "input": {
+      "placeholder": "Enter your question..."
+    },
+    "note": "Please verify the reliability of the content",
+    "agent": {
+      "default": "Agent",
+      "loading": "Loading agent..."
+    }
+  },
+  "agentConfig": {
+    "alerts": {
+      "noConfig": "This agent has no configuration items",
+      "noCheckpointer": "This agent has no Checkpointer configured, functionality may not work properly"
+    },
+    "labels": {
+      "modelSelection": "Model Selection",
+      "systemPrompt": "System Prompt",
+      "clickToEdit": "Click to edit",
+      "toolSelection": "Tool Selection",
+      "selected": "Selected",
+      "tools": "tools",
+      "clear": "Clear",
+      "selectTools": "Select Tools",
+      "boolean": "Boolean",
+      "singleSelect": "Single Select",
+      "multiSelect": "Multi Select",
+      "items": "items",
+      "number": "Number",
+      "slider": "Slider",
+      "other": "Other"
+    },
+    "buttons": {
+      "saveAndReload": "Save Configuration and Reload"
+    },
+    "toolsModal": {
+      "title": "Select Tools",
+      "searchPlaceholder": "Search tools...",
+      "selectedCount": "Selected {count} tools",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
+    }
+  },
+  "mcpServers": {
+    "header": {
+      "title": "MCP Server Management",
+      "description": "Manage MCP (Model Context Protocol) server configurations. Add, edit, or delete MCP servers to extend AI capabilities."
+    },
+    "buttons": {
+      "addServer": "Add Server"
+    },
+    "stats": {
+      "configured": "Configured {count} MCP servers"
+    },
+    "empty": {
+      "noServers": "No MCP server configurations"
+    },
+    "actions": {
+      "viewDetails": "View Details",
+      "details": "Details",
+      "testConnection": "Test Connection",
+      "test": "Test",
+      "editConfig": "Edit Configuration",
+      "edit": "Edit",
+      "deleteServer": "Delete Server",
+      "delete": "Delete",
+      "cannotDeleteBuiltin": "Built-in MCP cannot be deleted"
+    },
+    "modal": {
+      "addTitle": "Add MCP Server",
+      "editTitle": "Edit MCP Server",
+      "formMode": "Form Mode",
+      "jsonMode": "JSON Mode"
+    },
+    "form": {
+      "serverName": "Server Name",
+      "serverNamePlaceholder": "Enter server name (unique identifier)",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter server description",
+      "transportType": "Transport Type",
+      "icon": "Icon",
+      "iconPlaceholder": "Enter emoji, e.g. 🧠",
+      "serverUrl": "Server URL",
+      "httpHeaders": "HTTP Headers",
+      "httpTimeout": "HTTP Timeout (seconds)",
+      "sseReadTimeout": "SSE Read Timeout (seconds)",
+      "command": "Command",
+      "args": "Arguments",
+      "argsPlaceholder": "Enter argument and press Enter to add, e.g.: -m",
+      "tags": "Tags",
+      "tagsPlaceholder": "Enter tag and press Enter to add"
+    }
+  },
+  "knowledgeBaseCard": {
+    "title": "Database info loading",
+    "copyId": "Copy knowledge base ID",
+    "noDescription": "No description",
+    "modal": {
+      "editTitle": "Edit Knowledge Base Info",
+      "deleteDatabase": "Delete Database",
+      "cancel": "Cancel",
+      "confirm": "Confirm"
+    },
+    "form": {
+      "name": "Knowledge Base Name",
+      "namePlaceholder": "Enter knowledge base name",
+      "description": "Knowledge Base Description",
+      "descriptionPlaceholder": "Enter knowledge base description",
+      "autoGenerate": "Auto-generate questions",
+      "enable": "Enable",
+      "disable": "Disable",
+      "autoGenerateHint": "Auto-generate test questions after uploading files",
+      "llmModel": "Language Model (LLM)",
+      "selectModel": "Select model"
+    },
+    "messages": {
+      "idEmpty": "Knowledge base ID is empty",
+      "idCopied": "Knowledge base ID copied to clipboard",
+      "nameRequired": "Please enter knowledge base name"
+    }
+  },
+  "mindMap": {
+    "loading": "Loading...",
+    "generating": "AI is generating mind map...",
+    "empty": "No mind map",
+    "generate": "Generate Mind Map",
+    "toolbar": {
+      "regenerate": "Regenerate",
+      "fitView": "Fit View"
+    },
+    "messages": {
+      "loadingContent": "Loading document content...",
+      "loadFailed": "Failed to load mind map",
+      "generateSuccess": "Mind map generated successfully!",
+      "generateFailed": "Generation failed",
+      "renderFailed": "Render failed: Cannot find SVG container"
+    }
+  },
+  "graphCanvas": {
+    "stats": {
+      "nodes": "Nodes",
+      "edges": "Edges"
+    }
+  },
+  "evaluationBenchmarks": {
+    "header": {
+      "count": "{count} benchmarks",
+      "refresh": "Refresh",
+      "upload": "Upload Benchmark",
+      "generate": "Auto Generate"
+    },
+    "empty": {
+      "title": "No evaluation benchmarks",
+      "description": "Upload or generate evaluation benchmarks to get started"
+    },
+    "noDescription": "No description",
+    "types": {
+      "both": "Retrieval + Q&A",
+      "retrieval": "Retrieval Evaluation",
+      "answer": "Q&A Evaluation",
+      "query": "Query Only"
+    },
+    "tags": {
+      "goldChunk": "Gold Chunk",
+      "goldAnswer": "Gold Answer"
+    },
+    "footer": {
+      "questions": "{count} questions"
+    },
+    "modal": {
+      "title": "Evaluation Benchmark Details",
+      "questionCount": "Question Count:",
+      "goldChunk": "Gold Chunk:",
+      "goldAnswer": "Gold Answer:",
+      "yes": "Yes",
+      "no": "No",
+      "questionList": "Question List (Total {count})",
+      "more": "...and {count} more"
+    },
+    "table": {
+      "number": "#",
+      "question": "Question",
+      "goldChunk": "Gold Chunk",
+      "goldAnswer": "Gold Answer"
+    },
+    "pagination": {
+      "range": "Showing {start}-{end} of {total}"
+    },
+    "messages": {
+      "formatError": "Response format error",
+      "dataFormatError": "Benchmark data format error",
+      "loadFailed": "Failed to load evaluation benchmarks",
+      "uploadSuccess": "Benchmark uploaded successfully"
+    }
+  },
+  "searchConfig": {
+    "title": "Retrieval Configuration",
+    "buttons": {
+      "save": "Save",
+      "cancel": "Cancel"
+    },
+    "loading": "Loading configuration parameters...",
+    "error": {
+      "loadFailed": "Configuration load failed",
+      "reload": "Reload"
+    },
+    "form": {
+      "enable": "Enable",
+      "disable": "Disable"
+    },
+    "messages": {
+      "resetSuccess": "Reset to default configuration",
+      "saveError": "Unable to save configuration: Missing knowledge base ID",
+      "saveSuccess": "Configuration saved",
+      "saveFailed": "Save failed",
+      "saveToKbFailed": "Failed to save configuration to knowledge base"
+    }
+  },
+  "modelSelector": {
+    "placeholder": "Select model",
+    "status": {
+      "checking": "Checking...",
+      "check": "Check",
+      "unknown": "Status unknown",
+      "available": "Available",
+      "unavailable": "Unavailable",
+      "error": "Error",
+      "noDetails": "No details"
+    }
+  },
+  "benchmarkGenerate": {
+    "title": "Auto Generate Evaluation Benchmark",
+    "form": {
+      "name": "Benchmark Name",
+      "namePlaceholder": "Enter evaluation benchmark name",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter evaluation benchmark description (optional)",
+      "params": "Generation Parameters",
+      "questionCount": "Question Count",
+      "questionCountPlaceholder": "Number of questions to generate",
+      "neighborsCount": "Similar Chunks Count",
+      "neighborsCountPlaceholder": "Number of similar chunks to select each time",
+      "llmConfig": "LLM Configuration",
+      "configParams": "Configuration Parameters",
+      "llmModel": "LLM Model Configuration",
+      "selectLlm": "Select LLM model",
+      "embeddingModel": "Embedding Model",
+      "selectEmbedding": "Select Embedding model",
+      "llmPlaceholder": "Select LLM model for question generation",
+      "embeddingPlaceholder": "Select Embedding model for similarity calculation",
+      "temperature": "Temperature",
+      "temperaturePlaceholder": "Control randomness of generated content",
+      "maxTokens": "Max Tokens",
+      "maxTokensPlaceholder": "Maximum length of generated content"
+    },
+    "validation": {
+      "nameRequired": "Please enter benchmark name",
+      "nameLength": "Benchmark name should be 2-100 characters",
+      "questionCountRequired": "Please enter question count",
+      "llmRequired": "Please select LLM model",
+      "embeddingRequired": "Please select Embedding model"
+    },
+    "extra": {
+      "learnMore": "Want to learn about benchmark generation principles? Check",
+      "documentation": "Documentation"
+    },
+    "messages": {
+      "taskSubmitted": "Generation task submitted, please check results later",
+      "generateFailed": "Generation failed"
+    }
+  },
+  "benchmarkUpload": {
+    "title": "Upload Evaluation Benchmark",
+    "form": {
+      "name": "Benchmark Name",
+      "namePlaceholder": "Enter evaluation benchmark name",
+      "description": "Description",
+      "descriptionPlaceholder": "Enter evaluation benchmark description (optional)",
+      "file": "Benchmark File"
+    },
+    "upload": {
+      "dragText": "Click or drag file to this area to upload",
+      "hint": "Only supports JSONL format files (.jsonl)"
+    },
+    "validation": {
+      "nameRequired": "Please enter benchmark name",
+      "nameLength": "Benchmark name should be 2-100 characters",
+      "fileRequired": "Please select benchmark file"
+    },
+    "extra": {
+      "learnMore": "Want to learn about benchmark format? Check",
+      "documentation": "Documentation"
+    },
+    "messages": {
+      "jsonlOnly": "Only JSONL format files are supported",
+      "fileTooLarge": "File size cannot exceed 100MB",
+      "readFailed": "File read failed",
+      "fileEmpty": "File cannot be empty",
+      "formatError": "File format error, please check JSONL format",
+      "validationFailed": "File validation failed",
+      "selectFile": "Please select benchmark file",
+      "uploadSuccess": "Upload successful",
+      "uploadFailed": "Upload failed"
+    }
+  }
+}

@@ -28,7 +28,6 @@ class BaseAgent:
     def __init__(self, **kwargs):
         self.graph = None  # will be covered by get_graph
         self.checkpointer = None
-        self._async_conn = None
         self.workdir = Path(sys_config.save_dir) / "agents" / self.module_name
         self.workdir.mkdir(parents=True, exist_ok=True)
         self._metadata_cache = None  # Cache for metadata to avoid repeated file reads
@@ -63,30 +62,19 @@ class BaseAgent:
 
     async def stream_values(self, messages: list[str], input_context=None, **kwargs):
         graph = await self.get_graph()
-        context = self.context_schema()
-        agent_config = (input_context or {}).get("agent_config")
-        if isinstance(agent_config, dict):
-            context.update(agent_config)
-        context.update(input_context or {})
+        context = self.context_schema.from_file(module_name=self.module_name, input_context=input_context)
         for event in graph.astream({"messages": messages}, stream_mode="values", context=context):
             yield event["messages"]
 
     async def stream_messages(self, messages: list[str], input_context=None, **kwargs):
         graph = await self.get_graph()
-        context = self.context_schema()
-        agent_config = (input_context or {}).get("agent_config")
-        if isinstance(agent_config, dict):
-            context.update(agent_config)
-        context.update(input_context or {})
+        context = self.context_schema.from_file(module_name=self.module_name, input_context=input_context)
         logger.debug(f"stream_messages: {context}")
         # TODO Checkpointer 似乎还没有适配最新的 1.0 Context API
 
         # 从 input_context 中提取 attachments（如果有）
         attachments = (input_context or {}).get("attachments", [])
-        input_config = {
-            "configurable": {"thread_id": context.thread_id, "user_id": context.user_id},
-            "recursion_limit": 300,
-        }
+        input_config = {"configurable": input_context, "recursion_limit": 300}
 
         async for msg, metadata in graph.astream(
             {"messages": messages, "attachments": attachments},
@@ -98,19 +86,12 @@ class BaseAgent:
 
     async def invoke_messages(self, messages: list[str], input_context=None, **kwargs):
         graph = await self.get_graph()
-        context = self.context_schema()
-        agent_config = (input_context or {}).get("agent_config")
-        if isinstance(agent_config, dict):
-            context.update(agent_config)
-        context.update(input_context or {})
+        context = self.context_schema.from_file(module_name=self.module_name, input_context=input_context)
         logger.debug(f"invoke_messages: {context}")
 
         # 从 input_context 中提取 attachments（如果有）
         attachments = (input_context or {}).get("attachments", [])
-        input_config = {
-            "configurable": {"thread_id": context.thread_id, "user_id": context.user_id},
-            "recursion_limit": 100,
-        }
+        input_config = {"configurable": input_context, "recursion_limit": 100}
 
         msg = await graph.ainvoke(
             {"messages": messages, "attachments": attachments}, context=context, config=input_config
@@ -166,9 +147,6 @@ class BaseAgent:
         pass
 
     async def _get_checkpointer(self):
-        if self.checkpointer is not None:
-            return self.checkpointer
-
         # 创建数据库连接并确保设置 checkpointer
         checkpointer = None
 
@@ -179,20 +157,15 @@ class BaseAgent:
             logger.error(f"构建 Graph 设置 checkpointer 时出错: {e}, 尝试使用内存存储")
             checkpointer = InMemorySaver()
 
-        self.checkpointer = checkpointer
-        return self.checkpointer
+        return checkpointer
 
     async def get_async_conn(self) -> aiosqlite.Connection:
         """获取异步数据库连接"""
-        if self._async_conn is not None:
-            return self._async_conn
-
         conn = await aiosqlite.connect(os.path.join(self.workdir, "aio_history.db"))
         # Patch: langgraph's AsyncSqliteSaver expects is_alive() method which aiosqlite may not have
         if not hasattr(conn, "is_alive"):
             conn.is_alive = lambda: True
-        self._async_conn = conn
-        return self._async_conn
+        return conn
 
     async def get_aio_memory(self) -> AsyncSqliteSaver:
         """获取异步存储实例"""

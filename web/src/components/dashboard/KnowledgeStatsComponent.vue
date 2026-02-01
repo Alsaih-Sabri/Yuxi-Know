@@ -1,27 +1,27 @@
 <template>
-  <a-card title="知识库使用情况" :loading="loading" class="dashboard-card">
+  <a-card :title="$t('dashboard.knowledgeUsage')" :loading="loading" class="dashboard-card">
     <!-- 知识库概览 -->
     <div class="stats-overview">
       <a-row :gutter="16">
         <a-col :span="8">
           <a-statistic
-            title="知识库总数"
+            :title="$t('dashboard.totalDatabases')"
             :value="knowledgeStats?.total_databases || 0"
             :value-style="{ color: 'var(--color-info-500)' }"
-            suffix="个"
+            :suffix="$t('dashboard.items')"
           />
         </a-col>
         <a-col :span="8">
           <a-statistic
-            title="文件总数"
+            :title="$t('dashboard.totalFiles')"
             :value="knowledgeStats?.total_files || 0"
             :value-style="{ color: 'var(--color-success-500)' }"
-            suffix="个"
+            :suffix="$t('dashboard.items')"
           />
         </a-col>
         <a-col :span="8">
           <a-statistic
-            title="存储容量"
+            :title="$t('dashboard.storageCapacity')"
             :value="formattedStorageSize"
             :value-style="{ color: 'var(--color-warning-500)' }"
           />
@@ -37,7 +37,7 @@
       <a-col :span="24">
         <div class="chart-container">
           <div class="chart-header">
-            <h4>类型分布</h4>
+            <h4>{{ $t('dashboard.typeDistribution') }}</h4>
             <div class="legend" v-if="dbTypeLegend.length">
               <div class="legend-item" v-for="(item, idx) in dbTypeLegend" :key="item.name">
                 <span
@@ -57,7 +57,7 @@
       <!-- 文件类型分布 -->
       <a-col :span="24">
         <div class="chart-container">
-          <h4>文件类型分布</h4>
+          <h4>{{ $t('dashboard.fileTypeDistribution') }}</h4>
           <div ref="fileTypeChartRef" class="chart donut-chart-container">
             <div class="carousel-info" v-if="fileTypeData.length > 0">
               <div
@@ -111,9 +111,12 @@
 
 <script setup>
 import { ref, onMounted, watch, nextTick, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import * as echarts from 'echarts'
 import { getColorByIndex, getColorPalette } from '@/utils/chartColors'
 import { useThemeStore } from '@/stores/theme'
+
+const { t } = useI18n()
 
 // CSS 变量解析工具函数
 function getCSSVariable(variableName, element = document.documentElement) {
@@ -177,7 +180,7 @@ const initDbTypeChart = () => {
   if (!dbTypeChartRef.value || !props.knowledgeStats?.databases_by_type) return
 
   const entries = Object.entries(props.knowledgeStats.databases_by_type)
-    .map(([type, count]) => ({ name: type || '未知', value: count }))
+    .map(([type, count]) => ({ name: type || t('dashboard.unknown'), value: count }))
     .filter((item) => item.value > 0)
 
   // update legend data
@@ -257,7 +260,7 @@ const initFileTypeChart = () => {
   if (Object.keys(fileTypesData).length > 0) {
     const data = Object.entries(fileTypesData)
       .map(([type, count]) => ({
-        name: type || '未知',
+        name: type || t('dashboard.unknown'),
         value: count
       }))
       .sort((a, b) => b.value - a.value) // 按数量排序
@@ -294,7 +297,7 @@ const initFileTypeChart = () => {
       },
       series: [
         {
-          name: '文件类型',
+          name: t('dashboard.fileType'),
           type: 'pie',
           radius: ['45%', '75%'], // 调整为更大的环，为中心信息留出更多空间
           center: ['50%', '45%'], // 向上移动，为中心和底部图例留出空间
@@ -344,7 +347,7 @@ const initFileTypeChart = () => {
       },
       series: [
         {
-          name: '文件类型',
+          name: t('dashboard.fileType'),
           type: 'pie',
           radius: ['45%', '75%'],
           center: ['50%', '45%'],
@@ -367,7 +370,7 @@ const initFileTypeChart = () => {
           labelLine: {
             show: false
           },
-          data: [{ name: '暂无数据', value: 1 }],
+          data: [{ name: t('dashboard.noDataAvailable'), value: 1 }],
           color: [getCSSVariable('--color-info-500')]
         }
       ]

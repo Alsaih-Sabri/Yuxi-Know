@@ -3,20 +3,20 @@
     <!-- 操作栏 -->
     <div class="benchmarks-header">
       <div class="header-left">
-        <span class="total-count">{{ benchmarks.length }} 个基准</span>
+        <span class="total-count">{{ $t('evaluationBenchmarks.header.count', { count: benchmarks.length }) }}</span>
       </div>
       <div class="header-right">
         <a-button @click="loadBenchmarks">
           <template #icon><ReloadOutlined /></template>
-          刷新
+          {{ $t('evaluationBenchmarks.buttons.refresh') }}
         </a-button>
         <a-button type="primary" @click="showUploadModal">
           <template #icon><UploadOutlined /></template>
-          上传基准
+          {{ $t('evaluationBenchmarks.buttons.upload') }}
         </a-button>
         <a-button @click="showGenerateModal">
           <template #icon><RobotOutlined /></template>
-          自动生成
+          {{ $t('evaluationBenchmarks.buttons.generate') }}
         </a-button>
       </div>
     </div>
@@ -25,8 +25,8 @@
     <div class="benchmarks-list">
       <div v-if="!loading && benchmarks.length === 0" class="empty-state">
         <div class="empty-icon">📋</div>
-        <div class="empty-title">暂无评估基准</div>
-        <div class="empty-description">上传或生成评估基准开始使用</div>
+        <div class="empty-title">{{ $t('evaluationBenchmarks.empty.title') }}</div>
+        <div class="empty-description">{{ $t('evaluationBenchmarks.empty.description') }}</div>
       </div>
 
       <div v-else-if="loading" class="loading-state">
@@ -54,7 +54,7 @@
               </div>
             </div>
 
-            <p class="benchmark-desc">{{ benchmark.description || '暂无描述' }}</p>
+            <p class="benchmark-desc">{{ benchmark.description || $t('evaluationBenchmarks.empty.noDescription') }}</p>
 
             <!-- 标签区域 -->
             <div class="benchmark-meta">
@@ -63,21 +63,21 @@
                   v-if="benchmark.has_gold_chunks && benchmark.has_gold_answers"
                   class="type-badge type-both"
                 >
-                  检索 + 问答
+                  {{ $t('evaluationBenchmarks.types.both') }}
                 </span>
                 <span v-else-if="benchmark.has_gold_chunks" class="type-badge type-retrieval">
-                  检索评估
+                  {{ $t('evaluationBenchmarks.types.retrieval') }}
                 </span>
                 <span v-else-if="benchmark.has_gold_answers" class="type-badge type-answer">
-                  问答评估
+                  {{ $t('evaluationBenchmarks.types.answer') }}
                 </span>
-                <span v-else class="type-badge type-query">仅查询</span>
+                <span v-else class="type-badge type-query">{{ $t('evaluationBenchmarks.types.queryOnly') }}</span>
 
                 <span :class="['tag', benchmark.has_gold_chunks ? 'tag-yes' : 'tag-no']">
-                  {{ benchmark.has_gold_chunks ? '✓' : '✗' }} 黄金Chunk
+                  {{ benchmark.has_gold_chunks ? '✓' : '✗' }} {{ $t('evaluationBenchmarks.labels.goldChunk') }}
                 </span>
                 <span :class="['tag', benchmark.has_gold_answers ? 'tag-yes' : 'tag-no']">
-                  {{ benchmark.has_gold_answers ? '✓' : '✗' }} 黄金答案
+                  {{ benchmark.has_gold_answers ? '✓' : '✗' }} {{ $t('evaluationBenchmarks.labels.goldAnswer') }}
                 </span>
               </div>
             </div>
@@ -86,7 +86,7 @@
           <!-- 底部信息 -->
           <div class="benchmark-footer">
             <span class="benchmark-time">{{ formatDate(benchmark.created_at) }}</span>
-            <span class="benchmark-count">{{ benchmark.question_count }} 个问题</span>
+            <span class="benchmark-count">{{ $t('evaluationBenchmarks.labels.questionCount', { count: benchmark.question_count }) }}</span>
           </div>
         </div>
       </div>
@@ -107,32 +107,32 @@
     />
 
     <!-- 预览模态框 -->
-    <a-modal v-model:open="previewModalVisible" title="评估基准详情" width="1200px" :footer="null">
+    <a-modal v-model:open="previewModalVisible" :title="$t('evaluationBenchmarks.preview.title')" width="1200px" :footer="null">
       <div v-if="previewData" class="preview-content">
         <div class="preview-header">
           <h3>{{ previewData.name }}</h3>
           <div class="preview-meta">
             <span class="meta-item">
-              <span class="meta-label">问题数:</span>
+              <span class="meta-label">{{ $t('evaluationBenchmarks.preview.questionCount') }}</span>
               {{ previewData.question_count }}
             </span>
             <span class="meta-item">
-              <span class="meta-label">黄金Chunk:</span>
+              <span class="meta-label">{{ $t('evaluationBenchmarks.preview.goldChunk') }}</span>
               <span :class="previewData.has_gold_chunks ? 'status-yes' : 'status-no'">
-                {{ previewData.has_gold_chunks ? '有' : '无' }}
+                {{ previewData.has_gold_chunks ? $t('common.yes') : $t('common.no') }}
               </span>
             </span>
             <span class="meta-item">
-              <span class="meta-label">黄金答案:</span>
+              <span class="meta-label">{{ $t('evaluationBenchmarks.preview.goldAnswer') }}</span>
               <span :class="previewData.has_gold_answers ? 'status-yes' : 'status-no'">
-                {{ previewData.has_gold_answers ? '有' : '无' }}
+                {{ previewData.has_gold_answers ? $t('common.yes') : $t('common.no') }}
               </span>
             </span>
           </div>
         </div>
 
         <div class="preview-questions" v-if="previewQuestions && previewQuestions.length > 0">
-          <h4>问题列表 (共{{ previewPagination.total }}条)</h4>
+          <h4>{{ $t('evaluationBenchmarks.preview.questionList', { total: previewPagination.total }) }}</h4>
           <a-table
             :dataSource="previewQuestions"
             :columns="displayedQuestionColumns"
@@ -190,8 +190,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message, Modal } from 'ant-design-vue'
+
+const { t } = useI18n()
 import {
   UploadOutlined,
   RobotOutlined,

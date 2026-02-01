@@ -1,30 +1,30 @@
 <template>
   <a-modal
     v-model:open="visible"
-    title="自动生成评估基准"
+    :title="$t('benchmarkGenerate.title')"
     width="600px"
     :confirmLoading="generating"
     @ok="handleGenerate"
     @cancel="handleCancel"
   >
     <a-form ref="formRef" :model="formState" :rules="rules" layout="vertical">
-      <a-form-item label="基准名称" name="name">
-        <a-input v-model:value="formState.name" placeholder="请输入评估基准名称" />
+      <a-form-item :label="$t('benchmarkGenerate.form.name')" name="name">
+        <a-input v-model:value="formState.name" :placeholder="$t('benchmarkGenerate.form.namePlaceholder')" />
       </a-form-item>
 
-      <a-form-item label="描述" name="description">
+      <a-form-item :label="$t('benchmarkGenerate.form.description')" name="description">
         <a-textarea
           v-model:value="formState.description"
-          placeholder="请输入评估基准描述（可选）"
+          :placeholder="$t('benchmarkGenerate.form.descriptionPlaceholder')"
           :rows="3"
         />
       </a-form-item>
 
-      <a-form-item label="生成参数" name="params" :extra="extraText">
+      <a-form-item :label="$t('benchmarkGenerate.form.params')" name="params" :extra="extraText">
         <a-row :gutter="16">
           <a-col :span="12">
             <a-form-item
-              label="问题数量"
+              :label="$t('benchmarkGenerate.form.questionCount')"
               name="count"
               :labelCol="{ span: 24 }"
               :wrapperCol="{ span: 24 }"
@@ -34,13 +34,13 @@
                 :min="1"
                 :max="100"
                 style="width: 100%"
-                placeholder="生成问题数量"
+                :placeholder="$t('benchmarkGenerate.form.questionCountPlaceholder')"
               />
             </a-form-item>
           </a-col>
           <a-col :span="12">
             <a-form-item
-              label="相似chunks数量"
+              :label="$t('benchmarkGenerate.form.neighborsCount')"
               name="neighbors_count"
               :labelCol="{ span: 24 }"
               :wrapperCol="{ span: 24 }"
@@ -50,19 +50,19 @@
                 :min="0"
                 :max="10"
                 style="width: 100%"
-                placeholder="每次选取的相似chunks数量"
+                :placeholder="$t('benchmarkGenerate.form.neighborsCountPlaceholder')"
               />
             </a-form-item>
           </a-col>
         </a-row>
       </a-form-item>
 
-      <a-form-item label="LLM配置" name="llm_config">
-        <a-card size="small" title="配置参数">
+      <a-form-item :label="$t('benchmarkGenerate.form.llmConfig')" name="llm_config">
+        <a-card size="small" :title="$t('benchmarkGenerate.form.configParams')">
           <a-form-item
-            label="LLM模型配置"
+            :label="$t('benchmarkGenerate.form.llmModel')"
             name="llm_model_spec"
-            :rules="[{ required: true, message: '请选择LLM模型' }]"
+            :rules="[{ required: true, message: t('benchmarkGenerate.validation.llmRequired') }]"
           >
             <ModelSelectorComponent
               :model_spec="formState.llm_model_spec"
@@ -128,7 +128,10 @@
 
 <script setup>
 import { ref, reactive, computed, watch, h } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
+
+const { t } = useI18n()
 import { evaluationApi } from '@/apis/knowledge_api'
 import ModelSelectorComponent from '@/components/ModelSelectorComponent.vue'
 import EmbeddingModelSelector from '@/components/EmbeddingModelSelector.vue'

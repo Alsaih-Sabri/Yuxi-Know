@@ -1,8 +1,10 @@
 <script setup>
-import { ref, reactive, onMounted, computed, provide } from 'vue'
+import { ref, reactive, onMounted, useTemplateRef, computed, provide } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { GithubOutlined } from '@ant-design/icons-vue'
 import { Bot, Waypoints, LibraryBig, BarChart3, CircleCheck } from 'lucide-vue-next'
+import { onLongPress } from '@vueuse/core'
 
 import { useConfigStore } from '@/stores/config'
 import { useDatabaseStore } from '@/stores/database'
@@ -13,7 +15,9 @@ import UserInfoComponent from '@/components/UserInfoComponent.vue'
 import DebugComponent from '@/components/DebugComponent.vue'
 import TaskCenterDrawer from '@/components/TaskCenterDrawer.vue'
 import SettingsModal from '@/components/SettingsModal.vue'
+import LanguageSwitcher from '@/components/LanguageSwitcher.vue'
 
+const { t } = useI18n()
 const configStore = useConfigStore()
 const databaseStore = useDatabaseStore()
 const infoStore = useInfoStore()
@@ -31,6 +35,7 @@ const isLoadingStars = ref(false)
 
 // Add state for debug modal
 const showDebugModal = ref(false)
+const htmlRefHook = useTemplateRef('htmlRefHook')
 
 // Add state for settings modal
 const showSettingsModal = ref(false)
@@ -39,6 +44,21 @@ const showSettingsModal = ref(false)
 const openSettingsModal = () => {
   showSettingsModal.value = true
 }
+
+// Setup long press for debug modal
+onLongPress(
+  htmlRefHook,
+  () => {
+    console.log('long press')
+    showDebugModal.value = true
+  },
+  {
+    delay: 1000, // 1秒长按
+    modifiers: {
+      prevent: true
+    }
+  }
+)
 
 // Handle debug modal close
 const handleDebugModalClose = () => {
@@ -86,32 +106,32 @@ console.log(route)
 const activeTaskCount = computed(() => activeCountRef.value || 0)
 
 // 下面是导航菜单部分，添加智能体项
-const mainList = [
+const mainList = computed(() => [
   {
-    name: '智能体',
+    name: t('nav.agent'),
     path: '/agent',
     icon: Bot,
     activeIcon: Bot
   },
   {
-    name: '图谱',
+    name: t('nav.graph'),
     path: '/graph',
     icon: Waypoints,
     activeIcon: Waypoints
   },
   {
-    name: '知识库',
+    name: t('nav.database'),
     path: '/database',
     icon: LibraryBig,
     activeIcon: LibraryBig
   },
   {
-    name: 'Dashboard',
+    name: t('nav.dashboard'),
     path: '/dashboard',
     icon: BarChart3,
     activeIcon: BarChart3
   }
-]
+])
 
 // Provide settings modal methods to child components
 provide('settingsModal', {
@@ -152,7 +172,7 @@ provide('settingsModal', {
           @click="taskerStore.openDrawer()"
         >
           <a-tooltip placement="right">
-            <template #title>任务中心</template>
+            <template #title>{{ t('nav.taskCenter') }}</template>
             <a-badge
               :count="activeTaskCount"
               :overflow-count="99"
@@ -164,10 +184,13 @@ provide('settingsModal', {
           </a-tooltip>
         </div>
       </div>
-      <div class="fill"></div>
+      <div ref="htmlRefHook" class="fill debug-trigger"></div>
+      <div class="nav-item language-switcher">
+        <LanguageSwitcher />
+      </div>
       <div class="github nav-item">
         <a-tooltip placement="right">
-          <template #title>欢迎 Star</template>
+          <template #title>{{ t('nav.welcomeStar') }}</template>
           <a href="https://github.com/xerrors/Yuxi-Know" target="_blank" class="github-link">
             <GithubOutlined class="icon" />
             <span v-if="githubStars > 0" class="github-stars">
@@ -191,7 +214,7 @@ provide('settingsModal', {
     <!-- Debug Modal -->
     <a-modal
       v-model:open="showDebugModal"
-      title="调试面板"
+      :title="t('nav.debugPanel')"
       width="90%"
       :footer="null"
       @cancel="handleDebugModalClose"
@@ -216,6 +239,15 @@ provide('settingsModal', {
   width: 100%;
   height: 100vh;
   min-width: var(--min-width);
+
+  .debug-panel {
+    position: absolute;
+    z-index: 100;
+    right: 0;
+    bottom: 50px;
+    border-radius: 20px 0 0 20px;
+    cursor: pointer;
+  }
 }
 
 div.header,
@@ -251,7 +283,12 @@ div.header,
     gap: 16px;
   }
 
-  .fill {
+  // 添加debug触发器样式
+  .debug-trigger {
+    position: relative;
+    height: 100%;
+    width: 100%;
+    min-height: 20px;
     flex-grow: 1;
   }
 

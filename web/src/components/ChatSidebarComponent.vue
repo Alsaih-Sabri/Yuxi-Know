@@ -23,9 +23,9 @@
           class="new-chat-btn"
           :disabled="chatUIStore.creatingNewChat"
         >
-          <LoaderCircle v-if="chatUIStore.creatingNewChat" size="18" class="loading-icon" />
-          <MessageSquarePlus v-else size="18" />
-          创建新对话
+          <LoaderCircle v-if="chatUIStore.creatingNewChat" size="20" class="loading-icon" />
+          <MessageSquarePlus v-else size="20" />
+          {{ $t('chatSidebar.newChat') }}
         </button>
       </div>
       <div class="conversation-list">
@@ -39,7 +39,7 @@
               :class="{ active: currentChatId === chat.id }"
               @click="selectChat(chat)"
             >
-              <div class="conversation-title">{{ chat.title || '新的对话' }}</div>
+              <div class="conversation-title">{{ chat.title || $t('chatSidebar.newConversation') }}</div>
               <div class="actions-mask"></div>
               <div class="conversation-actions">
                 <a-dropdown :trigger="['click']" @click.stop>
@@ -50,14 +50,14 @@
                         @click.stop="renameChat(chat.id)"
                         :icon="h(EditOutlined)"
                       >
-                        重命名
+                        {{ $t('chatSidebar.rename') }}
                       </a-menu-item>
                       <a-menu-item
                         key="delete"
                         @click.stop="deleteChat(chat.id)"
                         :icon="h(DeleteOutlined)"
                       >
-                        删除
+                        {{ $t('chatSidebar.delete') }}
                       </a-menu-item>
                     </a-menu>
                   </template>
@@ -69,7 +69,7 @@
             </div>
           </div>
         </template>
-        <div v-else class="empty-list">暂无对话历史</div>
+        <div v-else class="empty-list">{{ $t('chatSidebar.noHistory') }}</div>
       </div>
     </div>
   </div>
@@ -77,6 +77,7 @@
 
 <script setup>
 import { computed, h } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { DeleteOutlined, EditOutlined, MoreOutlined } from '@ant-design/icons-vue'
 import { message, Modal } from 'ant-design-vue'
 import { PanelLeftClose, MessageSquarePlus, LoaderCircle } from 'lucide-vue-next'
@@ -84,6 +85,8 @@ import dayjs, { parseToShanghai } from '@/utils/time'
 import { useChatUIStore } from '@/stores/chatUI'
 import { useInfoStore } from '@/stores/info'
 import { storeToRefs } from 'pinia'
+
+const { t } = useI18n()
 
 // 使用 chatUI store
 const chatUIStore = useChatUIStore()

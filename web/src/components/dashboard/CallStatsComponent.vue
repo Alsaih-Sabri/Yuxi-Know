@@ -1,6 +1,6 @@
 <template>
   <div class="grid-item call-stats">
-    <a-card class="dashboard-card call-stats-section" title="调用统计" :loading="loading">
+    <a-card class="dashboard-card call-stats-section" :title="$t('dashboard.callStats')" :loading="loading">
       <template #extra>
         <div class="simple-controls">
           <div class="simple-toggle-group">
@@ -41,10 +41,13 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, defineExpose, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import * as echarts from 'echarts'
 import { dashboardApi } from '@/apis/dashboard_api'
 import { getColorByIndex, truncateLegend } from '@/utils/chartColors'
 import { useThemeStore } from '@/stores/theme'
+
+const { t } = useI18n()
 
 // CSS 变量解析工具函数
 function getCSSVariable(variableName, element = document.documentElement) {
@@ -63,17 +66,17 @@ const callStatsData = ref(null)
 const callStatsLoading = ref(false)
 const callTimeRange = ref('14days')
 const callDataType = ref('agents')
-const timeRangeOptions = [
-  { value: '14hours', label: '近14小时' },
-  { value: '14days', label: '近14天' },
-  { value: '14weeks', label: '近14周' }
-]
-const dataTypeOptions = [
-  { value: 'models', label: '模型调用' },
-  { value: 'agents', label: '智能体调用' },
-  { value: 'tokens', label: 'Token消耗' },
-  { value: 'tools', label: '工具调用' }
-]
+const timeRangeOptions = computed(() => [
+  { value: '14hours', label: t('callStats.last14Hours') },
+  { value: '14days', label: t('callStats.last14Days') },
+  { value: '14weeks', label: t('callStats.last14Weeks') }
+])
+const dataTypeOptions = computed(() => [
+  { value: 'models', label: t('callStats.modelCalls') },
+  { value: 'agents', label: t('callStats.agentCalls') },
+  { value: 'tokens', label: t('callStats.tokenUsage') },
+  { value: 'tools', label: t('callStats.toolCalls') }
+])
 const isTokenView = computed(() => callDataType.value === 'tokens')
 
 const formatTokenValue = (value) => {
@@ -164,14 +167,14 @@ const renderCallStatsChart = () => {
     if (callTimeRange.value === '14hours') {
       return date.split(' ')[1]
     } else if (callTimeRange.value === '14weeks') {
-      return `第${date.split('-')[1]}周`
+      return `${t('callStats.week')}${date.split('-')[1]}`
     } else {
       return date.split('-').slice(1).join('-')
     }
   })
 
   const series = categories.map((category, index) => ({
-    name: category === 'None' ? '未知模型' : category,
+    name: category === 'None' ? t('callStats.unknownModel') : category,
     type: 'bar',
     stack: 'total',
     emphasis: { focus: 'series' },
@@ -225,17 +228,17 @@ const renderCallStatsChart = () => {
           result += `${truncatedName}: ${formatValueForDisplay(param.value)}<br/>`
         })
         const labelMap = {
-          models: '模型调用',
-          agents: '智能体调用',
-          tokens: 'Token消耗',
-          tools: '工具调用'
+          models: t('callStats.modelCalls'),
+          agents: t('callStats.agentCalls'),
+          tokens: t('callStats.tokenUsage'),
+          tools: t('callStats.toolCalls')
         }
         const formattedTotal = formatValueForDisplay(total)
-        return `<div style=\"font-weight:bold;margin-bottom:5px\">${labelMap[callDataType.value]}</div>${result}<strong>总计: ${formattedTotal}</strong>`
+        return `<div style="font-weight:bold;margin-bottom:5px">${labelMap[callDataType.value]}</div>${result}<strong>${t('callStats.total')}: ${formattedTotal}</strong>`
       }
     },
     legend: {
-      data: categories.map((cat) => (cat === 'None' ? '未知模型' : cat)),
+      data: categories.map((cat) => (cat === 'None' ? t('callStats.unknownModel') : cat)),
       bottom: 5 /* 调整图例位置，从0改为5 */,
       textStyle: { color: getCSSVariable('--gray-500'), fontSize: 12 },
       itemWidth: 14,

@@ -13,14 +13,14 @@
         <!-- 左侧：文件名和图标 -->
         <div class="file-title">
           <component :is="fileIcon" :style="{ color: fileIconColor, fontSize: '18px' }" />
-          <span class="file-name">{{ file?.filename || '文件详情' }}</span>
+          <span class="file-name">{{ file?.filename || $t('fileDetail.title') }}</span>
         </div>
 
         <div class="header-controls">
           <!-- 字符数/片段数显示在 segment 左边 -->
           <span class="view-info">
             {{
-              viewMode === 'chunks' ? chunkCount + ' 个片段' : formatTextLength(charCount) + ' 字符'
+              viewMode === 'chunks' ? $t('fileDetail.info.chunks', { count: chunkCount }) : $t('fileDetail.info.characters', { count: formatTextLength(charCount) })
             }}
           </span>
 
@@ -40,14 +40,14 @@
               <a-menu @click="handleDownloadMenuClick">
                 <a-menu-item key="original" :disabled="!file.file_id">
                   <template #icon><Download :size="16" /></template>
-                  下载原文
+                  {{ $t('fileDetail.buttons.downloadOriginal') }}
                 </a-menu-item>
                 <a-menu-item
                   key="markdown"
                   :disabled="!((file.lines && file.lines.length > 0) || file.content)"
                 >
                   <template #icon><FileText :size="16" /></template>
-                  下载 Markdown
+                  {{ $t('fileDetail.buttons.downloadMarkdown') }}
                 </a-menu-item>
               </a-menu>
             </template>
@@ -61,7 +61,7 @@
       </div>
     </template>
     <div v-if="loading" class="loading-container">
-      <a-spin tip="正在加载文档内容..." />
+      <a-spin :tip="$t('fileDetail.loading.content')" />
     </div>
     <div v-else-if="file && hasContent" class="file-detail-content">
       <!-- Markdown 模式 -->
@@ -74,7 +74,7 @@
           class="markdown-content"
         />
         <div v-else class="empty-content">
-          <p>暂无文件内容</p>
+          <p>{{ $t('fileDetail.empty.noContent') }}</p>
         </div>
       </div>
 
@@ -91,7 +91,7 @@
           </div>
         </div>
         <div v-if="mappedChunks.length === 0" class="empty-content">
-          <p>暂无分块信息</p>
+          <p>{{ $t('fileDetail.empty.noChunks') }}</p>
         </div>
       </div>
     </div>
@@ -398,6 +398,7 @@ const handleDownloadMarkdown = () => {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  padding-right: 8px;
 }
 
 /* 文件标题样式 */

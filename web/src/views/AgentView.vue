@@ -4,7 +4,7 @@
       <!-- 智能体选择弹窗 -->
       <a-modal
         v-model:open="chatUIStore.agentModalOpen"
-        title="选择智能体"
+        :title="$t('agent.selectAgent')"
         :width="800"
         :footer="null"
         :maskClosable="true"
@@ -39,17 +39,6 @@
         </div>
       </a-modal>
 
-      <a-modal
-        v-model:open="createConfigModalOpen"
-        title="新建配置"
-        :width="320"
-        :confirmLoading="createConfigLoading"
-        @ok="handleCreateConfig"
-        @cancel="() => (createConfigModalOpen = false)"
-      >
-        <a-input v-model:value="createConfigName" placeholder="请输入配置名称" allow-clear />
-      </a-modal>
-
       <!-- 中间内容区域 -->
       <div class="content">
         <AgentChatComponent
@@ -59,59 +48,11 @@
           @open-agent-modal="openAgentModal"
           @close-config-sidebar="() => (chatUIStore.isConfigSidebarOpen = false)"
         >
-          <template #header-right>
-            <a-dropdown v-if="selectedAgentId" :trigger="['click']">
-              <div type="button" class="agent-nav-btn">
-                <Settings2 size="18" class="nav-btn-icon" />
-                <span class="text hide-text">
-                  {{ selectedConfigSummary?.name || '配置' }}
-                </span>
-                <ChevronDown size="16" class="nav-btn-icon" />
-              </div>
-              <template #overlay>
-                <a-menu
-                  :selectedKeys="selectedAgentConfigId ? [String(selectedAgentConfigId)] : []"
-                >
-                  <a-menu-item
-                    v-for="cfg in agentConfigs[selectedAgentId] || []"
-                    :key="String(cfg.id)"
-                    @click="selectAgentConfig(cfg.id)"
-                  >
-                    <div class="menu-item-full">
-                      <Star
-                        :size="14"
-                        :fill="cfg.is_default ? 'currentColor' : 'none'"
-                        :style="{
-                          color: cfg.is_default ? 'var(--color-warning-500)' : 'var(--gray-400)'
-                        }"
-                      />
-                      <span>{{ cfg.name }}</span>
-                    </div>
-                  </a-menu-item>
-                  <a-menu-divider v-if="userStore.isAdmin" />
-                  <a-menu-item
-                    v-if="userStore.isAdmin"
-                    key="create_config"
-                    @click="openCreateConfigModal"
-                  >
-                    <div class="menu-item-layout">
-                      <Plus :size="16" />
-                      <span>新建配置</span>
-                    </div>
-                  </a-menu-item>
-                  <a-menu-item
-                    v-if="userStore.isAdmin"
-                    key="open_config"
-                    @click="openConfigSidebar"
-                  >
-                    <div class="menu-item-layout">
-                      <SquarePen :size="16" />
-                      <span>编辑当前配置</span>
-                    </div>
-                  </a-menu-item>
-                </a-menu>
-              </template>
-            </a-dropdown>
+          <template #header-right="{ isMediumContainer }">
+            <div type="button" class="agent-nav-btn" @click="toggleConf">
+              <Settings2 size="18" class="nav-btn-icon" />
+              <span class="text" :class="{ 'hide-text': isMediumContainer }">{{ $t('agent.config') }}</span>
+            </div>
             <div
               v-if="selectedAgentId"
               ref="moreButtonRef"
@@ -148,15 +89,17 @@
           >
             <div class="menu-item" @click="handleShareChat">
               <ShareAltOutlined class="menu-icon" />
-              <span class="menu-text">分享对话</span>
+              <span class="menu-text">{{ $t('agent.shareChat') }}</span>
             </div>
+            <div class="menu-divider"></div>
             <div class="menu-item" @click="handleFeedback">
               <MessageOutlined class="menu-icon" />
-              <span class="menu-text">查看反馈</span>
+              <span class="menu-text">{{ $t('agent.viewFeedback') }}</span>
             </div>
+            <div class="menu-divider"></div>
             <div class="menu-item" @click="handlePreview">
               <EyeOutlined class="menu-icon" />
-              <span class="menu-text">预览页面</span>
+              <span class="menu-text">{{ $t('agent.previewPage') }}</span>
             </div>
           </div>
         </Transition>
@@ -167,6 +110,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import {
   StarOutlined,
   StarFilled,
@@ -175,7 +119,7 @@ import {
   EyeOutlined
 } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
-import { Settings2, Ellipsis, ChevronDown, Star, Plus, SquarePen } from 'lucide-vue-next'
+import { Settings2, Ellipsis } from 'lucide-vue-next'
 import AgentChatComponent from '@/components/AgentChatComponent.vue'
 import AgentConfigSidebar from '@/components/AgentConfigSidebar.vue'
 import FeedbackModalComponent from '@/components/dashboard/FeedbackModalComponent.vue'
@@ -188,6 +132,8 @@ import { onClickOutside } from '@vueuse/core'
 
 import { storeToRefs } from 'pinia'
 
+const { t } = useI18n()
+
 // 组件引用
 const feedbackModal = ref(null)
 const chatComponentRef = ref(null)
@@ -198,14 +144,7 @@ const agentStore = useAgentStore()
 const chatUIStore = useChatUIStore()
 
 // 从 agentStore 中获取响应式状态
-const {
-  agents,
-  selectedAgentId,
-  defaultAgentId,
-  agentConfigs,
-  selectedAgentConfigId,
-  selectedConfigSummary
-} = storeToRefs(agentStore)
+const { agents, selectedAgentId, defaultAgentId } = storeToRefs(agentStore)
 
 // 设置为默认智能体
 const setAsDefaultAgent = async (agentId) => {
@@ -213,18 +152,29 @@ const setAsDefaultAgent = async (agentId) => {
 
   try {
     await agentStore.setDefaultAgent(agentId)
-    message.success('已将当前智能体设为默认')
+    message.success(t('agent.setDefaultSuccess'))
   } catch (error) {
     console.error('设置默认智能体错误:', error)
-    message.error(error.message || '设置默认智能体时发生错误')
+    message.error(error.message || t('agent.setDefaultError'))
   }
 }
 
 // 这些方法现在由agentStore处理，无需在组件中定义
 
+const loadAgentConfig = async () => {
+  try {
+    await agentStore.loadAgentConfig()
+  } catch (error) {
+    console.error('加载配置出错:', error)
+    message.error(t('agent.loadConfigError'))
+  }
+}
+
 // 选择智能体（使用store方法）
-const selectAgent = async (agentId) => {
-  await agentStore.selectAgent(agentId)
+const selectAgent = (agentId) => {
+  agentStore.selectAgent(agentId)
+  // 加载该智能体的配置
+  loadAgentConfig()
 }
 
 // 打开智能体选择弹窗
@@ -233,60 +183,13 @@ const openAgentModal = () => {
 }
 
 // 从弹窗中选择智能体
-const selectAgentFromModal = async (agentId) => {
-  await selectAgent(agentId)
+const selectAgentFromModal = (agentId) => {
+  selectAgent(agentId)
   chatUIStore.agentModalOpen = false
 }
 
 const toggleConf = () => {
   chatUIStore.isConfigSidebarOpen = !chatUIStore.isConfigSidebarOpen
-}
-
-const openConfigSidebar = () => {
-  chatUIStore.isConfigSidebarOpen = true
-}
-
-const createConfigModalOpen = ref(false)
-const createConfigLoading = ref(false)
-const createConfigName = ref('')
-
-const openCreateConfigModal = () => {
-  createConfigName.value = ''
-  createConfigModalOpen.value = true
-}
-
-const handleCreateConfig = async () => {
-  if (!selectedAgentId.value) return
-  if (!createConfigName.value) {
-    message.error('请输入配置名称')
-    return
-  }
-
-  createConfigLoading.value = true
-  try {
-    await agentStore.createAgentConfigProfile({
-      name: createConfigName.value,
-      setDefault: false,
-      fromCurrent: false
-    })
-    createConfigModalOpen.value = false
-    chatUIStore.isConfigSidebarOpen = true
-    message.success('配置已创建')
-  } catch (error) {
-    console.error('创建配置出错:', error)
-    message.error(error.message || '创建配置失败')
-  } finally {
-    createConfigLoading.value = false
-  }
-}
-
-const selectAgentConfig = async (configId) => {
-  try {
-    await agentStore.selectAgentConfig(configId)
-  } catch (error) {
-    console.error('切换配置出错:', error)
-    message.error('切换配置失败')
-  }
 }
 
 // 更多菜单相关
@@ -330,7 +233,7 @@ const handleShareChat = async () => {
     console.log('[AgentView] Export data:', exportData)
 
     if (!exportData) {
-      message.warning('当前没有可导出的对话内容')
+      message.warning(t('agent.noExportContent'))
       return
     }
 
@@ -343,16 +246,16 @@ const handleShareChat = async () => {
         messages: exportData.messages,
         onGoingMessages: exportData.onGoingMessages
       })
-      message.warning('当前对话暂无内容可导出，请先进行对话')
+      message.warning(t('agent.startChatFirst'))
       return
     }
 
     const result = await ChatExporter.exportToHTML(exportData)
-    message.success(`对话已导出为HTML文件: ${result.filename}`)
+    message.success(t('agent.exportSuccess', { filename: result.filename }))
   } catch (error) {
     console.error('[AgentView] Export error:', error)
     if (error?.message?.includes('没有可导出的对话内容')) {
-      message.warning('当前对话暂无内容可导出，请先进行对话')
+      message.warning(t('agent.startChatFirst'))
       return
     }
     handleChatError(error, 'export')
@@ -974,21 +877,21 @@ const handlePreview = () => {
 // 自定义更多菜单样式
 .more-popup-menu {
   position: fixed;
-  min-width: 100px;
+  min-width: 130px;
   background: var(--gray-0);
   border-radius: 10px;
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.08),
     0 2px 8px rgba(0, 0, 0, 0.04);
   border: 1px solid var(--gray-100);
-  padding: 4px;
+  padding: 6px;
   z-index: 9999;
 
   .menu-item {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 6px 8px;
+    padding: 6px 14px;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
@@ -1113,23 +1016,7 @@ const handlePreview = () => {
   }
 }
 
-// 菜单项布局样式
-.menu-item-layout {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.menu-item-full {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-}
-
-@media (max-width: 768px) {
-  .hide-text {
-    display: none;
-  }
+.hide-text {
+  display: none;
 }
 </style>

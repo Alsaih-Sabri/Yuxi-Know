@@ -32,45 +32,45 @@ class Config(BaseModel):
     # ============================================================
     # 基础配置
     # ============================================================
-    save_dir: str = Field(default="saves", description="保存目录")
-    model_dir: str = Field(default="", description="本地模型目录")
+    save_dir: str = Field(default="saves", description="Save Directory|保存目录")
+    model_dir: str = Field(default="", description="Local Model Directory|本地模型目录")
 
     # ============================================================
     # 功能开关
     # ============================================================
-    enable_reranker: bool = Field(default=False, description="是否开启重排序")
-    enable_content_guard: bool = Field(default=False, description="是否启用内容审查")
-    enable_content_guard_llm: bool = Field(default=False, description="是否启用LLM内容审查")
-    enable_web_search: bool = Field(default=False, description="是否启用网络搜索")
+    enable_reranker: bool = Field(default=False, description="Enable Reranker|是否开启重排序")
+    enable_content_guard: bool = Field(default=False, description="Enable Content Guard|是否启用内容审查")
+    enable_content_guard_llm: bool = Field(default=False, description="Use LLM for Content Guard|是否启用LLM内容审查")
+    enable_web_search: bool = Field(default=False, description="Enable Web Search|是否启用网络搜索")
 
     # ============================================================
     # 模型配置
     # ============================================================
     default_model: str = Field(
         default="siliconflow/deepseek-ai/DeepSeek-V3.2",
-        description="默认对话模型",
+        description="Default Chat Model|默认对话模型",
     )
     fast_model: str = Field(
         default="siliconflow/THUDM/GLM-4-9B-0414",
-        description="快速响应模型",
+        description="Fast Response Model|快速响应模型",
     )
     embed_model: str = Field(
         default="siliconflow/BAAI/bge-m3",
-        description="默认 Embedding 模型",
+        description="Default Embedding Model|默认 Embedding 模型",
     )
     reranker: str = Field(
         default="siliconflow/BAAI/bge-reranker-v2-m3",
-        description="默认 Re-Ranker 模型",
+        description="Default Reranker Model|默认 Re-Ranker 模型",
     )
     content_guard_llm_model: str = Field(
         default="siliconflow/Qwen/Qwen3-235B-A22B-Instruct-2507",
-        description="内容审查LLM模型",
+        description="Content Guard LLM Model|内容审查LLM模型",
     )
 
     # ============================================================
     # 智能体配置
     # ============================================================
-    default_agent_id: str = Field(default="", description="默认智能体ID")
+    default_agent_id: str = Field(default="", description="Default Agent ID|默认智能体ID")
 
     # ============================================================
     # 模型信息（只读，不持久化）
@@ -291,8 +291,17 @@ class Config(BaseModel):
         fields_info = {}
         for field_name, field_info in Config.model_fields.items():
             if not field_info.exclude:  # 排除内部字段
+                # Parse bilingual description (format: "English|中文")
+                description = field_info.description or ""
+                if "|" in description:
+                    en_desc, zh_desc = description.split("|", 1)
+                else:
+                    en_desc = zh_desc = description
+                
                 fields_info[field_name] = {
-                    "des": field_info.description,
+                    "des": zh_desc,  # Default to Chinese for backward compatibility
+                    "des_en": en_desc,
+                    "des_zh": zh_desc,
                     "default": field_info.default,
                     "type": field_info.annotation.__name__
                     if hasattr(field_info.annotation, "__name__")

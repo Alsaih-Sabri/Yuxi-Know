@@ -1,5 +1,4 @@
 import asyncio
-import json
 import os
 import textwrap
 import traceback
@@ -10,13 +9,13 @@ from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Reques
 from fastapi.responses import FileResponse
 from starlette.responses import StreamingResponse
 
-from src.services.task_service import TaskContext, tasker
-from server.utils.auth_middleware import get_admin_user, get_required_user
+from server.services.tasker import TaskContext, tasker
+from server.utils.auth_middleware import get_admin_user
 from src import config, knowledge_base
 from src.knowledge.indexing import SUPPORTED_FILE_EXTENSIONS, is_supported_file_extension, process_file_to_markdown
 from src.knowledge.utils import calculate_content_hash
 from src.models.embed import test_all_embedding_models_status, test_embedding_model_status
-from src.storage.postgres.models_business import User
+from src.storage.db.models import User
 from src.storage.minio.client import StorageError, aupload_file_to_minio, get_minio_client
 from src.utils import logger
 
@@ -64,10 +63,10 @@ media_types = {
 
 @knowledge.get("/databases")
 async def get_databases(current_user: User = Depends(get_admin_user)):
-    """获取所有知识库（根据用户权限过滤）"""
+    """获取所有知识库"""
     try:
-        user_info = {"role": current_user.role, "department_id": current_user.department_id}
-        return await knowledge_base.get_databases_by_user(user_info)
+        database = knowledge_base.get_databases()
+        return database
     except Exception as e:
         logger.error(f"获取数据库列表失败 {e}, {traceback.format_exc()}")
         return {"message": f"获取数据库列表失败 {e}", "databases": []}
@@ -81,18 +80,17 @@ async def create_database(
     kb_type: str = Body("lightrag"),
     additional_params: dict = Body({}),
     llm_info: dict = Body(None),
-    share_config: dict = Body(None),
     current_user: User = Depends(get_admin_user),
 ):
     """创建知识库"""
     logger.debug(
         f"Create database {database_name} with kb_type {kb_type}, "
         f"additional_params {additional_params}, llm_info {llm_info}, "
-        f"embed_model_name {embed_model_name}, share_config {share_config}"
+        f"embed_model_name {embed_model_name}"
     )
     try:
         # 先检查名称是否已存在
-        if await knowledge_base.database_name_exists(database_name):
+        if knowledge_base.database_name_exists(database_name):
             raise HTTPException(
                 status_code=409,
                 detail=f"知识库名称 '{database_name}' 已存在，请使用其他名称",
@@ -118,16 +116,8 @@ async def create_database(
         remove_reranker_config(kb_type, additional_params)
 
         embed_info = config.embed_model_names[embed_model_name]
-        # 将Pydantic模型转换为字典以便JSON序列化
-        embed_info_dict = embed_info.model_dump() if hasattr(embed_info, "model_dump") else embed_info.dict()
         database_info = await knowledge_base.create_database(
-            database_name,
-            description,
-            kb_type=kb_type,
-            embed_info=embed_info_dict,
-            llm_info=llm_info,
-            share_config=share_config,
-            **additional_params,
+            database_name, description, kb_type=kb_type, embed_info=embed_info, llm_info=llm_info, **additional_params
         )
 
         # 需要重新加载所有智能体，因为工具刷新了
@@ -143,32 +133,10 @@ async def create_database(
         raise HTTPException(status_code=400, detail=f"创建数据库失败: {e}")
 
 
-@knowledge.get("/databases/accessible")
-async def get_accessible_databases(current_user: User = Depends(get_required_user)):
-    """获取当前用户有权访问的知识库列表（用于智能体配置）"""
-    try:
-        user_info = {"role": current_user.role, "department_id": current_user.department_id}
-        databases = await knowledge_base.get_databases_by_user(user_info)
-
-        accessible = [
-            {
-                "name": db.get("name", ""),
-                "db_id": db.get("db_id"),
-                "description": db.get("description", ""),
-            }
-            for db in databases.get("databases", [])
-        ]
-
-        return {"databases": accessible}
-    except Exception as e:
-        logger.error(f"获取可访问知识库列表失败: {e}, {traceback.format_exc()}")
-        return {"message": f"获取可访问知识库列表失败: {str(e)}", "databases": []}
-
-
 @knowledge.get("/databases/{db_id}")
 async def get_database_info(db_id: str, current_user: User = Depends(get_admin_user)):
     """获取知识库详细信息"""
-    database = await knowledge_base.get_database_info(db_id)
+    database = knowledge_base.get_database_info(db_id)
     if database is None:
         raise HTTPException(status_code=404, detail="Database not found")
     return database
@@ -180,14 +148,13 @@ async def update_database_info(
     name: str = Body(...),
     description: str = Body(...),
     llm_info: dict = Body(None),
-    additional_params: dict = Body({}),
-    share_config: dict = Body(None),
+    additional_params: dict = Body({}),  # Now accepts a dict
     current_user: User = Depends(get_admin_user),
 ):
     """更新知识库信息"""
     logger.debug(
-        f"[update_database_info] 接收到的参数: name={name}, llm_info={llm_info}, "
-        f"additional_params={additional_params}, share_config={share_config}"
+        f"Update database {db_id} info: {name}, {description}, llm_info: {llm_info}, "
+        f"additional_params: {additional_params}"
     )
     try:
         database = await knowledge_base.update_database(
@@ -195,8 +162,7 @@ async def update_database_info(
             name,
             description,
             llm_info,
-            additional_params=additional_params,
-            share_config=share_config,
+            additional_params=additional_params,  # Pass the dict to the manager
         )
         return {"message": "更新成功", "database": database}
     except Exception as e:
@@ -269,9 +235,9 @@ async def add_documents(
         "qa_separator": params.get("qa_separator", ""),
     }
 
-    # URL 解析与入库（需白名单验证）
+    # 禁止 URL 解析与入库
     if content_type == "url":
-        raise HTTPException(status_code=400, detail="URL 处理方式已变更，请使用 fetch-url 接口先获取内容")
+        raise HTTPException(status_code=400, detail="URL 文档上传与解析已禁用")
 
     # 安全检查：验证文件路径
     if content_type == "file":
@@ -306,7 +272,7 @@ async def add_documents(
                 try:
                     # 1. Add file record (UPLOADED)
                     file_meta = await knowledge_base.add_file_record(
-                        db_id, item, params=params, operator_id=current_user.user_id
+                        db_id, item, params=params, operator_id=current_user.id
                     )
                     file_id = file_meta["file_id"]
                     added_files[item] = (file_id, file_meta)
@@ -338,7 +304,7 @@ async def add_documents(
 
                 try:
                     # 2. Parse file (PARSING -> PARSED)
-                    file_meta = await knowledge_base.parse_file(db_id, file_id, operator_id=current_user.user_id)
+                    file_meta = await knowledge_base.parse_file(db_id, file_id, operator_id=current_user.id)
                     processed_items.append(file_meta)
                     parse_success_count += 1
                 except Exception as parse_error:
@@ -370,10 +336,10 @@ async def add_documents(
                     try:
                         # 1. 更新入库参数
                         await knowledge_base.update_file_params(
-                            db_id, file_id, indexing_params, operator_id=current_user.user_id
+                            db_id, file_id, indexing_params, operator_id=current_user.id
                         )
                         # 2. 执行入库
-                        result = await knowledge_base.index_file(db_id, file_id, operator_id=current_user.user_id)
+                        result = await knowledge_base.index_file(db_id, file_id, operator_id=current_user.id)
                         processed_items.append(result)
                     except Exception as index_error:
                         logger.error(f"自动入库失败 {item} (file_id={file_id}): {index_error}")
@@ -415,7 +381,7 @@ async def add_documents(
         return summary | {"items": processed_items}
 
     try:
-        database = await knowledge_base.get_database_info(db_id)
+        database = knowledge_base.get_database_info(db_id)
         task = await tasker.enqueue(
             name=f"知识库文档处理 ({database['name']})",
             task_type="knowledge_ingest",
@@ -456,7 +422,7 @@ async def parse_documents(db_id: str, file_ids: list[str] = Body(...), current_u
                 await context.set_progress(progress, f"正在解析第 {idx}/{total} 个文档")
 
                 try:
-                    result = await knowledge_base.parse_file(db_id, file_id, operator_id=current_user.user_id)
+                    result = await knowledge_base.parse_file(db_id, file_id, operator_id=current_user.id)
                     processed_items.append(result)
                 except Exception as e:
                     logger.error(f"Parse failed for {file_id}: {e}")
@@ -473,7 +439,7 @@ async def parse_documents(db_id: str, file_ids: list[str] = Body(...), current_u
         return {"items": processed_items}
 
     try:
-        database = await knowledge_base.get_database_info(db_id)
+        database = knowledge_base.get_database_info(db_id)
         task = await tasker.enqueue(
             name=f"文档解析 ({database['name']})",
             task_type="knowledge_parse",
@@ -550,7 +516,7 @@ async def index_documents(
         return {"items": processed_items}
 
     try:
-        database = await knowledge_base.get_database_info(db_id)
+        database = knowledge_base.get_database_info(db_id)
         task = await tasker.enqueue(
             name=f"文档入库 ({database['name']})",
             task_type="knowledge_index",
@@ -640,14 +606,9 @@ async def download_document(db_id: str, doc_id: str, request: Request, current_u
         file_info = await knowledge_base.get_file_basic_info(db_id, doc_id)
         file_meta = file_info.get("meta", {})
 
-        # 获取文件类型、路径和文件名
-        file_type = file_meta.get("file_type", "file")
+        # 获取文件路径和文件名
         file_path = file_meta.get("path", "")
         filename = file_meta.get("filename", "file")
-
-        # URL 类型文件没有原始文件可下载
-        if file_type == "url":
-            raise HTTPException(status_code=400, detail="URL 类型文件不支持下载原始文件")
         logger.debug(f"File path from database: {file_path}")
         logger.debug(f"Original filename from database: {filename}")
 
@@ -806,7 +767,7 @@ async def update_knowledge_base_query_params(
     """更新知识库查询参数配置"""
     try:
         # 获取知识库实例
-        kb_instance = await knowledge_base._get_kb_for_database(db_id)
+        kb_instance = knowledge_base.get_kb(db_id)
         if not kb_instance:
             raise HTTPException(status_code=404, detail="Knowledge base not found")
 
@@ -816,13 +777,10 @@ async def update_knowledge_base_query_params(
             if db_id not in kb_instance.databases_meta:
                 raise HTTPException(status_code=404, detail="Database not found in instance metadata")
 
-            # 确保 query_params 不为 None
-            if kb_instance.databases_meta[db_id].get("query_params") is None:
-                kb_instance.databases_meta[db_id]["query_params"] = {}
-
-            options = kb_instance.databases_meta[db_id]["query_params"].setdefault("options", {})
+            # 使用 setdefault 简化嵌套字典的初始化
+            options = kb_instance.databases_meta[db_id].setdefault("query_params", {}).setdefault("options", {})
             options.update(params)
-            await kb_instance._save_metadata()
+            kb_instance._save_metadata()
 
             logger.info(f"更新知识库 {db_id} 查询参数: {params}")
 
@@ -838,7 +796,7 @@ async def get_knowledge_base_query_params(db_id: str, current_user: User = Depen
     """获取知识库类型特定的查询参数"""
     try:
         # 获取知识库实例
-        kb_instance = await knowledge_base._get_kb_for_database(db_id)
+        kb_instance = knowledge_base._get_kb_for_database(db_id)
 
         # 调用知识库实例的方法获取配置
         params = kb_instance.get_query_params_config(
@@ -914,13 +872,15 @@ async def generate_sample_questions(
         生成的问题列表
     """
     try:
+        import json
+
         from src.models import select_model
 
         # 从请求体中提取参数
         count = request_body.get("count", 10)
 
         # 获取知识库信息
-        db_info = await knowledge_base.get_database_info(db_id)
+        db_info = knowledge_base.get_database_info(db_id)
         if not db_info:
             raise HTTPException(status_code=404, detail=f"知识库 {db_id} 不存在")
 
@@ -966,7 +926,7 @@ async def generate_sample_questions(
         # 选择模型并调用
         model = select_model()
         messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}]
-        response = await model.call(messages, stream=False)
+        response = model.call(messages, stream=False)
 
         # 解析AI返回的JSON
         try:
@@ -993,10 +953,14 @@ async def generate_sample_questions(
 
             # 保存问题到知识库元数据
             try:
-                from src.repositories.knowledge_base_repository import KnowledgeBaseRepository
-
-                await KnowledgeBaseRepository().update(db_id, {"sample_questions": questions})
-                logger.info(f"成功保存 {len(questions)} 个问题到知识库 {db_id}")
+                async with knowledge_base._metadata_lock:
+                    # 确保知识库元数据存在
+                    if db_id not in knowledge_base.global_databases_meta:
+                        knowledge_base.global_databases_meta[db_id] = {}
+                    # 保存问题到对应知识库
+                    knowledge_base.global_databases_meta[db_id]["sample_questions"] = questions
+                    knowledge_base._save_global_metadata()
+                    logger.info(f"成功保存 {len(questions)} 个问题到知识库 {db_id}")
             except Exception as save_error:
                 logger.error(f"保存问题失败: {save_error}")
 
@@ -1031,15 +995,12 @@ async def get_sample_questions(db_id: str, current_user: User = Depends(get_admi
         问题列表
     """
     try:
-        from src.repositories.knowledge_base_repository import KnowledgeBaseRepository
-
-        kb_repo = KnowledgeBaseRepository()
-        kb = await kb_repo.get_by_id(db_id)
-
-        if kb is None:
+        # 直接从全局元数据中读取
+        if db_id not in knowledge_base.global_databases_meta:
             raise HTTPException(status_code=404, detail=f"知识库 {db_id} 不存在")
 
-        questions = kb.sample_questions or []
+        db_meta = knowledge_base.global_databases_meta[db_id]
+        questions = db_meta.get("sample_questions", [])
 
         return {
             "message": "success",
@@ -1093,82 +1054,6 @@ async def move_document(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@knowledge.post("/files/fetch-url")
-async def fetch_url(
-    url: str = Body(..., embed=True),
-    db_id: str | None = Body(None, embed=True),
-    current_user: User = Depends(get_admin_user),
-):
-    """
-    抓取 URL 内容并上传到 MinIO
-    """
-    logger.debug(f"Fetching URL: {url} for db_id: {db_id}")
-    try:
-        from src.knowledge.utils.url_fetcher import fetch_url_content
-        from src.storage.minio import get_minio_client
-        from src.knowledge.utils import calculate_content_hash
-
-        # 1. 下载内容 (包含白名单校验、大小限制、类型检查)
-        content_bytes, final_url = await fetch_url_content(url)
-
-        # 2. 计算 Hash
-        content_hash = await calculate_content_hash(content_bytes)
-
-        # 检查是否已存在相同内容的文件
-        if db_id:
-            file_exists = await knowledge_base.file_existed_in_db(db_id, content_hash)
-            if file_exists:
-                raise HTTPException(
-                    status_code=409,
-                    detail="数据库中已经存在了相同内容文件",
-                )
-
-        # 3. 上传到 MinIO
-        minio_client = get_minio_client()
-        # 确保存储 bucket 存在
-        bucket_name = "kb-html-archives"
-        await asyncio.to_thread(minio_client.ensure_bucket_exists, bucket_name)
-
-        # 如果没有提供 db_id，使用 default
-        folder = db_id if db_id else "default"
-        object_name = f"{folder}/{content_hash}.html"
-
-        upload_result = await minio_client.aupload_file(
-            bucket_name=bucket_name,
-            object_name=object_name,
-            data=content_bytes,
-            content_type="text/html",
-        )
-
-        # 检测同名文件（URL即为文件名）
-        same_name_files = []
-        has_same_name = False
-        if db_id:
-            same_name_files = await knowledge_base.get_same_name_files(db_id, url)
-            has_same_name = len(same_name_files) > 0
-
-        return {
-            "status": "success",
-            "file_path": upload_result.url,
-            "minio_url": upload_result.url,
-            "content_hash": content_hash,
-            "filename": url,  # 原始 URL 作为文件名
-            "final_url": final_url,
-            "size": len(content_bytes),
-            "has_same_name": has_same_name,
-            "same_name_files": same_name_files,
-        }
-
-    except HTTPException:
-        raise
-    except ValueError as e:
-        logger.warning(f"URL fetch validation failed: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Failed to fetch URL {url}: {e}, {traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Failed to fetch URL: {str(e)}")
-
-
 @knowledge.post("/files/upload")
 async def upload_file(
     file: UploadFile = File(...),
@@ -1211,9 +1096,9 @@ async def upload_file(
     timestamp = int(time.time() * 1000)
     minio_filename = f"{basename}_{timestamp}{ext}"
 
-    # 生成符合MinIO规范的存储桶名称（将下划线替换为连字符，截取长度以满足MinIO的63字符限制）
+    # 生成符合MinIO规范的存储桶名称（将下划线替换为连字符）
     if db_id:
-        bucket_name = f"ref-{db_id[:32].replace('_', '-')}"
+        bucket_name = f"ref-{db_id.replace('_', '-')}"
     else:
         bucket_name = "default-uploads"
 
@@ -1277,7 +1162,7 @@ async def get_knowledge_base_types(current_user: User = Depends(get_admin_user))
 async def get_knowledge_base_statistics(current_user: User = Depends(get_admin_user)):
     """获取知识库统计信息"""
     try:
-        stats = await knowledge_base.get_statistics()
+        stats = knowledge_base.get_statistics()
         return {"stats": stats, "message": "success"}
     except Exception as e:
         logger.error(f"获取知识库统计失败 {e}, {traceback.format_exc()}")
@@ -1366,7 +1251,7 @@ async def generate_description(
 
     try:
         model = select_model()
-        response = await model.call(prompt)
+        response = await asyncio.to_thread(model.call, prompt)
         description = response.content.strip()
         logger.debug(f"Generated description: {description}")
         return {"description": description, "status": "success"}

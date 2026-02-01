@@ -51,29 +51,29 @@
 
       <!-- 对话记录 - 占据1x1网格 -->
       <div class="grid-item conversations">
-        <a-card class="conversations-section" title="对话记录" :loading="loading">
+        <a-card class="conversations-section" :title="$t('dashboard.conversationRecords')" :loading="loading">
           <template #extra>
             <a-space>
               <a-input
                 v-model:value="filters.user_id"
-                placeholder="用户ID"
+                :placeholder="$t('dashboard.userId')"
                 size="small"
                 style="width: 120px"
                 @change="handleFilterChange"
               />
               <a-select
                 v-model:value="filters.status"
-                placeholder="状态"
+                :placeholder="$t('dashboard.status')"
                 size="small"
                 style="width: 100px"
                 @change="handleFilterChange"
               >
-                <a-select-option value="active">活跃</a-select-option>
-                <a-select-option value="deleted">已删除</a-select-option>
-                <a-select-option value="all">全部</a-select-option>
+                <a-select-option value="active">{{ $t('dashboard.active') }}</a-select-option>
+                <a-select-option value="deleted">{{ $t('dashboard.deleted') }}</a-select-option>
+                <a-select-option value="all">{{ $t('dashboard.all') }}</a-select-option>
               </a-select>
-              <a-button size="small" @click="loadConversations" :loading="loading"> 刷新 </a-button>
-              <a-button size="small" @click="feedbackModal.show()"> 反馈详情 </a-button>
+              <a-button size="small" @click="loadConversations" :loading="loading"> {{ $t('dashboard.refresh') }} </a-button>
+              <a-button size="small" @click="feedbackModal.show()"> {{ $t('dashboard.feedbackDetails') }} </a-button>
             </a-space>
           </template>
 
@@ -92,12 +92,12 @@
                   @click="handleViewDetail(record)"
                   class="conversation-title"
                   :class="{ loading: loadingDetail }"
-                  >{{ record.title || '未命名对话' }}</a
+                  >{{ record.title || $t('dashboard.unnamedConversation') }}</a
                 >
               </template>
               <template v-if="column.key === 'status'">
                 <a-tag :color="record.status === 'active' ? 'green' : 'red'" size="small">
-                  {{ record.status === 'active' ? '活跃' : '已删除' }}
+                  {{ record.status === 'active' ? $t('dashboard.active') : $t('dashboard.deleted') }}
                 </a-tag>
               </template>
               <template v-if="column.key === 'updated_at'">
@@ -110,7 +110,7 @@
                   @click="handleViewDetail(record)"
                   :loading="loadingDetail"
                 >
-                  详情
+                  {{ $t('dashboard.details') }}
                 </a-button>
               </template>
             </template>
@@ -125,7 +125,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { dashboardApi } from '@/apis/dashboard_api'
 import dayjs, { parseToShanghai } from '@/utils/time'
@@ -139,6 +140,8 @@ import AgentStatsComponent from '@/components/dashboard/AgentStatsComponent.vue'
 import CallStatsComponent from '@/components/dashboard/CallStatsComponent.vue'
 import StatsOverviewComponent from '@/components/dashboard/StatsOverviewComponent.vue'
 import FeedbackModalComponent from '@/components/dashboard/FeedbackModalComponent.vue'
+
+const { t } = useI18n()
 
 // 组件引用
 const feedbackModal = ref(null)
@@ -178,47 +181,47 @@ const conversationPagination = reactive({
 })
 
 // 表格列定义
-const conversationColumns = [
+const conversationColumns = computed(() => [
   {
-    title: '对话标题',
+    title: t('dashboard.conversationTitle'),
     dataIndex: 'title',
     key: 'title',
     ellipsis: true
   },
   {
-    title: '用户',
+    title: t('dashboard.user'),
     dataIndex: 'user_id',
     key: 'user_id',
     width: '80px',
     ellipsis: true
   },
   {
-    title: '消息数',
+    title: t('dashboard.messageCount'),
     dataIndex: 'message_count',
     key: 'message_count',
     width: '60px',
     align: 'center'
   },
   {
-    title: '状态',
+    title: t('dashboard.status'),
     dataIndex: 'status',
     key: 'status',
     width: '70px',
     align: 'center'
   },
   {
-    title: '更新时间',
+    title: t('dashboard.updatedAt'),
     dataIndex: 'updated_at',
     key: 'updated_at',
     width: '120px'
   },
   {
-    title: '操作',
+    title: t('dashboard.actions'),
     key: 'actions',
     width: '60px',
     align: 'center'
   }
-]
+])
 
 // 子组件引用
 const userStatsRef = ref(null)
@@ -245,19 +248,19 @@ const loadAllStats = async () => {
     }
 
     console.log('Dashboard 数据加载完成:', response)
-    message.success('数据加载成功')
+    message.success(t('dashboard.dataLoadSuccess'))
   } catch (error) {
     console.error('加载统计数据失败:', error)
-    message.error('加载统计数据失败')
+    message.error(t('dashboard.dataLoadFailed'))
 
     // 如果并行请求失败，尝试单独加载基础数据
     try {
       const basicResponse = await dashboardApi.getStats()
       basicStats.value = basicResponse
-      message.warning('详细数据加载失败，仅显示基础统计')
+      message.warning(t('dashboard.detailedDataFailed'))
     } catch (basicError) {
       console.error('加载基础统计数据也失败:', basicError)
-      message.error('无法加载任何统计数据')
+      message.error(t('dashboard.dataLoadFailed'))
     }
   } finally {
     loading.value = false
@@ -284,7 +287,7 @@ const loadConversations = async () => {
     conversationPagination.total = response.length
   } catch (error) {
     console.error('加载对话列表失败:', error)
-    message.error('加载对话列表失败')
+    message.error(t('dashboard.conversationLoadFailed'))
   }
 }
 
@@ -300,10 +303,10 @@ const formatDate = (dateString) => {
     return parsed.format('HH:mm')
   }
   if (diffDays === 1) {
-    return '昨天'
+    return t('time.yesterday')
   }
   if (diffDays < 7) {
-    return `${diffDays}天前`
+    return t('time.daysAgo', { n: diffDays })
   }
   return parsed.format('MM-DD')
 }
@@ -316,7 +319,7 @@ const handleViewDetail = async (record) => {
     console.log(detail)
   } catch (error) {
     console.error('获取对话详情失败:', error)
-    message.error('获取对话详情失败')
+    message.error(t('dashboard.detailLoadFailed'))
   } finally {
     loadingDetail.value = false
   }

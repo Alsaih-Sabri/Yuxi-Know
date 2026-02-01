@@ -1,21 +1,21 @@
 <template>
   <div class="model-providers-section">
     <!-- 自定义供应商管理区域 -->
-    <h3>模型配置</h3>
-    <p>请在 <code>.env</code> 文件中配置对应的 APIKEY，并重新启动服务</p>
+    <h3>{{ $t('modelProviders.headers.modelConfig') }}</h3>
+    <p>{{ $t('modelProviders.descriptions.envConfig') }}</p>
     <a-divider />
     <div class="custom-providers-section">
       <div class="section-header">
-        <h3>自定义供应商</h3>
+        <h3>{{ $t('modelProviders.headers.customProviders') }}</h3>
         <a-button type="primary" @click="openAddCustomProviderModal">
           <template #icon>
             <PlusOutlined />
           </template>
-          添加自定义供应商
+          {{ $t('modelProviders.buttons.addCustomProvider') }}
         </a-button>
       </div>
       <p class="section-description">
-        添加自定义的LLM供应商，支持OpenAI兼容的API格式。API密钥支持直接配置或使用环境变量名。
+        {{ $t('modelProviders.descriptions.customProviderInfo') }}
       </p>
 
       <!-- 自定义供应商列表 -->
@@ -38,7 +38,7 @@
               <template #icon>
                 <ApiOutlined />
               </template>
-              测试连接
+              {{ $t('modelProviders.buttons.testConnection') }}
             </a-button>
             <a-button
               type="text"
@@ -48,19 +48,19 @@
               <template #icon>
                 <EditOutlined />
               </template>
-              编辑
+              {{ $t('modelProviders.buttons.edit') }}
             </a-button>
             <a-popconfirm
-              title="确定要删除这个自定义供应商吗？"
+              :title="$t('modelProviders.buttons.confirmDelete')"
               @confirm="deleteCustomProvider(providerId)"
-              ok-text="确定"
-              cancel-text="取消"
+              :ok-text="$t('modelProviders.buttons.confirm')"
+              :cancel-text="$t('modelProviders.buttons.cancel')"
             >
               <a-button type="text" size="small" danger>
                 <template #icon>
                   <DeleteOutlined />
                 </template>
-                删除
+                {{ $t('modelProviders.buttons.delete') }}
               </a-button>
             </a-popconfirm>
           </div>
@@ -68,16 +68,16 @@
         <div class="card-content">
           <div class="provider-details">
             <div class="detail-item">
-              <span class="label">API地址:</span>
+              <span class="label">{{ $t('modelProviders.details.apiUrl') }}</span>
               <span class="value">{{ provider.base_url }}</span>
             </div>
             <div class="detail-item">
-              <span class="label">默认模型:</span>
+              <span class="label">{{ $t('modelProviders.details.defaultModel') }}</span>
               <span class="value">{{ provider.default }}</span>
             </div>
             <div class="detail-item">
-              <span class="label">可用模型:</span>
-              <span class="value">{{ provider.models?.join(', ') || '无' }}</span>
+              <span class="label">{{ $t('modelProviders.details.availableModels') }}</span>
+              <span class="value">{{ provider.models?.join(', ') || $t('modelProviders.details.none') }}</span>
             </div>
           </div>
         </div>
@@ -85,8 +85,8 @@
 
       <!-- 无自定义供应商时的提示 -->
       <div v-if="Object.keys(customProviders).length === 0" class="empty-state">
-        <a-empty description="暂无自定义供应商">
-          <a-button type="primary" @click="openAddCustomProviderModal">添加自定义供应商</a-button>
+        <a-empty :description="$t('modelProviders.empty.noCustomProviders')">
+          <a-button type="primary" @click="openAddCustomProviderModal">{{ $t('modelProviders.buttons.addCustomProvider') }}</a-button>
         </a-empty>
       </div>
     </div>
@@ -96,10 +96,10 @@
     <!-- 系统内置供应商 -->
     <div class="builtin-providers-section">
       <div class="section-header">
-        <h3>系统内置供应商</h3>
+        <h3>{{ $t('modelProviders.headers.builtinProviders') }}</h3>
         <div class="providers-stats">
-          <span class="stats-item available"> {{ modelKeys.length }} 可用 </span>
-          <span class="stats-item unavailable"> {{ notModelKeys.length }} 未配置 </span>
+          <span class="stats-item available"> {{ $t('modelProviders.stats.available', { count: modelKeys.length }) }} </span>
+          <span class="stats-item unavailable"> {{ $t('modelProviders.stats.notConfigured', { count: notModelKeys.length }) }} </span>
         </div>
       </div>
 
@@ -121,7 +121,7 @@
               type="text"
               class="expand-button"
               @click.stop="openProviderConfig(item)"
-              title="配置模型"
+              :title="$t('common.edit')"
             >
               <SettingOutlined /> 已选 {{ modelNames[item].models?.length || 0 }} 个模型
             </a-button>
@@ -149,11 +149,11 @@
           <div class="model-title-container">
             <h3>{{ modelNames[item].name }}</h3>
             <a :href="modelNames[item].url" target="_blank" class="model-url">
-              查看信息 <InfoCircleOutlined />
+              {{ $t('common.viewInfo') }} <InfoCircleOutlined />
             </a>
           </div>
           <div class="missing-keys">
-            需配置<span>{{ modelNames[item].env }}</span>
+            {{ $t('common.required') }}<span>{{ modelNames[item].env }}</span>
           </div>
         </div>
       </div>
@@ -163,11 +163,11 @@
     <a-modal
       class="provider-config-modal"
       v-model:open="providerConfig.visible"
-      :title="`配置${providerConfig.providerName}模型`"
+      :title="$t('modelProviders.modal.configTitle', { provider: providerConfig.providerName })"
       @ok="saveProviderConfig"
       @cancel="cancelProviderConfig"
-      :okText="'保存配置'"
-      :cancelText="'取消'"
+      :okText="$t('modelProviders.modal.save')"
+      :cancelText="$t('modelProviders.modal.cancel')"
       :ok-type="'primary'"
       :width="800"
     >
@@ -177,12 +177,12 @@
             h(LoadingOutlined, { style: { fontSize: '32px', color: 'var(--main-color)' } })
           "
         />
-        <div class="loading-text">正在获取模型列表...</div>
+        <div class="loading-text">{{ $t('modelProviders.modal.loadingModels') }}</div>
       </div>
       <div v-else class="modal-config-content">
         <div class="modal-config-header">
           <p class="description">
-            勾选您希望在系统中启用的模型，请注意，列表中可能包含非对话模型，请仔细甄别。
+            {{ $t('modelProviders.modal.selectModelsInfo') }}
           </p>
         </div>
 
@@ -193,7 +193,7 @@
             class="simple-notice warning"
             style="margin-bottom: 20px"
           >
-            <p>检测到配置中包含当前供应商列表中不存在的模型。以下模型可能已失效或被供应商移除：</p>
+            <p>{{ $t('modelProviders.warnings.unsupportedModels') }}</p>
             <div class="unsupported-list">
               <a-tag
                 closable
@@ -214,14 +214,14 @@
               @click="removeAllUnsupported"
               class="clear-btn"
             >
-              一键移除所有失效模型
+              {{ $t('modelProviders.warnings.removeAllUnsupported') }}
             </a-button>
           </div>
 
           <div class="model-search" v-if="providerConfig.allModels.length > 0">
             <a-input
               v-model:value="providerConfig.searchQuery"
-              placeholder="搜索模型..."
+              :placeholder="$t('modelProviders.search.placeholder')"
               allow-clear
             >
               <template #prefix>
@@ -232,9 +232,9 @@
 
           <!-- 显示选中统计信息 -->
           <div class="selection-summary" v-if="providerConfig.allModels.length > 0">
-            <span>已选择 {{ providerConfig.selectedModels.length }} 个模型</span>
+            <span>{{ $t('modelProviders.search.selected', { count: providerConfig.selectedModels.length }) }}</span>
             <span v-if="providerConfig.searchQuery" class="filter-info">
-              （当前筛选显示 {{ filteredModels.length }} 个）
+              {{ $t('modelProviders.search.filtered', { count: filteredModels.length }) }}
             </span>
           </div>
 
@@ -382,6 +382,7 @@
 
 <script setup>
 import { computed, reactive, watch, h, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import {
   InfoCircleOutlined, // Keep if still used for other things, if not, remove. For now assume it might be used elsewhere.

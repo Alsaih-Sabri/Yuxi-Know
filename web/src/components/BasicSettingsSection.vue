@@ -1,15 +1,15 @@
 <template>
   <div class="basic-settings-section">
-    <h3 class="section-title">检索配置</h3>
+    <h3 class="section-title">{{ $t('basicSettings.retrievalConfig') }}</h3>
     <div class="settings-panel">
       <div class="setting-row two-cols">
         <div class="col-item">
-          <div class="setting-label">{{ items?.default_model?.des || '默认对话模型' }}</div>
+          <div class="setting-label">{{ items?.default_model?.des || $t('basicSettings.defaultChatModel') }}</div>
           <div class="setting-content">
             <ModelSelectorComponent
               @select-model="handleChatModelSelect"
               :model_spec="configStore.config?.default_model"
-              placeholder="请选择默认模型"
+              :placeholder="$t('basicSettings.selectDefaultModel')"
             />
           </div>
         </div>
@@ -19,7 +19,7 @@
             <ModelSelectorComponent
               @select-model="handleFastModelSelect"
               :model_spec="configStore.config?.fast_model"
-              placeholder="请选择模型"
+              :placeholder="$t('basicSettings.selectModel')"
             />
           </div>
         </div>
@@ -42,7 +42,7 @@
               class="full-width"
               :value="configStore.config?.reranker"
               @change="handleChange('reranker', $event)"
-              placeholder="请选择重排序模型"
+              :placeholder="$t('basicSettings.selectRerankerModel')"
             >
               <a-select-option v-for="(name, idx) in rerankerChoices" :key="idx" :value="name"
                 >{{ name }}
@@ -53,7 +53,7 @@
       </div>
     </div>
 
-    <h3 class="section-title">内容审查配置</h3>
+    <h3 class="section-title">{{ $t('basicSettings.contentGuardConfig') }}</h3>
     <div class="section">
       <div class="card">
         <span class="label">{{ items?.enable_content_guard.des }}</span>
@@ -79,71 +79,85 @@
         <ModelSelectorComponent
           @select-model="handleContentGuardModelSelect"
           :model_spec="configStore.config?.content_guard_llm_model"
-          placeholder="请选择模型"
+          :placeholder="$t('basicSettings.selectModel')"
         />
       </div>
     </div>
 
     <!-- 服务链接部分 -->
-    <h3 v-if="userStore.isAdmin" class="section-title">服务链接</h3>
+    <h3 v-if="userStore.isAdmin" class="section-title">{{ $t('basicSettings.serviceLinks') }}</h3>
     <div v-if="userStore.isAdmin">
       <p class="service-description">
-        快速访问系统相关的外部服务，需要将 localhost 替换为实际的 IP 地址。
+        {{ $t('basicSettings.serviceDescription') }}
       </p>
       <div class="services-grid">
         <div class="service-link-card">
           <div class="service-info">
-            <h4>Neo4j 浏览器</h4>
-            <p>图数据库管理界面</p>
+            <h4>{{ $t('basicSettings.services.neo4j.title') }}</h4>
+            <p>{{ $t('basicSettings.services.neo4j.description') }}</p>
           </div>
           <a-button
             type="default"
             @click="openLink('http://localhost:7474/')"
             :icon="h(GlobalOutlined)"
           >
-            访问
+            {{ $t('basicSettings.visit') }}
           </a-button>
         </div>
 
         <div class="service-link-card">
           <div class="service-info">
-            <h4>API 接口文档</h4>
-            <p>系统接口文档和调试工具</p>
+            <h4>{{ $t('basicSettings.services.api.title') }}</h4>
+            <p>{{ $t('basicSettings.services.api.description') }}</p>
           </div>
           <a-button
             type="default"
             @click="openLink('http://localhost:5050/docs')"
             :icon="h(GlobalOutlined)"
           >
-            访问
+            {{ $t('basicSettings.visit') }}
           </a-button>
         </div>
 
         <div class="service-link-card">
           <div class="service-info">
-            <h4>MinIO 对象存储</h4>
-            <p>文件存储管理控制台</p>
+            <h4>{{ $t('basicSettings.services.minio.title') }}</h4>
+            <p>{{ $t('basicSettings.services.minio.description') }}</p>
           </div>
           <a-button
             type="default"
             @click="openLink('http://localhost:9001')"
             :icon="h(GlobalOutlined)"
           >
-            访问
+            {{ $t('basicSettings.visit') }}
           </a-button>
         </div>
 
         <div class="service-link-card">
           <div class="service-info">
-            <h4>Milvus WebUI</h4>
-            <p>向量数据库管理界面</p>
+            <h4>{{ $t('basicSettings.services.milvus.title') }}</h4>
+            <p>{{ $t('basicSettings.services.milvus.description') }}</p>
           </div>
           <a-button
             type="default"
             @click="openLink('http://localhost:9091/webui/')"
             :icon="h(GlobalOutlined)"
           >
-            访问
+            {{ $t('basicSettings.visit') }}
+          </a-button>
+        </div>
+
+        <div class="service-link-card">
+          <div class="service-info">
+            <h4>{{ $t('basicSettings.services.sqlite.title') }}</h4>
+            <p>{{ $t('basicSettings.services.sqlite.description') }}</p>
+          </div>
+          <a-button
+            type="default"
+            @click="openLink('http://localhost:9092/')"
+            :icon="h(GlobalOutlined)"
+          >
+            {{ $t('basicSettings.visit') }}
           </a-button>
         </div>
       </div>
@@ -153,15 +167,32 @@
 
 <script setup>
 import { computed, h } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
 import { useUserStore } from '@/stores/user'
 import { GlobalOutlined } from '@ant-design/icons-vue'
 import ModelSelectorComponent from '@/components/ModelSelectorComponent.vue'
 import EmbeddingModelSelector from '@/components/EmbeddingModelSelector.vue'
 
+const { t, locale } = useI18n()
 const configStore = useConfigStore()
 const userStore = useUserStore()
-const items = computed(() => configStore.config._config_items)
+
+// Get config items with language-specific descriptions
+const items = computed(() => {
+  const configItems = configStore.config._config_items
+  if (!configItems) return {}
+  
+  // Transform items to use language-specific description
+  const transformed = {}
+  for (const [key, value] of Object.entries(configItems)) {
+    transformed[key] = {
+      ...value,
+      des: locale.value === 'en' ? value.des_en || value.des : value.des_zh || value.des
+    }
+  }
+  return transformed
+})
 
 const rerankerChoices = computed(() => {
   return Object.keys(configStore?.config?.reranker_names || {}) || []

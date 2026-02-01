@@ -3,12 +3,12 @@
     <!-- 头部区域 -->
     <div class="header-section">
       <div class="header-content">
-        <h3 class="title">用户管理</h3>
-        <p class="description">管理系统用户，请谨慎操作。删除用户后该用户将无法登录系统。</p>
+        <h3 class="title">{{ $t('userManagement.title') }}</h3>
+        <p class="description">{{ $t('userManagement.description') }}</p>
       </div>
       <a-button type="primary" @click="showAddUserModal" class="add-btn">
         <template #icon><PlusOutlined /></template>
-        添加用户
+        {{ $t('userManagement.addUser') }}
       </a-button>
     </div>
 
@@ -21,7 +21,7 @@
 
         <div class="cards-container">
           <div v-if="userManagement.users.length === 0" class="empty-state">
-            <a-empty description="暂无用户数据" />
+            <a-empty :description="$t('userManagement.noUsers')" />
           </div>
           <div v-else class="user-cards-grid">
             <div v-for="user in userManagement.users" :key="user.id" class="user-card">
@@ -41,22 +41,20 @@
                   <div class="user-info-content">
                     <div class="name-tag-row">
                       <h4 class="username">{{ user.username }}</h4>
-                      <div
-                        v-if="
-                          user.role === 'admin' ||
-                          user.role === 'superadmin' ||
-                          user.department_name
-                        "
-                        class="role-dept-badge"
-                      >
-                        <span class="role-icon-wrapper" :class="getRoleClass(user.role)">
-                          <UserLock v-if="user.role === 'superadmin'" :size="14" />
-                          <UserStar v-else-if="user.role === 'admin'" :size="14" />
-                          <User v-else :size="14" />
-                        </span>
-                        <span v-if="user.department_name" class="dept-text">
+                      <div class="tags-row">
+                        <a-tag
+                          v-if="userStore.isSuperAdmin && user.department_name"
+                          class="dept-tag small-tag"
+                        >
                           {{ user.department_name }}
-                        </span>
+                        </a-tag>
+                        <a-tooltip :title="getRoleLabel(user.role)">
+                          <span class="role-icon-wrapper" :class="getRoleClass(user.role)">
+                            <UserLock v-if="user.role === 'superadmin'" :size="16" />
+                            <UserStar v-else-if="user.role === 'admin'" :size="16" />
+                            <User v-else :size="16" />
+                          </span>
+                        </a-tooltip>
                       </div>
                     </div>
                     <div class="user-id-row">ID: {{ user.user_id || '-' }}</div>
@@ -66,21 +64,21 @@
 
               <div class="card-content">
                 <div class="info-item">
-                  <span class="info-label">手机号:</span>
+                  <span class="info-label">{{ $t('userManagement.phoneNumber') }}</span>
                   <span class="info-value phone-text">{{ user.phone_number || '-' }}</span>
                 </div>
                 <div class="info-item">
-                  <span class="info-label">创建时间:</span>
+                  <span class="info-label">{{ $t('userManagement.createdAt') }}</span>
                   <span class="info-value time-text">{{ formatTime(user.created_at) }}</span>
                 </div>
                 <div class="info-item">
-                  <span class="info-label">最后登录:</span>
+                  <span class="info-label">{{ $t('userManagement.lastLogin') }}</span>
                   <span class="info-value time-text">{{ formatTime(user.last_login) }}</span>
                 </div>
               </div>
 
               <div class="card-actions">
-                <a-tooltip title="编辑用户">
+                <a-tooltip :title="$t('userManagement.editUser')">
                   <a-button
                     type="text"
                     size="small"
@@ -88,10 +86,10 @@
                     class="action-btn"
                   >
                     <EditOutlined />
-                    <span>编辑</span>
+                    <span>{{ $t('userManagement.edit') }}</span>
                   </a-button>
                 </a-tooltip>
-                <a-tooltip title="删除用户">
+                <a-tooltip :title="$t('userManagement.deleteUser')">
                   <a-button
                     type="text"
                     size="small"
@@ -104,7 +102,7 @@
                     class="action-btn"
                   >
                     <DeleteOutlined />
-                    <span>删除</span>
+                    <span>{{ $t('userManagement.delete') }}</span>
                   </a-button>
                 </a-tooltip>
               </div>
@@ -126,10 +124,10 @@
       class="user-modal"
     >
       <a-form layout="vertical" class="user-form">
-        <a-form-item label="用户名" required class="form-item">
+        <a-form-item :label="$t('userManagement.username')" required class="form-item">
           <a-input
             v-model:value="userManagement.form.username"
-            placeholder="请输入用户名（2-20个字符）"
+            :placeholder="$t('userManagement.usernamePlaceholder')"
             size="large"
             @blur="validateAndGenerateUserId"
             :maxlength="20"
@@ -142,27 +140,27 @@
         <!-- 显示自动生成的用户ID -->
         <a-form-item
           v-if="userManagement.form.generatedUserId || userManagement.editMode"
-          label="用户ID"
+          :label="$t('userManagement.userId')"
           class="form-item"
         >
           <a-input
             :value="userManagement.form.generatedUserId"
-            placeholder="自动生成"
+            :placeholder="$t('userManagement.autoGenerated')"
             size="large"
             disabled
-            :addon-before="userManagement.editMode ? '已存在ID' : '登录ID'"
+            :addon-before="userManagement.editMode ? $t('userManagement.existingId') : $t('userManagement.loginId')"
           />
           <div v-if="!userManagement.editMode" class="help-text">
-            此ID将用于登录，根据用户名自动生成
+            {{ $t('userManagement.userIdHint') }}
           </div>
-          <div v-else class="help-text">编辑模式下不能修改用户ID</div>
+          <div v-else class="help-text">{{ $t('userManagement.userIdEditHint') }}</div>
         </a-form-item>
 
         <!-- 手机号字段 -->
-        <a-form-item label="手机号" class="form-item">
+        <a-form-item :label="$t('userManagement.phoneNumberLabel')" class="form-item">
           <a-input
             v-model:value="userManagement.form.phoneNumber"
-            placeholder="请输入手机号（可选，可用于登录）"
+            :placeholder="$t('userManagement.phoneNumberPlaceholder')"
             size="large"
             :maxlength="11"
           />
@@ -174,50 +172,45 @@
         <template v-if="userManagement.editMode">
           <div class="password-toggle">
             <a-checkbox v-model:checked="userManagement.displayPasswordFields">
-              修改密码
+              {{ $t('userManagement.changePassword') }}
             </a-checkbox>
           </div>
         </template>
 
         <template v-if="!userManagement.editMode || userManagement.displayPasswordFields">
-          <a-form-item label="密码" required class="form-item">
+          <a-form-item :label="$t('userManagement.password')" required class="form-item">
             <a-input-password
               v-model:value="userManagement.form.password"
-              placeholder="请输入密码"
+              :placeholder="$t('userManagement.passwordPlaceholder')"
               size="large"
             />
           </a-form-item>
 
-          <a-form-item label="确认密码" required class="form-item">
+          <a-form-item :label="$t('userManagement.confirmPassword')" required class="form-item">
             <a-input-password
               v-model:value="userManagement.form.confirmPassword"
-              placeholder="请再次输入密码"
+              :placeholder="$t('userManagement.confirmPasswordPlaceholder')"
               size="large"
             />
           </a-form-item>
         </template>
 
-        <a-form-item
-          v-if="userManagement.editMode && userManagement.form.role === 'superadmin'"
-          label="角色"
-          class="form-item"
-        >
-          <a-input value="超级管理员" size="large" disabled />
-          <div class="help-text">超级管理员账户无法修改角色</div>
-        </a-form-item>
-        <a-form-item v-else label="角色" class="form-item">
+        <a-form-item :label="$t('userManagement.role')" class="form-item">
           <a-select v-model:value="userManagement.form.role" size="large">
-            <a-select-option value="user">普通用户</a-select-option>
-            <a-select-option value="admin" v-if="userStore.isSuperAdmin">管理员</a-select-option>
+            <a-select-option value="user">{{ $t('userManagement.normalUser') }}</a-select-option>
+            <a-select-option value="admin" v-if="userStore.isSuperAdmin">{{ $t('userManagement.admin') }}</a-select-option>
+            <a-select-option value="superadmin" v-if="userStore.isSuperAdmin"
+              >{{ $t('userManagement.superAdmin') }}</a-select-option
+            >
           </a-select>
         </a-form-item>
 
         <!-- 部门选择器（仅超级管理员可见） -->
-        <a-form-item v-if="userStore.isSuperAdmin" label="部门" class="form-item">
+        <a-form-item v-if="userStore.isSuperAdmin" :label="$t('userManagement.department')" class="form-item">
           <a-select
             v-model:value="userManagement.form.departmentId"
             size="large"
-            placeholder="请选择部门"
+            :placeholder="$t('userManagement.selectDepartment')"
           >
             <a-select-option
               v-for="dept in departmentManagement.departments"
@@ -235,6 +228,7 @@
 
 <script setup>
 import { reactive, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { notification, Modal } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 import { departmentApi } from '@/apis'
@@ -242,6 +236,7 @@ import { DeleteOutlined, EditOutlined, PlusOutlined } from '@ant-design/icons-vu
 import { User, UserLock, UserStar } from 'lucide-vue-next'
 import { formatDateTime } from '@/utils/time'
 
+const { t } = useI18n()
 const userStore = useUserStore()
 
 // 用户管理相关状态
@@ -250,7 +245,7 @@ const userManagement = reactive({
   users: [],
   error: null,
   modalVisible: false,
-  modalTitle: '添加用户',
+  modalTitle: t('userManagement.addUser'),
   editMode: false,
   editUserId: null,
   form: {
@@ -279,7 +274,7 @@ const fetchDepartments = async () => {
     const departments = await departmentApi.getDepartments()
     departmentManagement.departments = departments
   } catch (error) {
-    console.error('获取部门列表失败:', error)
+    console.error(t('userManagement.getDepartmentsFailed'), error)
   }
 }
 
@@ -288,7 +283,7 @@ const validateAndGenerateUserId = async () => {
   const username = userManagement.form.username.trim()
 
   // 清空之前的错误和生成的ID
-  userManagement.form.usernameError = ''
+  userManagement.form.usernameError = t('userManagement.userIdExists')
   userManagement.form.generatedUserId = ''
 
   if (!username) {
@@ -304,7 +299,7 @@ const validateAndGenerateUserId = async () => {
     const result = await userStore.validateUsernameAndGenerateUserId(username)
     userManagement.form.generatedUserId = result.user_id
   } catch (error) {
-    userManagement.form.usernameError = error.message || '用户名验证失败'
+    userManagement.form.usernameError = error.message || t('userManagement.checkUserIdFailed')
   }
 }
 
@@ -338,7 +333,7 @@ watch(
     userManagement.form.phoneError = ''
 
     if (newPhone && !validatePhoneNumber(newPhone)) {
-      userManagement.form.phoneError = '请输入正确的手机号格式'
+      userManagement.form.phoneError = t('userManagement.phoneFormat')
     }
   }
 )
@@ -354,8 +349,8 @@ const fetchUsers = async () => {
     userManagement.users = users
     userManagement.error = null
   } catch (error) {
-    console.error('获取用户列表失败:', error)
-    userManagement.error = '获取用户列表失败'
+    console.error(t('userManagement.loadUsersFailed'), error)
+    userManagement.error = t('userManagement.loadUsersFailed')
   } finally {
     userManagement.loading = false
   }
@@ -363,7 +358,7 @@ const fetchUsers = async () => {
 
 // 打开添加用户模态框
 const showAddUserModal = () => {
-  userManagement.modalTitle = '添加用户'
+  userManagement.modalTitle = t('userManagement.addUser')
   userManagement.editMode = false
   userManagement.editUserId = null
   userManagement.form = {
@@ -383,7 +378,7 @@ const showAddUserModal = () => {
 
 // 打开编辑用户模态框
 const showEditUserModal = (user) => {
-  userManagement.modalTitle = '编辑用户'
+  userManagement.modalTitle = `${t('userManagement.editUser')} - ${user.username}`
   userManagement.editMode = true
   userManagement.editUserId = user.id
   userManagement.form = {
@@ -406,7 +401,7 @@ const handleUserFormSubmit = async () => {
   try {
     // 简单验证
     if (!userManagement.form.username.trim()) {
-      notification.error({ message: '用户名不能为空' })
+      notification.error({ message: t('userManagement.usernameRequired') })
       return
     }
 
@@ -415,24 +410,24 @@ const handleUserFormSubmit = async () => {
       userManagement.form.username.trim().length < 2 ||
       userManagement.form.username.trim().length > 20
     ) {
-      notification.error({ message: '用户名长度必须在 2-20 个字符之间' })
+      notification.error({ message: t('userManagement.usernameLength') })
       return
     }
 
     // 验证手机号
     if (userManagement.form.phoneNumber && !validatePhoneNumber(userManagement.form.phoneNumber)) {
-      notification.error({ message: '请输入正确的手机号格式' })
+      notification.error({ message: t('userManagement.phoneFormat') })
       return
     }
 
     if (userManagement.displayPasswordFields) {
       if (!userManagement.form.password) {
-        notification.error({ message: '密码不能为空' })
+        notification.error({ message: t('userManagement.passwordRequired') })
         return
       }
 
       if (userManagement.form.password !== userManagement.form.confirmPassword) {
-        notification.error({ message: '两次输入的密码不一致' })
+        notification.error({ message: t('userManagement.passwordMismatch') })
         return
       }
     }
@@ -463,7 +458,7 @@ const handleUserFormSubmit = async () => {
       }
 
       await userStore.updateUser(userManagement.editUserId, updateData)
-      notification.success({ message: '用户更新成功' })
+      notification.success({ message: t('userManagement.updateUserSuccess') })
     } else {
       // 创建新用户
       const createData = {
@@ -483,17 +478,17 @@ const handleUserFormSubmit = async () => {
       }
 
       await userStore.createUser(createData)
-      notification.success({ message: '用户创建成功' })
+      notification.success({ message: t('userManagement.addUserSuccess') })
     }
 
     // 重新获取用户列表
     await fetchUsers()
     userManagement.modalVisible = false
   } catch (error) {
-    console.error('用户操作失败:', error)
+    console.error(t('userManagement.operationFailed'), error)
     notification.error({
-      message: '操作失败',
-      description: error.message || '请稍后重试'
+      message: t('userManagement.operationFailed'),
+      description: error.message || t('userManagement.operationFailed')
     })
   } finally {
     userManagement.loading = false
@@ -504,29 +499,29 @@ const handleUserFormSubmit = async () => {
 const confirmDeleteUser = (user) => {
   // 自己不能删除自己
   if (user.id === userStore.userId) {
-    notification.error({ message: '不能删除自己的账户' })
+    notification.error({ message: t('userManagement.deleteSelfFailed') })
     return
   }
 
   // 确认对话框
   Modal.confirm({
-    title: '确认删除用户',
-    content: `确定要删除用户 "${user.username}" 吗？此操作不可撤销。`,
-    okText: '删除',
+    title: t('userManagement.deleteUserConfirm', { username: user.username }),
+    content: t('userManagement.deleteUserDescription'),
+    okText: t('userManagement.delete'),
     okType: 'danger',
-    cancelText: '取消',
+    cancelText: t('userManagement.cancel'),
     async onOk() {
       try {
         userManagement.loading = true
         await userStore.deleteUser(user.id)
-        notification.success({ message: '用户删除成功' })
+        notification.success({ message: t('userManagement.deleteUserSuccess') })
         // 重新获取用户列表
         await fetchUsers()
       } catch (error) {
-        console.error('删除用户失败:', error)
+        console.error(t('userManagement.deleteUserFailed'), error)
         notification.error({
-          message: '删除失败',
-          description: error.message || '请稍后重试'
+          message: t('userManagement.deleteUserFailed'),
+          description: error.message || t('userManagement.deleteUserFailed')
         })
       } finally {
         userManagement.loading = false
@@ -539,11 +534,11 @@ const confirmDeleteUser = (user) => {
 const getRoleLabel = (role) => {
   switch (role) {
     case 'superadmin':
-      return '超级管理员'
+      return t('userManagement.superAdmin')
     case 'admin':
-      return '管理员'
+      return t('userManagement.admin')
     case 'user':
-      return '普通用户'
+      return t('userManagement.normalUser')
     default:
       return role
   }
@@ -629,7 +624,7 @@ onMounted(async () => {
           background: var(--gray-0);
           border: 1px solid var(--gray-150);
           border-radius: 8px;
-          padding: 12px;
+          padding: 12px 16px;
           padding-bottom: 6px;
 
           transition: all 0.2s ease;
@@ -679,7 +674,6 @@ onMounted(async () => {
                 .name-tag-row {
                   display: flex;
                   align-items: center;
-                  justify-content: space-between;
                   gap: 8px;
                   margin-bottom: 2px;
                   flex-wrap: wrap;
@@ -690,39 +684,40 @@ onMounted(async () => {
                     font-weight: 600;
                     color: var(--gray-900);
                     line-height: 1.2;
-                    flex-shrink: 0;
                   }
 
-                  .role-dept-badge {
-                    display: inline-flex;
+                  .tags-row {
+                    display: flex;
                     align-items: center;
-                    gap: 4px;
-                    padding: 2px 8px 2px 4px;
-                    background: var(--gray-50);
-                    border-radius: 4px;
+                    gap: 6px;
 
                     .role-icon-wrapper {
                       display: flex;
                       align-items: center;
                       justify-content: center;
-                      width: 16px;
-                      height: 16px;
+                      width: 20px;
+                      height: 20px;
+                      border-radius: 4px;
 
                       &.role-superadmin {
                         color: var(--color-error-700);
+                        background: var(--color-error-50);
                       }
                       &.role-admin {
                         color: var(--color-info-700);
+                        background: var(--color-info-50);
                       }
                       &.role-user {
                         color: var(--color-success-700);
+                        background: var(--color-success-50);
                       }
                     }
 
-                    .dept-text {
+                    .small-tag {
                       font-size: 12px;
-                      color: var(--gray-700);
-                      font-weight: 500;
+                      height: 22px;
+                      padding: 0 4px;
+                      margin-right: 4px;
                     }
                   }
                 }

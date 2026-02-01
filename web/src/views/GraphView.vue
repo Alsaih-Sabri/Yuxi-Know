@@ -2,19 +2,19 @@
   <div class="database-empty" v-if="!state.showPage">
     <a-empty>
       <template #description>
-        <span> 点击右上角用户头像中的"系统设置"来启用知识图谱。 </span>
+        <span> {{ $t('graph.enableHint') }} </span>
       </template>
     </a-empty>
   </div>
   <div class="graph-container layout-container" v-else>
-    <HeaderComponent title="图数据库">
+    <HeaderComponent :title="$t('graph.title')">
       <template #actions>
         <div class="db-selector">
           <div class="status-wrapper">
             <div class="status-indicator" :class="graphStatusClass"></div>
             <span class="status-text">{{ graphStatusText }}</span>
           </div>
-          <span class="label">知识库: </span>
+          <span class="label">{{ $t('graph.knowledgeBase') }}: </span>
           <a-select
             v-model:value="state.selectedDbId"
             style="width: 200px"
@@ -22,17 +22,17 @@
             @change="handleDbChange"
             :loading="state.loadingDatabases"
             mode="combobox"
-            placeholder="选择或输入KB ID"
+            :placeholder="$t('graph.selectOrInputKbId')"
           />
         </div>
         <!-- <a-button type="default" @click="openLink('http://localhost:7474/')" :icon="h(GlobalOutlined)">
           Neo4j 浏览器
         </a-button> -->
         <a-button v-if="isNeo4j" type="primary" @click="state.showModal = true"
-          ><UploadOutlined /> 上传文件</a-button
+          ><UploadOutlined /> {{ $t('graph.uploadFile') }}</a-button
         >
         <a-button v-else type="primary" @click="state.showUploadTipModal = true"
-          ><UploadOutlined /> 上传文件</a-button
+          ><UploadOutlined /> {{ $t('graph.uploadFile') }}</a-button
         >
         <a-button
           v-if="unindexedCount > 0"
@@ -40,7 +40,7 @@
           @click="indexNodes"
           :loading="state.indexing"
         >
-          <SyncOutlined v-if="!state.indexing" /> 为{{ unindexedCount }}个节点添加索引
+          <SyncOutlined v-if="!state.indexing" /> {{ $t('graph.indexNodes', { count: unindexedCount }) }}
         </a-button>
       </template>
     </HeaderComponent>
@@ -60,7 +60,7 @@
             <div class="actions-left">
               <a-input
                 v-model:value="state.searchInput"
-                placeholder="输入要查询的实体 (*为全部)"
+                :placeholder="$t('graph.searchPlaceholder')"
                 style="width: 300px"
                 @keydown.enter="onSearch"
                 allow-clear
@@ -74,7 +74,7 @@
               </a-input>
               <a-input
                 v-model:value="sampleNodeCount"
-                placeholder="查询数量"
+                :placeholder="$t('graph.queryCount')"
                 style="width: 100px"
                 @keydown.enter="loadSampleNodes"
                 :loading="graph.fetching"
@@ -89,7 +89,7 @@
             </div>
             <div class="actions-right">
               <a-button type="default" @click="exportGraphData" :icon="h(ExportOutlined)">
-                导出数据
+                {{ $t('graph.exportData') }}
               </a-button>
             </div>
           </div>
@@ -111,21 +111,21 @@
 
     <a-modal
       :open="state.showModal"
-      title="上传文件"
+      :title="$t('graph.uploadFileTitle')"
       @ok="addDocumentByFile"
       @cancel="handleModalCancel"
-      ok-text="添加到图数据库"
-      cancel-text="取消"
+      :ok-text="$t('graph.addToGraph')"
+      :cancel-text="$t('graph.cancel')"
       :confirm-loading="state.processing"
       :ok-button-props="{ disabled: !hasValidFile }"
     >
       <div class="upload">
         <div class="note">
-          <p>上传的文件内容参考 test/data/A_Dream_of_Red_Mansions_tiny.jsonl 中的格式：</p>
+          <p>{{ $t('graph.uploadNote') }}</p>
         </div>
         <div class="upload-config">
           <div class="config-row">
-            <label class="config-label">嵌入模型</label>
+            <label class="config-label">{{ $t('graph.embeddingModel') }}</label>
             <div class="config-field">
               <EmbeddingModelSelector
                 v-model:value="state.embedModelName"
@@ -135,10 +135,10 @@
             </div>
           </div>
           <div v-if="!embedModelConfigurable" class="config-hint-row">
-            * 图数据库已有数据或已设定模型，不可更改
+            {{ $t('graph.modelNotChangeable') }}
           </div>
           <div class="config-row">
-            <label class="config-label">批处理大小</label>
+            <label class="config-label">{{ $t('graph.batchSize') }}</label>
             <div class="config-field">
               <a-input-number
                 v-model:value="state.batchSize"
@@ -148,7 +148,7 @@
               />
             </div>
           </div>
-          <div class="config-hint-row">默认值: 40，范围: 1-1000</div>
+          <div class="config-hint-row">{{ $t('graph.batchSizeHint') }}</div>
         </div>
         <a-upload-dragger
           class="upload-dragger"
@@ -162,8 +162,8 @@
           @change="handleFileUpload"
           @drop="handleDrop"
         >
-          <p class="ant-upload-text">点击或者把文件拖拽到这里上传</p>
-          <p class="ant-upload-hint">目前仅支持上传 jsonl 文件。</p>
+          <p class="ant-upload-text">{{ $t('graph.dragOrClickUpload') }}</p>
+          <p class="ant-upload-hint">{{ $t('graph.jsonlOnly') }}</p>
         </a-upload-dragger>
       </div>
     </a-modal>
@@ -171,7 +171,7 @@
     <!-- 上传提示弹窗 -->
     <a-modal
       :open="state.showUploadTipModal"
-      title="文件上传说明"
+      :title="$t('graph.uploadTipTitle')"
       @cancel="() => (state.showUploadTipModal = false)"
       :footer="null"
       width="500px"
@@ -184,10 +184,10 @@
           style="margin-bottom: 16px"
         />
         <div v-if="!isNeo4j" class="upload-tip-actions">
-          <p>如需上传文档到当前选中的知识库，请前往对应的知识库详情页面进行操作：</p>
+          <p>{{ $t('graph.uploadTipNonNeo4j') }}</p>
           <div class="action-buttons">
             <a-button type="primary" @click="goToDatabasePage">
-              <DatabaseOutlined /> 前往知识库详情页
+              <DatabaseOutlined /> {{ $t('graph.goToDatabase') }}
             </a-button>
           </div>
         </div>
@@ -199,6 +199,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, h } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { useConfigStore } from '@/stores/config'
 import {
@@ -221,6 +222,7 @@ import GraphDetailPanel from '@/components/GraphDetailPanel.vue'
 import EmbeddingModelSelector from '@/components/EmbeddingModelSelector.vue'
 import { useGraph } from '@/composables/useGraph'
 
+const { t } = useI18n()
 const configStore = useConfigStore()
 const cur_embed_model = computed(() => configStore.config?.embed_model)
 const modelMatched = computed(
@@ -355,7 +357,7 @@ const loadGraphInfo = () => {
     })
     .catch((error) => {
       console.error(error)
-      message.error(error.message || '加载图数据库信息失败')
+      message.error(error.message || t('graph.loadGraphFailed'))
       state.loadingGraphInfo = false
     })
 }
@@ -363,12 +365,12 @@ const loadGraphInfo = () => {
 const addDocumentByFile = () => {
   // 使用计算属性验证文件
   if (!hasValidFile.value) {
-    message.error('请先等待文件上传完成')
+    message.error(t('graph.waitUpload'))
     return
   }
 
   if (!state.embedModelName) {
-    message.error('请选择嵌入模型')
+    message.error(t('graph.selectEmbedModel'))
     return
   }
 
@@ -382,7 +384,7 @@ const addDocumentByFile = () => {
 
   // 再次验证文件路径
   if (!filePath) {
-    message.error('文件路径获取失败，请重新上传文件')
+    message.error(t('graph.filePathFailed'))
     state.processing = false
     return
   }
@@ -406,7 +408,7 @@ const addDocumentByFile = () => {
     })
     .catch((error) => {
       console.error(error)
-      message.error(error.message || '添加文件失败')
+      message.error(error.message || t('graph.addFileFailed'))
     })
     .finally(() => (state.processing = false))
 }
@@ -428,14 +430,14 @@ const loadSampleNodes = () => {
     })
     .catch((error) => {
       console.error(error)
-      message.error(error.message || '加载节点失败')
+      message.error(error.message || t('graph.loadNodesFailed'))
     })
     .finally(() => (graph.fetching = false))
 }
 
 const onSearch = () => {
   if (state.searchLoading) {
-    message.error('请稍后再试')
+    message.error(t('graph.pleaseWait'))
     return
   }
 
@@ -458,14 +460,14 @@ const onSearch = () => {
       }
       graph.updateGraphData(result.nodes, result.edges)
       if (graph.graphData.nodes.length === 0) {
-        message.info('未找到相关实体')
+        message.info(t('graph.noEntitiesFound'))
       }
       console.log(data)
       console.log(graph.graphData)
     })
     .catch((error) => {
       console.error('查询错误:', error)
-      message.error(`查询出错：${error.message || '未知错误'}`)
+      message.error(t('graph.queryError') + (error.message || ''))
     })
     .finally(() => (state.searchLoading = false))
 }
@@ -482,12 +484,12 @@ const handleFileUpload = ({ file, fileList: newFileList }) => {
 
   // 如果上传失败，显示错误信息
   if (file.status === 'error') {
-    message.error(`文件上传失败: ${file.name}`)
+    message.error(t('graph.uploadFailed') + file.name)
   }
 
   // 如果上传成功，显示成功信息
   if (file.status === 'done' && file.response?.file_path) {
-    message.success(`文件上传成功: ${file.name}`)
+    message.success(t('graph.uploadSuccess') + file.name)
   }
 
   console.log('File upload status:', file.status, file.name)
@@ -511,8 +513,8 @@ const graphStatusClass = computed(() => {
 })
 
 const graphStatusText = computed(() => {
-  if (state.loadingGraphInfo) return '加载中'
-  return graphInfo.value?.status === 'open' ? '已连接' : '已关闭'
+  if (state.loadingGraphInfo) return t('graph.loading')
+  return graphInfo.value?.status === 'open' ? t('graph.connected') : t('graph.closed')
 })
 
 // 为未索引节点添加索引
@@ -520,13 +522,13 @@ const indexNodes = () => {
   // 判断 embed_model_name 是否相同
   if (!modelMatched.value) {
     message.error(
-      `向量模型不匹配，无法添加索引，当前向量模型为 ${cur_embed_model.value}，图数据库向量模型为 ${graphInfo.value?.embed_model_name}`
+      t('graph.modelMismatch', { current: cur_embed_model.value, graph: graphInfo.value?.embed_model_name })
     )
     return
   }
 
   if (state.processing) {
-    message.error('后台正在处理，请稍后再试')
+    message.error(t('graph.processingWait'))
     return
   }
 
@@ -534,13 +536,13 @@ const indexNodes = () => {
   neo4jApi
     .indexEntities('neo4j')
     .then((data) => {
-      message.success(data.message || '索引添加成功')
+      message.success(data.message || t('graph.indexSuccess'))
       // 刷新图谱信息
       loadGraphInfo()
     })
     .catch((error) => {
       console.error(error)
-      message.error(error.message || '添加索引失败')
+      message.error(error.message || t('graph.indexFailed'))
     })
     .finally(() => {
       state.indexing = false
@@ -570,7 +572,7 @@ const exportGraphData = () => {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
 
-  message.success('图谱数据已导出')
+  message.success(t('graph.dataExported'))
 }
 
 const getAuthHeaders = () => {
@@ -589,12 +591,12 @@ const getDatabaseName = () => {
 
 const getUploadTipMessage = () => {
   if (isNeo4j.value) {
-    return 'Neo4j 图数据库支持通过上传 JSONL 格式文件直接导入实体和关系数据。'
+    return t('graph.neo4jUploadTip')
   } else {
     const selectedDb = state.dbOptions.find((db) => db.value === state.selectedDbId)
-    const dbType = selectedDb?.type || '未知'
+    const dbType = selectedDb?.type || 'unknown'
     const dbName = selectedDb?.label || getDatabaseName()
-    return `当前选择的是 ${dbType.toUpperCase()} 类型的知识库"${dbName}"，该类型知识库需要在文档知识库页面上传文档，系统会自动从中提取知识图谱。`
+    return t('graph.kbUploadTip', { type: dbType.toUpperCase(), name: dbName })
   }
 }
 
@@ -630,6 +632,7 @@ const goToDatabasePage = () => {
 .db-selector {
   display: flex;
   align-items: center;
+  margin-right: 20px;
 
   .label {
     font-size: 14px;
@@ -766,7 +769,7 @@ const goToDatabasePage = () => {
   }
 
   :deep(.ant-input) {
-    padding: 2px 0px;
+    padding: 2px 10px;
   }
 
   button {

@@ -17,8 +17,8 @@ export class ChatExporter {
    */
   static async exportToHTML(options = {}) {
     const {
-      chatTitle = '新对话',
-      agentName = '智能助手',
+      chatTitle = 'New Conversation',
+      agentName = 'AI Assistant',
       agentDescription = '',
       messages = []
     } = options || {}

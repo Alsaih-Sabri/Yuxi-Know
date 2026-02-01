@@ -87,11 +87,11 @@ export class ErrorHandler {
    */
   static handleChatError(error, operation) {
     const contextMap = {
-      send: '发送消息',
-      create: '创建对话',
-      delete: '删除对话',
-      rename: '重命名对话',
-      load: '加载对话',
+      send: 'Send message',
+      create: 'Create conversation',
+      delete: 'Delete conversation',
+      rename: 'Rename conversation',
+      load: 'Load conversation',
       export: '导出对话',
       stream: '流式处理'
     }

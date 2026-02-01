@@ -1,13 +1,12 @@
 <template>
-  <a-drawer :open="isOpen" :width="620" title="任务中心" placement="right" @close="handleClose">
-    <p>提醒：任务执行成功，只代表任务已执行完成，但是任务内部可能有问题已捕获，请注意观察日志。</p>
+  <a-drawer :open="isOpen" :width="620" :title="$t('taskCenter.title')" placement="right" @close="handleClose">
     <div class="task-center">
       <div class="task-toolbar">
         <div class="task-filter-group">
           <a-segmented v-model:value="statusFilter" :options="taskFilterOptions" />
         </div>
         <div class="task-toolbar-actions">
-          <a-button type="text" @click="handleRefresh" :loading="loadingState"> 刷新 </a-button>
+          <a-button type="text" @click="handleRefresh" :loading="loadingState"> {{ $t('taskCenter.refresh') }} </a-button>
         </div>
       </div>
 
@@ -16,7 +15,7 @@
         type="error"
         show-icon
         class="task-alert"
-        :message="lastErrorState.message || '加载任务信息失败'"
+        :message="lastErrorState.message || $t('taskCenter.loadFailed')"
       />
 
       <div v-if="hasTasks" class="task-list">
@@ -66,15 +65,15 @@
           <!-- 底部信息 -->
           <div class="task-card-footer">
             <div class="task-card-times">
-              <span v-if="task.started_at">开始 {{ formatTime(task.started_at, 'short') }}</span>
+              <span v-if="task.started_at">{{ $t('taskCenter.started') }} {{ formatTime(task.started_at, 'short') }}</span>
               <span v-if="task.completed_at"
-                >· 完成 {{ formatTime(task.completed_at, 'short') }}</span
+                >· {{ $t('taskCenter.finished') }} {{ formatTime(task.completed_at, 'short') }}</span
               >
-              <span v-if="!task.started_at">创建 {{ formatTime(task.created_at, 'short') }}</span>
+              <span v-if="!task.started_at">{{ $t('taskCenter.created') }} {{ formatTime(task.created_at, 'short') }}</span>
             </div>
             <div class="task-card-actions">
               <a-button type="text" size="small" @click.stop="handleDetail(task.id)">
-                详情
+                {{ $t('taskCenter.details') }}
               </a-button>
               <a-button
                 type="text"
@@ -83,16 +82,7 @@
                 v-if="canCancel(task)"
                 @click.stop="handleCancel(task.id)"
               >
-                取消
-              </a-button>
-              <a-button
-                type="text"
-                size="small"
-                danger
-                v-if="isTaskCompleted(task)"
-                @click.stop="handleDelete(task.id, task.name)"
-              >
-                删除
+                {{ $t('taskCenter.cancel') }}
               </a-button>
             </div>
           </div>
@@ -101,9 +91,9 @@
 
       <div v-else class="task-empty">
         <div class="task-empty-icon">🗂️</div>
-        <div class="task-empty-title">暂无任务</div>
+        <div class="task-empty-title">{{ $t('taskCenter.noTasks') }}</div>
         <div class="task-empty-subtitle">
-          当你提交知识库导入或其他后台任务时，会在这里展示实时进度（仅展示最近的 100 个任务）。
+          {{ $t('taskCenter.noTasksHint') }}
         </div>
       </div>
     </div>
@@ -112,10 +102,13 @@
 
 <script setup>
 import { computed, h, onBeforeUnmount, watch, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Modal } from 'ant-design-vue'
 import { useTaskerStore } from '@/stores/tasker'
 import { storeToRefs } from 'pinia'
 import { formatFullDateTime, formatRelative, parseToShanghai } from '@/utils/time'
+
+const { t } = useI18n()
 
 const taskerStore = useTaskerStore()
 const {
@@ -142,7 +135,7 @@ const taskFilterOptions = computed(() => [
   {
     label: () =>
       h('span', { class: 'task-filter-option' }, [
-        '全部',
+        t('taskCenter.all'),
         h('span', { class: 'filter-count' }, totalTaskCount.value)
       ]),
     value: 'all'
@@ -150,7 +143,7 @@ const taskFilterOptions = computed(() => [
   {
     label: () =>
       h('span', { class: 'task-filter-option' }, [
-        '进行中',
+        t('taskCenter.inProgress'),
         h('span', { class: 'filter-count' }, inProgressCount.value)
       ]),
     value: 'active'
@@ -158,7 +151,7 @@ const taskFilterOptions = computed(() => [
   {
     label: () =>
       h('span', { class: 'task-filter-option' }, [
-        '已完成',
+        t('taskCenter.completed'),
         h('span', { class: 'filter-count' }, completedCount.value)
       ]),
     value: 'success'
@@ -166,7 +159,7 @@ const taskFilterOptions = computed(() => [
   {
     label: () =>
       h('span', { class: 'task-filter-option' }, [
-        '失败',
+        t('taskCenter.failed'),
         h('span', { class: 'filter-count' }, failedTaskCount.value)
       ]),
     value: 'failed'
@@ -191,12 +184,12 @@ const hasTasks = computed(() => filteredTasks.value.length > 0)
 
 const ACTIVE_CLASS_STATUSES = new Set(['pending', 'queued', 'running'])
 const FAILED_STATUSES = new Set(['failed', 'cancelled'])
-const TASK_TYPE_LABELS = {
-  knowledge_ingest: '知识库导入',
-  knowledge_rechunks: '文档重新分块',
-  graph_task: '图谱处理',
-  agent_job: '智能体任务'
-}
+const TASK_TYPE_LABELS = computed(() => ({
+  knowledge_ingest: t('taskCenter.knowledgeIngest'),
+  knowledge_rechunks: t('taskCenter.knowledgeRechunks'),
+  graph_task: t('taskCenter.graphTask'),
+  agent_job: t('taskCenter.agentJob')
+}))
 
 function taskCardClasses(task) {
   return {
@@ -207,8 +200,8 @@ function taskCardClasses(task) {
 }
 
 function taskTypeLabel(type) {
-  if (!type) return '后台任务'
-  return TASK_TYPE_LABELS[type] || type
+  if (!type) return t('taskCenter.backgroundTask')
+  return TASK_TYPE_LABELS.value[type] || type
 }
 
 function formatTaskId(id) {
@@ -251,11 +244,11 @@ function handleDetail(taskId) {
     return
   }
   const detail = h('div', { class: 'task-detail' }, [
-    h('p', [h('strong', '状态：'), statusLabel(task.status)]),
-    h('p', [h('strong', '进度：'), `${Math.round(task.progress || 0)}%`]),
-    h('p', [h('strong', '更新时间：'), formatTime(task.updated_at)]),
-    h('p', [h('strong', '描述：'), task.message || '-']),
-    h('p', [h('strong', '错误：'), task.error || '-'])
+    h('p', [h('strong', `${t('taskCenter.status')}: `), statusLabel(task.status)]),
+    h('p', [h('strong', `${t('taskCenter.progress')}: `), `${Math.round(task.progress || 0)}%`]),
+    h('p', [h('strong', `${t('taskCenter.updatedAt')}: `), formatTime(task.updated_at)]),
+    h('p', [h('strong', `${t('taskCenter.description')}: `), task.message || '-']),
+    h('p', [h('strong', `${t('taskCenter.error')}: `), task.error || '-'])
   ])
   Modal.info({
     title: task.name,
@@ -266,19 +259,6 @@ function handleDetail(taskId) {
 
 function handleCancel(taskId) {
   taskerStore.cancelTask(taskId)
-}
-
-function handleDelete(taskId, taskName) {
-  Modal.confirm({
-    title: '确认删除',
-    content: `确定要删除任务"${taskName}"吗？此操作不可恢复。`,
-    okText: '删除',
-    okType: 'danger',
-    cancelText: '取消',
-    onOk: () => {
-      taskerStore.deleteTask(taskId)
-    }
-  })
 }
 
 function formatTime(value, mode = 'full') {
@@ -304,15 +284,15 @@ function getTaskDuration(task) {
     const seconds = diffSeconds % 60
 
     if (hours > 0) {
-      return `${hours}小时${minutes}分钟`
+      return `${hours}${t('taskCenter.hours')}${minutes}${t('taskCenter.minutes')}`
     }
     if (minutes > 0) {
-      return `${minutes}分钟${seconds}秒`
+      return `${minutes}${t('taskCenter.minutes')}${seconds}${t('taskCenter.seconds')}`
     }
     if (seconds > 0) {
-      return `${seconds}秒`
+      return `${seconds}${t('taskCenter.seconds')}`
     }
-    return '小于1秒'
+    return t('taskCenter.lessThan1Second')
   } catch {
     return null
   }
@@ -324,12 +304,12 @@ function isTaskCompleted(task) {
 
 function statusLabel(status) {
   const map = {
-    pending: '等待中',
-    queued: '已排队',
-    running: '进行中',
-    success: '已完成',
-    failed: '失败',
-    cancelled: '已取消'
+    pending: t('taskCenter.pending'),
+    queued: t('taskCenter.queued'),
+    running: t('taskCenter.running'),
+    success: t('taskCenter.success'),
+    failed: t('taskCenter.failed'),
+    cancelled: t('taskCenter.cancelled')
   }
   return map[status] || status
 }

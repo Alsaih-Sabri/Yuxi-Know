@@ -11,12 +11,12 @@
       <!-- Statistical Info Panel -->
       <div class="graph-stats-panel" v-if="graphData.nodes.length > 0">
         <div class="stat-item">
-          <span class="stat-label">节点</span>
+          <span class="stat-label">{{ $t('graphCanvas.nodes') }}</span>
           <span class="stat-value">{{ graphData.nodes.length }}</span>
           <span v-if="graphInfo?.node_count" class="stat-total">/ {{ graphInfo.node_count }}</span>
         </div>
         <div class="stat-item">
-          <span class="stat-label">边</span>
+          <span class="stat-label">{{ $t('graphCanvas.edges') }}</span>
           <span class="stat-value">{{ graphData.edges.length }}</span>
           <span v-if="graphInfo?.edge_count" class="stat-total">/ {{ graphInfo.edge_count }}</span>
         </div>
@@ -31,7 +31,10 @@
 <script setup>
 import { Graph } from '@antv/g6'
 import { onMounted, onUnmounted, ref, watch, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useThemeStore } from '@/stores/theme'
+
+const { t } = useI18n()
 
 const props = defineProps({
   graphData: {

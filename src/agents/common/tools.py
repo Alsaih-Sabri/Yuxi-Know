@@ -30,7 +30,7 @@ def get_tavily_search():
     return _tavily_search_instance
 
 
-@tool(name_or_callable="calculator", description="可以对给定的2个数字选择进行 add, subtract, multiply, divide 运算")
+@tool(name_or_callable="计算器", description="可以对给定的2个数字选择进行 add, subtract, multiply, divide 运算")
 def calculator(a: float, b: float, operation: str) -> float:
     try:
         if operation == "add":
@@ -87,7 +87,7 @@ async def text_to_img_demo(text: str) -> str:
     return image_url
 
 
-@tool(name_or_callable="human_in_the_loop_debug", description="请求人工审批工具，用于在执行重要操作前获得人类确认。")
+@tool(name_or_callable="人工审批工具(Debug)", description="请求人工审批工具，用于在执行重要操作前获得人类确认。")
 def get_approved_user_goal(
     operation_description: str,
 ) -> dict:
@@ -192,15 +192,12 @@ def get_kb_based_tools(db_names: list[str] | None = None) -> list:
                 try:
                     logger.debug(f"Getting mindmap for database {db_id}")
 
-                    from src.repositories.knowledge_base_repository import KnowledgeBaseRepository
-
-                    kb_repo = KnowledgeBaseRepository()
-                    kb = await kb_repo.get_by_id(db_id)
-
-                    if kb is None:
+                    # 从知识库元数据中获取思维导图
+                    if db_id not in knowledge_base.global_databases_meta:
                         return f"知识库 {retriever_info['name']} 不存在"
 
-                    mindmap_data = kb.mindmap
+                    db_meta = knowledge_base.global_databases_meta[db_id]
+                    mindmap_data = db_meta.get("mindmap")
 
                     if not mindmap_data:
                         return f"知识库 {retriever_info['name']} 还没有生成思维导图。"

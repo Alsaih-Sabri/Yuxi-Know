@@ -1,23 +1,22 @@
 <template>
   <div class="database-container layout-container">
-    <HeaderComponent title="文档知识库" :loading="dbState.listLoading">
+    <HeaderComponent :title="$t('database.title')" :loading="dbState.listLoading">
       <template #actions>
-        <a-button type="primary" @click="state.openNewDatabaseModel = true"> 新建知识库 </a-button>
+        <a-button type="primary" @click="state.openNewDatabaseModel = true"> {{ $t('database.newDatabase') }} </a-button>
       </template>
     </HeaderComponent>
 
     <a-modal
       :open="state.openNewDatabaseModel"
-      title="新建知识库"
+      :title="$t('database.newDatabase')"
       :confirm-loading="dbState.creating"
       @ok="handleCreateDatabase"
       @cancel="cancelCreateDatabase"
       class="new-database-modal"
       width="800px"
-      destroyOnClose
     >
       <!-- 知识库类型选择 -->
-      <h3>知识库类型<span style="color: var(--color-error-500)">*</span></h3>
+      <h3>{{ $t('database.databaseType') }}<span style="color: var(--color-error-500)">*</span></h3>
       <div class="kb-type-cards">
         <div
           v-for="(typeInfo, typeKey) in orderedKbTypes"
@@ -45,20 +44,20 @@
         />
       </div> -->
 
-      <h3>知识库名称<span style="color: var(--color-error-500)">*</span></h3>
-      <a-input v-model:value="newDatabase.name" placeholder="新建知识库名称" size="large" />
+      <h3>{{ $t('database.databaseName') }}<span style="color: var(--color-error-500)">*</span></h3>
+      <a-input v-model:value="newDatabase.name" :placeholder="$t('database.databaseNamePlaceholder')" size="large" />
 
-      <h3>嵌入模型</h3>
+      <h3>{{ $t('database.embeddingModel') }}</h3>
       <EmbeddingModelSelector
         v-model:value="newDatabase.embed_model_name"
         style="width: 100%"
         size="large"
-        placeholder="请选择嵌入模型"
+        :placeholder="$t('database.selectEmbeddingModel')"
       />
 
       <!-- 仅对 LightRAG 提供语言选择和LLM选择 -->
       <div v-if="newDatabase.kb_type === 'lightrag'">
-        <h3 style="margin-top: 20px">语言</h3>
+        <h3 style="margin-top: 20px">{{ $t('database.language') }}</h3>
         <a-select
           v-model:value="newDatabase.language"
           :options="languageOptions"
@@ -67,57 +66,51 @@
           :dropdown-match-select-width="false"
         />
 
-        <h3 style="margin-top: 20px">语言模型 (LLM)</h3>
-        <p style="color: var(--gray-700); font-size: 14px">可以在设置中配置语言模型</p>
+        <h3 style="margin-top: 20px">{{ $t('database.languageModel') }}</h3>
+        <p style="color: var(--gray-700); font-size: 14px">{{ $t('database.languageModelHint') }}</p>
         <ModelSelectorComponent
           :model_spec="llmModelSpec"
-          placeholder="请选择模型"
+          :placeholder="$t('database.selectModel')"
           @select-model="handleLLMSelect"
           size="large"
           style="width: 100%; height: 60px"
         />
       </div>
 
-      <h3 style="margin-top: 20px">知识库描述</h3>
+      <h3 style="margin-top: 20px">{{ $t('database.description') }}</h3>
       <p style="color: var(--gray-700); font-size: 14px">
-        在智能体流程中，这里的描述会作为工具的描述。智能体会根据知识库的标题和描述来选择合适的工具。所以这里描述的越详细，智能体越容易选择到合适的工具。
+        {{ $t('database.descriptionHint') }}
       </p>
       <AiTextarea
         v-model="newDatabase.description"
         :name="newDatabase.name"
-        placeholder="新建知识库描述"
+        :placeholder="$t('database.descriptionPlaceholder')"
         :auto-size="{ minRows: 3, maxRows: 10 }"
       />
 
-      <!-- 隐私设置（暂时隐藏）
-      <h3 style="margin-top: 20px">隐私设置</h3>
+      <h3 style="margin-top: 20px">{{ $t('database.privacySettings') }}</h3>
       <div class="privacy-config">
         <a-switch
           v-model:checked="newDatabase.is_private"
-          checked-children="私有"
-          un-checked-children="公开"
+          :checked-children="$t('database.private')"
+          :un-checked-children="$t('database.public')"
           size="default"
         />
-        <span style="margin-left: 12px">设置为私有知识库</span>
+        <span style="margin-left: 12px">{{ $t('database.setAsPrivate') }}</span>
         <a-tooltip
-          title="当前未使用此属性。在部分智能体的设计中，可以根据隐私标志来决定启用什么模型和策略。例如，对于私有知识库，可以选择更严格的数据处理和访问控制策略，以保护敏感信息的安全性和隐私性。"
+          :title="$t('database.privacyHint')"
         >
           <InfoCircleOutlined style="margin-left: 8px; color: var(--gray-500); cursor: help" />
         </a-tooltip>
       </div>
-      -->
-
-      <!-- 共享配置 -->
-      <h3>共享设置</h3>
-      <ShareConfigForm v-model="shareConfig" :auto-select-user-dept="true" />
       <template #footer>
-        <a-button key="back" @click="cancelCreateDatabase">取消</a-button>
+        <a-button key="back" @click="cancelCreateDatabase">{{ $t('database.cancel') }}</a-button>
         <a-button
           key="submit"
           type="primary"
           :loading="dbState.creating"
           @click="handleCreateDatabase"
-          >创建</a-button
+          >{{ $t('database.create') }}</a-button
         >
       </template>
     </a-modal>
@@ -125,18 +118,18 @@
     <!-- 加载状态 -->
     <div v-if="dbState.listLoading" class="loading-container">
       <a-spin size="large" />
-      <p>正在加载知识库...</p>
+      <p>{{ $t('database.loading') }}</p>
     </div>
 
     <!-- 空状态显示 -->
     <div v-else-if="!databases || databases.length === 0" class="empty-state">
-      <h3 class="empty-title">暂无知识库</h3>
-      <p class="empty-description">创建您的第一个知识库，开始管理文档和知识</p>
+      <h3 class="empty-title">{{ $t('database.empty') }}</h3>
+      <p class="empty-description">{{ $t('database.emptyHint') }}</p>
       <a-button type="primary" size="large" @click="state.openNewDatabaseModel = true">
         <template #icon>
           <PlusOutlined />
         </template>
-        创建知识库
+        {{ $t('database.createDatabase') }}
       </a-button>
     </div>
 
@@ -152,7 +145,7 @@
         <LockOutlined
           v-if="database.metadata?.is_private"
           class="private-lock-icon"
-          title="私有知识库"
+          :title="$t('database.privateDatabase')"
         />
         <div class="top">
           <div class="icon">
@@ -161,7 +154,7 @@
           <div class="info">
             <h3>{{ database.name }}</h3>
             <p>
-              <span>{{ database.files ? Object.keys(database.files).length : 0 }} 文件</span>
+              <span>{{ database.files ? Object.keys(database.files).length : 0 }} {{ $t('database.files') }}</span>
               <span class="created-time-inline" v-if="database.created_at">
                 {{ formatCreatedTime(database.created_at) }}
               </span>
@@ -171,7 +164,7 @@
         <!-- <a-tooltip :title="database.description || '暂无描述'">
           <p class="description">{{ database.description || '暂无描述' }}</p>
         </a-tooltip> -->
-        <p class="description">{{ database.description || '暂无描述' }}</p>
+        <p class="description">{{ database.description || $t('database.noDescription') }}</p>
         <div class="tags">
           <a-tag color="blue" v-if="database.embed_info?.name">{{
             database.embed_info.name
@@ -194,6 +187,7 @@
 <script setup>
 import { ref, onMounted, reactive, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { storeToRefs } from 'pinia'
 import { useConfigStore } from '@/stores/config'
 import { useDatabaseStore } from '@/stores/database'
@@ -202,11 +196,11 @@ import { typeApi } from '@/apis/knowledge_api'
 import HeaderComponent from '@/components/HeaderComponent.vue'
 import ModelSelectorComponent from '@/components/ModelSelectorComponent.vue'
 import EmbeddingModelSelector from '@/components/EmbeddingModelSelector.vue'
-import ShareConfigForm from '@/components/ShareConfigForm.vue'
 import dayjs, { parseToShanghai } from '@/utils/time'
 import AiTextarea from '@/components/AiTextarea.vue'
 import { getKbTypeLabel, getKbTypeIcon, getKbTypeColor } from '@/utils/kb_utils'
 
+const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const configStore = useConfigStore()
@@ -217,12 +211,6 @@ const { databases, state: dbState } = storeToRefs(databaseStore)
 
 const state = reactive({
   openNewDatabaseModel: false
-})
-
-// 共享配置状态（用于提交数据）
-const shareConfig = ref({
-  is_shared: true,
-  accessible_department_ids: []
 })
 
 // 语言选项（值使用英文，以保证后端/LightRAG 兼容；标签为中英文方便理解）
@@ -293,11 +281,6 @@ const loadSupportedKbTypes = async () => {
 
 const resetNewDatabase = () => {
   Object.assign(newDatabase, createEmptyDatabaseForm())
-  // 重置共享配置
-  shareConfig.value = {
-    is_shared: true,
-    accessible_department_ids: []
-  }
 }
 
 const cancelCreateDatabase = () => {
@@ -316,24 +299,24 @@ const formatCreatedTime = (createdAt) => {
   const diffInDays = today.diff(createdDay, 'day')
 
   if (diffInDays === 0) {
-    return '今天创建'
+    return t('database.createdToday')
   }
   if (diffInDays === 1) {
-    return '昨天创建'
+    return t('database.createdYesterday')
   }
   if (diffInDays < 7) {
-    return `${diffInDays} 天前创建`
+    return t('database.createdDaysAgo', { n: diffInDays })
   }
   if (diffInDays < 30) {
     const weeks = Math.floor(diffInDays / 7)
-    return `${weeks} 周前创建`
+    return t('database.createdWeeksAgo', { n: weeks })
   }
   if (diffInDays < 365) {
     const months = Math.floor(diffInDays / 30)
-    return `${months} 个月前创建`
+    return t('database.createdMonthsAgo', { n: months })
   }
   const years = Math.floor(diffInDays / 365)
-  return `${years} 年前创建`
+  return t('database.createdYearsAgo', { n: years })
 }
 
 // 处理知识库类型改变
@@ -366,14 +349,6 @@ const buildRequestData = () => {
     additional_params: {
       is_private: newDatabase.is_private || false
     }
-  }
-
-  // 添加共享配置
-  requestData.share_config = {
-    is_shared: shareConfig.value.is_shared,
-    accessible_departments: shareConfig.value.is_shared
-      ? []
-      : shareConfig.value.accessible_department_ids || []
   }
 
   // 根据类型添加特定配置

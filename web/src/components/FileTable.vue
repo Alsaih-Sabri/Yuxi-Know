@@ -5,7 +5,7 @@
         <a-dropdown trigger="click">
           <a-button type="primary" size="small" class="upload-btn">
             <FileUp size="14" style="margin-left: 4px" />
-            上传
+            {{ $t('fileTable.actions.upload') }}
             <ChevronDown size="14" style="margin-left: 4px" />
           </a-button>
           <template #overlay>
@@ -15,21 +15,14 @@
                 @click="showAddFilesModal({ isFolder: false })"
                 :icon="h(FileUp, { size: 16 })"
               >
-                上传文件
+                {{ $t('fileTable.actions.uploadFile') }}
               </a-menu-item>
               <a-menu-item
                 key="upload-folder"
                 @click="showAddFilesModal({ isFolder: true })"
                 :icon="h(FolderUp, { size: 16 })"
               >
-                上传文件夹
-              </a-menu-item>
-              <a-menu-item
-                key="upload-url"
-                @click="showAddFilesModal({ mode: 'url' })"
-                :icon="h(Link, { size: 16 })"
-              >
-                解析 URL
+                {{ $t('fileTable.actions.uploadFolder') }}
               </a-menu-item>
             </a-menu>
           </template>
@@ -40,7 +33,7 @@
           type="text"
           size="small"
           @click="showCreateFolderModal"
-          title="新建文件夹"
+          :title="$t('fileTable.actions.newFolder')"
         >
           <template #icon><FolderPlus size="16" /></template>
         </a-button>
@@ -48,7 +41,7 @@
       <div class="panel-actions">
         <a-input
           v-model:value="filenameFilter"
-          placeholder="搜索"
+          :placeholder="$t('fileTable.actions.search')"
           size="small"
           class="action-searcher"
           allow-clear
@@ -64,7 +57,7 @@
             type="text"
             class="panel-action-btn"
             :class="{ active: sortField !== 'filename' }"
-            title="排序"
+            :title="$t('fileTable.actions.sort')"
           >
             <template #icon><ArrowUpDown size="16" /></template>
           </a-button>
@@ -82,13 +75,13 @@
             type="text"
             class="panel-action-btn"
             :class="{ active: statusFilter !== 'all' }"
-            title="筛选状态"
+            :title="$t('fileTable.actions.filter')"
           >
             <template #icon><Filter size="16" /></template>
           </a-button>
           <template #overlay>
             <a-menu :selectedKeys="[statusFilter]" @click="handleStatusMenuClick">
-              <a-menu-item key="all">全部状态</a-menu-item>
+              <a-menu-item key="all">{{ $t('fileTable.status.all') }}</a-menu-item>
               <a-menu-item v-for="opt in statusOptions" :key="opt.value">
                 {{ opt.label }}
               </a-menu-item>
@@ -100,7 +93,7 @@
           type="text"
           @click="handleRefresh"
           :loading="refreshing"
-          title="刷新"
+          :title="$t('fileTable.actions.refresh')"
           class="panel-action-btn"
         >
           <template #icon><RotateCw size="16" /></template>
@@ -108,7 +101,7 @@
         <a-button
           type="text"
           @click="toggleSelectionMode"
-          title="多选"
+          :title="$t('fileTable.actions.multiSelect')"
           class="panel-action-btn"
           :class="{ active: isSelectionMode }"
         >
@@ -126,7 +119,7 @@
         <a-button
           type="text"
           @click="toggleRightPanel"
-          title="切换右侧面板"
+          :title="$t('fileTable.actions.togglePanel')"
           class="panel-action-btn expand"
           :class="{ expanded: props.rightPanelVisible }"
         >
@@ -143,7 +136,7 @@
           @change="onSelectAllChange"
           style="margin-right: 8px"
         />
-        <span>{{ selectedRowKeys.length }} 项</span>
+        <span>{{ $t('fileTable.batch.selected', { count: selectedRowKeys.length }) }}</span>
       </div>
       <div style="display: flex; gap: 2px">
         <a-button
@@ -153,7 +146,7 @@
           :disabled="!canBatchParse"
           :icon="h(FileText, { size: 16 })"
         >
-          批量解析
+          {{ $t('fileTable.batch.parse') }}
         </a-button>
         <a-button
           type="link"
@@ -162,7 +155,7 @@
           :disabled="!canBatchIndex"
           :icon="h(Database, { size: 16 })"
         >
-          批量入库
+          {{ $t('fileTable.batch.index') }}
         </a-button>
         <a-button
           type="link"
@@ -172,7 +165,7 @@
           :disabled="!canBatchDelete"
           :icon="h(Trash2, { size: 16 })"
         >
-          批量删除
+          {{ $t('fileTable.batch.delete') }}
         </a-button>
       </div>
     </div>
@@ -185,8 +178,8 @@
       width="600px"
     >
       <template #footer>
-        <a-button key="back" @click="handleIndexConfigCancel">取消</a-button>
-        <a-button key="submit" type="primary" @click="handleIndexConfigConfirm">确定</a-button>
+        <a-button key="back" @click="handleIndexConfigCancel">{{ $t('fileTable.buttons.cancel') }}</a-button>
+        <a-button key="submit" type="primary" @click="handleIndexConfigConfirm">{{ $t('fileTable.buttons.confirm') }}</a-button>
       </template>
       <div class="index-params">
         <ChunkParamsConfig :temp-chunk-params="indexParams" :show-qa-split="true" />
@@ -196,13 +189,13 @@
     <!-- 新建文件夹模态框 -->
     <a-modal
       v-model:open="createFolderModalVisible"
-      title="新建文件夹"
+      :title="$t('fileTable.modal.newFolder')"
       :confirm-loading="createFolderLoading"
       @ok="handleCreateFolder"
     >
       <a-input
         v-model:value="newFolderName"
-        placeholder="请输入文件夹名称"
+        :placeholder="$t('fileTable.modal.folderPlaceholder')"
         @pressEnter="handleCreateFolder"
       />
     </a-modal>
@@ -256,15 +249,15 @@
                   <span class="label">ID:</span> <span class="value">{{ record.file_id }}</span>
                 </div>
                 <div class="info-row">
-                  <span class="label">状态:</span>
+                  <span class="label">{{ $t('fileTable.fileInfo.status') }}</span>
                   <span class="value">{{ getStatusText(record.status) }}</span>
                 </div>
                 <div class="info-row">
-                  <span class="label">时间:</span>
+                  <span class="label">{{ $t('fileTable.fileInfo.time') }}</span>
                   <span class="value">{{ formatRelativeTime(record.created_at) }}</span>
                 </div>
                 <div v-if="record.error_message" class="info-row error">
-                  <span class="label">错误:</span>
+                  <span class="label">{{ $t('fileTable.fileInfo.error') }}</span>
                   <span class="value">{{ record.error_message }}</span>
                 </div>
               </div>
@@ -335,11 +328,11 @@
                 <template v-if="record.is_folder">
                   <a-button type="text" block @click="showCreateFolderModal(record.file_id)">
                     <template #icon><component :is="h(FolderPlus)" size="14" /></template>
-                    新建子文件夹
+                    {{ $t('fileTable.fileInfo.newSubfolder') }}
                   </a-button>
                   <a-button type="text" block danger @click="handleDeleteFolder(record)">
                     <template #icon><component :is="h(Trash2)" size="14" /></template>
-                    删除文件夹
+                    {{ $t('fileTable.fileInfo.deleteFolder') }}
                   </a-button>
                 </template>
                 <template v-else>
@@ -349,12 +342,11 @@
                     @click="handleDownloadFile(record)"
                     :disabled="
                       lock ||
-                      record.file_type === 'url' ||
                       !['done', 'indexed', 'parsed', 'error_indexing'].includes(record.status)
                     "
                   >
                     <template #icon><component :is="h(Download)" size="14" /></template>
-                    下载文件
+                    {{ $t('fileTable.fileInfo.downloadFile') }}
                   </a-button>
 
                   <!-- Parse Action -->
@@ -366,7 +358,7 @@
                     :disabled="lock"
                   >
                     <template #icon><component :is="h(FileText)" size="14" /></template>
-                    {{ record.status === 'error_parsing' ? '重试解析' : '解析文件' }}
+                    {{ record.status === 'error_parsing' ? $t('fileTable.fileInfo.retryParse') : $t('fileTable.fileInfo.parseFile') }}
                   </a-button>
 
                   <!-- Index Action -->
@@ -378,7 +370,7 @@
                     :disabled="lock"
                   >
                     <template #icon><component :is="h(Database)" size="14" /></template>
-                    {{ record.status === 'error_indexing' ? '重试入库' : '入库' }}
+                    {{ record.status === 'error_indexing' ? $t('fileTable.fileInfo.retryIndex') : $t('fileTable.fileInfo.index') }}
                   </a-button>
 
                   <!-- Reindex Action -->
@@ -390,7 +382,7 @@
                     :disabled="lock"
                   >
                     <template #icon><component :is="h(RotateCw)" size="14" /></template>
-                    重新入库
+                    {{ $t('fileTable.fileInfo.reindex') }}
                   </a-button>
 
                   <a-button
@@ -403,7 +395,7 @@
                     "
                   >
                     <template #icon><component :is="h(Trash2)" size="14" /></template>
-                    删除文件
+                    {{ $t('fileTable.fileInfo.deleteFile') }}
                   </a-button>
                 </template>
               </div>
@@ -419,10 +411,13 @@
 
 <script setup>
 import { ref, computed, watch, h } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useDatabaseStore } from '@/stores/database'
 import { message, Modal } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 import { documentApi } from '@/apis/knowledge_api'
+
+const { t } = useI18n()
 import {
   CheckCircleFilled,
   HourglassFilled,
@@ -449,19 +444,18 @@ import {
   Search,
   Filter,
   ArrowUpDown,
-  ChevronDown,
-  Link
+  ChevronDown
 } from 'lucide-vue-next'
 
 const store = useDatabaseStore()
 const userStore = useUserStore()
 
 const sortField = ref('filename')
-const sortOptions = [
-  { label: '文件名', value: 'filename' },
-  { label: '创建时间', value: 'created_at' },
-  { label: '状态', value: 'status' }
-]
+const sortOptions = computed(() => [
+  { label: t('common.filename'), value: 'filename' },
+  { label: t('common.createdAt'), value: 'created_at' },
+  { label: t('common.status'), value: 'status' }
+])
 
 const handleSortMenuClick = (e) => {
   sortField.value = e.key
@@ -478,17 +472,17 @@ const handleStatusMenuClick = (e) => {
 // Status text mapping
 const getStatusText = (status) => {
   const map = {
-    uploaded: '已上传',
-    parsing: '解析中',
-    parsed: '已解析',
-    error_parsing: '解析失败',
-    indexing: '入库中',
-    indexed: '已入库',
-    error_indexing: '入库失败',
-    done: '已入库',
-    failed: '入库失败',
-    processing: '处理中',
-    waiting: '等待中'
+    uploaded: t('database.status.uploaded'),
+    parsing: t('database.status.parsing'),
+    parsed: t('database.status.parsed'),
+    error_parsing: t('database.status.errorParsing'),
+    indexing: t('database.status.indexing'),
+    indexed: t('database.status.indexed'),
+    error_indexing: t('database.status.errorIndexing'),
+    done: t('database.status.done'),
+    failed: t('database.status.failed'),
+    processing: t('database.status.processing'),
+    waiting: t('database.status.waiting')
   }
   return map[status] || status
 }
@@ -840,10 +834,7 @@ const buildFileTree = (fileList) => {
     const normalizedName = file.filename.replace(/\\/g, '/')
     const parts = normalizedName.split('/')
 
-    // 检测是否是 URL（URL 不应该被解析为文件夹层级）
-    const isUrl = file.filename.startsWith('http://') || file.filename.startsWith('https://')
-
-    if (isUrl || parts.length === 1) {
+    if (parts.length === 1) {
       // Root item
       // Check if it's an explicit folder that should merge with an existing implicit one?
       if (item.is_folder) {

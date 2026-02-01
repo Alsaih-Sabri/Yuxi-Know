@@ -25,7 +25,7 @@
             :disabled="state.checkingStatus"
             class="status-check-button"
           >
-            {{ state.checkingStatus ? '检查中...' : '检查' }}
+            {{ state.checkingStatus ? $t('modelSelector.checking') : $t('modelSelector.check') }}
           </a-button>
         </div>
       </div>
@@ -52,7 +52,10 @@
 
 <script setup>
 import { computed, reactive } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@/stores/config'
+
+const { t } = useI18n()
 import { chatModelApi } from '@/apis/system_api'
 
 const props = defineProps({

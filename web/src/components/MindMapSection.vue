@@ -4,22 +4,22 @@
       <!-- 加载状态 -->
       <div v-if="loading" class="loading-state">
         <a-spin size="small" />
-        <span>加载中...</span>
+        <span>{{ $t('mindMap.loading') }}</span>
       </div>
 
       <!-- 生成中状态 -->
       <div v-else-if="generating" class="generating-state">
         <a-spin size="small" />
-        <span>AI 正在生成思维导图...</span>
+        <span>{{ $t('mindMap.generating') }}</span>
       </div>
 
       <!-- 空状态 -->
       <div v-else-if="!mindmapData" class="empty-state">
         <Network :size="32" />
-        <p>暂无思维导图</p>
+        <p>{{ $t('mindMap.empty') }}</p>
         <a-button type="primary" size="small" @click="generateMindmap">
           <template #icon><Sparkles :size="14" /></template>
-          生成思维导图
+          {{ $t('mindMap.buttons.generate') }}
         </a-button>
       </div>
 
@@ -32,14 +32,14 @@
               size="small"
               @click="refreshMindmap"
               :loading="generating"
-              title="重新生成"
+              :title="$t('mindMap.buttons.regenerate')"
             >
               <template #icon><RefreshCw :size="14" /></template>
-              <span class="toolbar-text">重新生成</span>
+              <span class="toolbar-text">{{ $t('mindMap.buttons.regenerate') }}</span>
             </a-button>
-            <a-button type="text" size="small" @click="fitView" title="适应视图">
+            <a-button type="text" size="small" @click="fitView" :title="$t('mindMap.buttons.fitView')">
               <template #icon><Maximize2 :size="14" /></template>
-              <span class="toolbar-text">适应视图</span>
+              <span class="toolbar-text">{{ $t('mindMap.buttons.fitView') }}</span>
             </a-button>
           </a-space>
         </div>
@@ -53,7 +53,10 @@
 
 <script setup>
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
+
+const { t } = useI18n()
 import { RefreshCw, Network, Sparkles, Maximize2 } from 'lucide-vue-next'
 import { mindmapApi } from '@/apis/mindmap_api'
 import { Markmap } from 'markmap-view'

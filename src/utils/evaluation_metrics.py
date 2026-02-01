@@ -45,7 +45,7 @@ class AnswerMetrics:
     """答案评估指标计算"""
 
     @staticmethod
-    async def judge_correctness(query: str, generated_answer: str, gold_answer: str, judge_llm: Any) -> dict[str, Any]:
+    def judge_correctness(query: str, generated_answer: str, gold_answer: str, judge_llm: Any) -> dict[str, Any]:
         """
         使用LLM判断生成的答案是否正确
         """
@@ -75,7 +75,7 @@ class AnswerMetrics:
             }}
             """)
         try:
-            response = await judge_llm.call(prompt, stream=False)
+            response = judge_llm.call(prompt, stream=False)
             content = response.content.strip()
 
             # 尝试清理可能的 markdown 代码块
@@ -117,14 +117,14 @@ class EvaluationMetricsCalculator:
         return metrics
 
     @staticmethod
-    async def calculate_answer_metrics(
+    def calculate_answer_metrics(
         query: str, generated_answer: str, gold_answer: str, judge_llm: Any = None
     ) -> dict[str, Any]:
         """计算答案指标 (LLM Judge)"""
         if not judge_llm:
             return {}
 
-        return await AnswerMetrics.judge_correctness(query, generated_answer, gold_answer, judge_llm)
+        return AnswerMetrics.judge_correctness(query, generated_answer, gold_answer, judge_llm)
 
     @staticmethod
     def calculate_overall_score(

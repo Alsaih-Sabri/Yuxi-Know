@@ -1,24 +1,24 @@
 <template>
   <a-modal
     :open="props.modelValue"
-    title="检索配置"
+    :title="$t('searchConfig.title')"
     width="800px"
     :confirm-loading="loading"
     @ok="handleSave"
     @cancel="handleCancel"
-    ok-text="保存"
-    cancel-text="取消"
+    :ok-text="$t('searchConfig.buttons.save')"
+    :cancel-text="$t('searchConfig.buttons.cancel')"
   >
     <div class="search-config-modal">
       <div v-if="loading" class="config-loading">
         <a-spin size="large" />
-        <p>加载配置参数中...</p>
+        <p>{{ $t('searchConfig.loading') }}</p>
       </div>
 
       <div v-else-if="error" class="config-error">
-        <a-result status="error" title="配置加载失败" :sub-title="error">
+        <a-result status="error" :title="$t('searchConfig.error.title')" :sub-title="error">
           <template #extra>
-            <a-button type="primary" @click="loadQueryParams">重新加载</a-button>
+            <a-button type="primary" @click="loadQueryParams">{{ $t('searchConfig.buttons.reload') }}</a-button>
           </template>
         </a-result>
       </div>
@@ -28,9 +28,6 @@
           <a-row :gutter="16">
             <a-col :span="12" v-for="param in queryParams" :key="param.key">
               <a-form-item :label="param.label">
-                <template #extra v-if="param.description">
-                  <div class="param-description">{{ param.description }}</div>
-                </template>
                 <a-select
                   v-if="param.type === 'select'"
                   v-model:value="meta[param.key]"
@@ -50,8 +47,8 @@
                   @update:value="(value) => updateMeta(param.key, value)"
                   style="width: 100%"
                 >
-                  <a-select-option value="true">启用</a-select-option>
-                  <a-select-option value="false">关闭</a-select-option>
+                  <a-select-option value="true">{{ $t('searchConfig.options.enable') }}</a-select-option>
+                  <a-select-option value="false">{{ $t('searchConfig.options.disable') }}</a-select-option>
                 </a-select>
                 <a-input-number
                   v-else-if="param.type === 'number'"
@@ -71,8 +68,11 @@
 
 <script setup>
 import { ref, reactive, computed, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useDatabaseStore } from '@/stores/database'
 import { message } from 'ant-design-vue'
+
+const { t } = useI18n()
 import { queryApi } from '@/apis/knowledge_api'
 
 const props = defineProps({
@@ -274,13 +274,6 @@ watch(
 
 .config-forms {
   max-width: 100%;
-}
-
-.param-description {
-  font-size: 12px;
-  color: var(--gray-500);
-  line-height: 1.5;
-  margin-top: 4px;
 }
 
 // 表单样式优化

@@ -7,7 +7,7 @@
           <div class="search-input-wrapper">
             <a-textarea
               v-model:value="queryText"
-              placeholder="输入查询内容..."
+              :placeholder="$t('querySection.input.placeholder')"
               :auto-size="{ minRows: 2, maxRows: 6 }"
               class="search-textarea"
               @press-enter.prevent="onQuery"
@@ -15,14 +15,14 @@
             <div class="search-actions">
               <div class="query-examples-compact">
                 <div class="examples-label-group">
-                  <a-tooltip title="点击手动生成测试问题" placement="bottom">
+                  <a-tooltip :title="$t('querySection.examples.generateTooltip')" placement="bottom">
                     <a-button
                       type="text"
                       size="small"
                       class="examples-label-btn"
                       @click="() => generateSampleQuestions(false)"
                     >
-                      示例:
+                      {{ $t('querySection.examples.label') }}
                     </a-button>
                   </a-tooltip>
                 </div>
@@ -30,7 +30,7 @@
                   <!-- 加载中或生成中 -->
                   <div v-if="loadingQuestions || generatingQuestions" class="loading-text">
                     <a-spin size="small" />
-                    <span>{{ generatingQuestions ? 'AI生成中...' : '加载中...' }}</span>
+                    <span>{{ generatingQuestions ? $t('querySection.examples.generating') : $t('querySection.examples.loading') }}</span>
                   </div>
 
                   <!-- 示例轮播 -->
@@ -48,12 +48,12 @@
 
                   <!-- 空状态 - 添加文件后会自动生成 -->
                   <span v-else style="color: var(--gray-500); font-size: 12px"
-                    >暂无问题，请点击左侧按钮生成</span
+                    >{{ $t('querySection.examples.noQuestions') }}</span
                   >
                 </div>
               </div>
               <div style="display: flex; gap: 12px; align-items: center">
-                <a-tooltip :title="showRawData ? '切换至格式化显示' : '切换至原始数据'">
+                <a-tooltip :title="showRawData ? $t('querySection.actions.showFormatted') : $t('querySection.actions.showRaw')">
                   <a-button
                     type="text"
                     shape="circle"
@@ -91,30 +91,31 @@
               <!-- 元数据信息 -->
               <div v-if="queryResult.metadata" class="lightrag-metadata">
                 <div class="metadata-row">
-                  <span class="metadata-label">查询模式:</span>
+                  <span class="metadata-label">{{ $t('querySection.metadata.queryMode') }}</span>
                   <span class="metadata-value query-mode">{{
                     queryResult.metadata.query_mode
                   }}</span>
                 </div>
                 <div v-if="queryResult.metadata.processing_info" class="metadata-row">
-                  <span class="metadata-label">统计:</span>
+                  <span class="metadata-label">{{ $t('querySection.metadata.statistics') }}</span>
                   <span class="metadata-value">
-                    找到
-                    {{ queryResult.metadata.processing_info.total_entities_found || 0 }} 个实体,
-                    {{ queryResult.metadata.processing_info.total_relations_found || 0 }} 个关系,
-                    使用 {{ queryResult.metadata.processing_info.final_chunks_count || 0 }} 个文档块
+                    {{ $t('querySection.metadata.found', { 
+                      entities: queryResult.metadata.processing_info.total_entities_found || 0,
+                      relations: queryResult.metadata.processing_info.total_relations_found || 0,
+                      chunks: queryResult.metadata.processing_info.final_chunks_count || 0
+                    }) }}
                   </span>
                 </div>
                 <!-- 高级关键词 -->
                 <div v-if="queryResult.metadata.keywords?.high_level" class="metadata-row">
-                  <span class="metadata-label">高级关键词:</span>
+                  <span class="metadata-label">{{ $t('querySection.metadata.highLevelKeywords') }}</span>
                   <span class="keywords-text">{{
                     queryResult.metadata.keywords.high_level.join('、')
                   }}</span>
                 </div>
                 <!-- 低级关键词 -->
                 <div v-if="queryResult.metadata.keywords?.low_level" class="metadata-row">
-                  <span class="metadata-label">低级关键词:</span>
+                  <span class="metadata-label">{{ $t('querySection.metadata.lowLevelKeywords') }}</span>
                   <span class="keywords-text">{{
                     queryResult.metadata.keywords.low_level.join('、')
                   }}</span>
@@ -130,7 +131,7 @@
                   <template #header>
                     <div class="collapse-header">
                       <Network :size="16" />
-                      <span>实体 ({{ queryResult.data.entities.length }})</span>
+                      <span>{{ $t('querySection.results.entities', { count: queryResult.data.entities.length }) }}</span>
                     </div>
                   </template>
                   <div class="lightrag-entities">
@@ -144,7 +145,7 @@
                         <span class="entity-type">{{ entity.entity_type }}</span>
                       </div>
                       <div class="entity-description">
-                        <strong>描述:</strong> {{ entity.description }}
+                        <strong>{{ $t('querySection.results.description') }}</strong> {{ entity.description }}
                       </div>
                       <div class="entity-meta">
                         <span class="meta-item">
@@ -339,11 +340,13 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, h } from 'vue'
-import { useDatabaseStore } from '@/stores/database'
+import { useI18n } from 'vue-i18n'
 import { message } from 'ant-design-vue'
 import { queryApi } from '@/apis/knowledge_api'
 import { SearchOutlined } from '@ant-design/icons-vue'
 import { Braces, Tags, Network, Link, FileText, ArrowRight } from 'lucide-vue-next'
+
+const { t } = useI18n()
 
 const store = useDatabaseStore()
 

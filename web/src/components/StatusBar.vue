@@ -25,7 +25,7 @@
           <a-badge :count="activeTaskCount" :overflow-count="99" class="task-center-badge">
             <span class="task-center-button">
               <ClipboardList class="icon" />
-              <span class="task-center-label">任务中心</span>
+              <span class="task-center-label">{{ $t('statusBar.taskCenter') }}</span>
             </span>
           </a-badge>
         </div>
@@ -36,12 +36,15 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useInfoStore } from '@/stores/info'
 import { useUserStore } from '@/stores/user'
 import { Clock, User, ClipboardList } from 'lucide-vue-next'
 import { useTaskerStore } from '@/stores/tasker'
 import { storeToRefs } from 'pinia'
 import dayjs from '@/utils/time'
+
+const { t } = useI18n()
 
 // 使用 stores
 const infoStore = useInfoStore()
@@ -58,7 +61,7 @@ const branding = computed(() => infoStore.branding)
 
 // 用户名计算属性
 const currentUser = computed(() => {
-  return userStore.username || '游客'
+  return userStore.username || t('statusBar.guest')
 })
 
 // 问候语计算属性
@@ -67,18 +70,18 @@ const greeting = computed(() => {
   let greetingText = ''
 
   if (hour >= 5 && hour < 12) {
-    greetingText = '早上好'
+    greetingText = t('statusBar.greeting.morning')
   } else if (hour >= 12 && hour < 14) {
-    greetingText = '中午好'
+    greetingText = t('statusBar.greeting.noon')
   } else if (hour >= 14 && hour < 18) {
-    greetingText = '下午好'
+    greetingText = t('statusBar.greeting.afternoon')
   } else if (hour >= 18 && hour < 22) {
-    greetingText = '晚上好'
+    greetingText = t('statusBar.greeting.evening')
   } else {
-    greetingText = '夜深了'
+    greetingText = t('statusBar.greeting.night')
   }
 
-  return `${greetingText}！${currentUser.value}`
+  return `${greetingText}, ${currentUser.value}!`
 })
 
 const activeTaskCount = computed(() => activeCountRef.value || 0)
@@ -90,7 +93,7 @@ const openTaskCenter = () => {
 // 更新时间
 const updateTime = () => {
   const now = dayjs().tz('Asia/Shanghai')
-  currentTime.value = now.format('YYYY年MM月DD日 HH:mm:ss')
+  currentTime.value = now.format(t('statusBar.timeFormat'))
 }
 
 // 定时器

@@ -26,47 +26,39 @@
             </div>
           </a-menu-item>
           <a-menu-divider />
-          <a-menu-item key="docs" @click="openDocs" :icon="BookOpenIcon">
-            <span class="menu-text">文档中心</span>
+          <a-menu-item key="docs" @click="openDocs" :icon="h(BookOpen, { size: '16' })">
+            <span class="menu-text">{{ $t('userInfo.docCenter') }}</span>
           </a-menu-item>
           <a-menu-item
             key="theme"
             @click="toggleTheme"
-            :icon="themeStore.isDark ? SunIcon : MoonIcon"
+            :icon="h(themeStore.isDark ? Sun : Moon, { size: '16' })"
           >
             <span class="menu-text">{{
-              themeStore.isDark ? '切换到浅色模式' : '切换到深色模式 (Beta)'
+              themeStore.isDark ? $t('userInfo.switchToLight') : $t('userInfo.switchToDark')
             }}</span>
           </a-menu-item>
           <a-menu-divider v-if="userStore.isAdmin" />
           <a-menu-item
-            v-if="userStore.isSuperAdmin"
-            key="debug"
-            @click="showDebug = true"
-            :icon="TerminalIcon"
-          >
-            <span class="menu-text">调试面板（非生产环境）</span>
-          </a-menu-item>
-          <a-menu-item
             v-if="userStore.isAdmin"
             key="setting"
             @click="goToSetting"
-            :icon="SettingsIcon"
+            :icon="h(Settings, { size: '16' })"
           >
-            <span class="menu-text">系统设置</span>
+            <span class="menu-text">{{ $t('userInfo.systemSettings') }}</span>
           </a-menu-item>
-          <a-menu-item key="logout" @click="logout" :icon="LogOutIcon">
-            <span class="menu-text">退出登录</span>
+          <a-menu-item key="logout" @click="logout" :icon="h(LogOut, { size: '16' })">
+            <span class="menu-text">{{ $t('userInfo.logout') }}</span>
           </a-menu-item>
         </a-menu>
       </template>
     </a-dropdown>
-    <a-button v-else-if="showButton" type="primary" @click="goToLogin"> 登录 </a-button>
+    <a-button v-else-if="showButton" type="primary" @click="goToLogin"> {{ $t('userInfo.login') }} </a-button>
 
     <!-- 个人资料弹窗 -->
     <a-modal
       v-model:open="profileModalVisible"
-      title="个人资料"
+      :title="$t('userInfo.profile')"
       :footer="null"
       width="520px"
       class="profile-modal"
@@ -95,10 +87,10 @@
               >
                 <a-button type="primary" size="small" :loading="avatarUploading">
                   <template #icon><Upload size="14" /></template>
-                  {{ userStore.avatar ? '更换头像' : '上传头像' }}
+                  {{ userStore.avatar ? $t('userInfo.changeAvatar') : $t('userInfo.uploadAvatar') }}
                 </a-button>
               </a-upload>
-              <div class="avatar-tips">支持 JPG、PNG 格式，文件不超过 5MB</div>
+              <div class="avatar-tips">{{ $t('userInfo.avatarTips') }}</div>
             </div>
           </div>
         </div>
@@ -106,44 +98,44 @@
         <!-- 用户信息区域 -->
         <div class="info-section">
           <div class="info-item">
-            <div class="info-label">用户名</div>
+            <div class="info-label">{{ $t('userInfo.username') }}</div>
             <div class="info-value" v-if="!profileEditing">
-              {{ userStore.username || '未设置' }}
+              {{ userStore.username || $t('userInfo.notSet') }}
             </div>
             <div class="info-value" v-else>
               <a-input
                 v-model:value="editedProfile.username"
-                placeholder="请输入用户名（2-20个字符）"
+                :placeholder="$t('userInfo.usernamePlaceholder')"
                 :max-length="20"
                 style="width: 240px"
               />
             </div>
           </div>
           <div class="info-item">
-            <div class="info-label">用户ID</div>
+            <div class="info-label">{{ $t('userInfo.userId') }}</div>
             <div class="info-value user-id" v-if="!profileEditing">
-              {{ userStore.userIdLogin || '未设置' }}
+              {{ userStore.userIdLogin || $t('userInfo.notSet') }}
             </div>
             <div class="info-value" v-else>
               <a-input :value="userStore.userIdLogin || ''" disabled style="width: 240px" />
             </div>
           </div>
           <div class="info-item">
-            <div class="info-label">手机号</div>
+            <div class="info-label">{{ $t('userInfo.phoneNumber') }}</div>
             <div class="info-value" v-if="!profileEditing">
-              {{ userStore.phoneNumber || '未设置' }}
+              {{ userStore.phoneNumber || $t('userInfo.notSet') }}
             </div>
             <div class="info-value" v-else>
               <a-input
                 v-model:value="editedProfile.phone_number"
-                placeholder="请输入手机号"
+                :placeholder="$t('userInfo.phonePlaceholder')"
                 :max-length="11"
                 style="width: 200px"
               />
             </div>
           </div>
           <div class="info-item">
-            <div class="info-label">角色</div>
+            <div class="info-label">{{ $t('userInfo.role') }}</div>
             <div class="info-value">
               <a-tag :color="getRoleColor(userStore.userRole)" class="role-tag">
                 {{ userRoleText }}
@@ -151,8 +143,8 @@
             </div>
           </div>
           <div class="info-item" v-if="userStore.departmentId">
-            <div class="info-label">部门</div>
-            <div class="info-value">{{ userStore.departmentName || '默认部门' }}</div>
+            <div class="info-label">{{ $t('userInfo.department') }}</div>
+            <div class="info-value">{{ userStore.departmentName || $t('userInfo.defaultDepartment') }}</div>
           </div>
         </div>
 
@@ -160,30 +152,31 @@
         <div class="actions-section">
           <a-space>
             <template v-if="!profileEditing">
-              <a-button type="primary" @click="startEdit"> 编辑资料 </a-button>
-              <a-button @click="profileModalVisible = false"> 关闭 </a-button>
+              <a-button type="primary" @click="startEdit"> {{ $t('userInfo.editProfile') }} </a-button>
+              <a-button @click="profileModalVisible = false"> {{ $t('userInfo.close') }} </a-button>
             </template>
             <template v-else>
               <a-button type="primary" @click="saveProfile" :loading="avatarUploading">
-                保存
+                {{ $t('userInfo.save') }}
               </a-button>
-              <a-button @click="cancelEdit"> 取消 </a-button>
+              <a-button @click="cancelEdit"> {{ $t('userInfo.cancel') }} </a-button>
             </template>
           </a-space>
         </div>
       </div>
     </a-modal>
-
-    <!-- 调试面板 Modal -->
-    <DebugComponent v-model:show="showDebug" />
   </div>
 </template>
 
 <script setup>
 import { computed, ref, inject, h } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useUserStore } from '@/stores/user'
-import DebugComponent from '@/components/DebugComponent.vue'
+//
+//
+//
+//
 import { message } from 'ant-design-vue'
 import {
   CircleUser,
@@ -194,25 +187,14 @@ import {
   User,
   LogOut,
   Upload,
-  Settings,
-  Terminal
+  Settings
 } from 'lucide-vue-next'
 import { useThemeStore } from '@/stores/theme'
 
+const { t } = useI18n()
 const router = useRouter()
 const userStore = useUserStore()
 const themeStore = useThemeStore()
-
-// 预定义图标组件，避免 Vue 警告
-const BookOpenIcon = h(BookOpen, { size: '16' })
-const SunIcon = h(Sun, { size: '16' })
-const MoonIcon = h(Moon, { size: '16' })
-const TerminalIcon = h(Terminal, { size: '16' })
-const SettingsIcon = h(Settings, { size: '16' })
-const LogOutIcon = h(LogOut, { size: '16' })
-
-// 调试面板状态
-const showDebug = ref(false)
 
 // Inject settings modal methods
 const { openSettingsModal } = inject('settingsModal', {})
@@ -247,13 +229,13 @@ const userInitial = computed(() => {
 const userRoleText = computed(() => {
   switch (userStore.userRole) {
     case 'superadmin':
-      return '超级管理员'
+      return t('roles.superadmin')
     case 'admin':
-      return '管理员'
+      return t('roles.admin')
     case 'user':
-      return '普通用户'
+      return t('roles.user')
     default:
-      return '未知角色'
+      return t('roles.user')
   }
 })
 
@@ -269,7 +251,7 @@ const userRoleClass = computed(() => {
 // 退出登录
 const logout = () => {
   userStore.logout()
-  message.success('已退出登录')
+  message.success(t('userInfo.loggedOut'))
   // 跳转到首页
   router.push('/login')
 }
@@ -352,7 +334,7 @@ const saveProfile = async () => {
       (editedProfile.value.username.trim().length < 2 ||
         editedProfile.value.username.trim().length > 20)
     ) {
-      message.error('用户名长度必须在 2-20 个字符之间')
+      message.error(t('userInfo.usernameLength'))
       return
     }
 
@@ -361,7 +343,7 @@ const saveProfile = async () => {
       editedProfile.value.phone_number &&
       !validatePhoneNumber(editedProfile.value.phone_number)
     ) {
-      message.error('请输入正确的手机号格式')
+      message.error(t('userInfo.phoneFormat'))
       return
     }
 
@@ -369,11 +351,11 @@ const saveProfile = async () => {
       username: editedProfile.value.username?.trim() || undefined,
       phone_number: editedProfile.value.phone_number || undefined
     })
-    message.success('个人资料更新成功！')
+    message.success(t('userInfo.profileUpdated'))
     profileEditing.value = false
   } catch (error) {
     console.error('更新个人资料失败:', error)
-    message.error('更新失败：' + (error.message || '请稍后重试'))
+    message.error(t('userInfo.updateFailed') + (error.message || ''))
   }
 }
 
@@ -388,13 +370,13 @@ const validatePhoneNumber = (phone) => {
 const beforeUpload = (file) => {
   const isImage = file.type.startsWith('image/')
   if (!isImage) {
-    message.error('只能上传图片文件！')
+    message.error(t('userInfo.imageOnly'))
     return false
   }
 
   const isLt5M = file.size / 1024 / 1024 < 5
   if (!isLt5M) {
-    message.error('图片大小不能超过 5MB！')
+    message.error(t('userInfo.fileTooLarge'))
     return false
   }
 
@@ -417,10 +399,10 @@ const handleAvatarChange = async (info) => {
   try {
     avatarUploading.value = true
     const result = await userStore.uploadAvatar(info.file.originFileObj || info.file)
-    message.success('头像上传成功！')
+    message.success(t('userInfo.avatarUploaded'))
   } catch (error) {
     console.error('头像上传失败:', error)
-    message.error('头像上传失败：' + (error.message || '请稍后重试'))
+    message.error(t('userInfo.avatarUploadFailed') + (error.message || ''))
   } finally {
     avatarUploading.value = false
   }

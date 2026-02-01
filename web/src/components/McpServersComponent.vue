@@ -3,23 +3,21 @@
     <!-- 头部区域 -->
     <div class="header-section">
       <div class="header-content">
-        <h3 class="title">MCP 服务器管理</h3>
+        <h3 class="title">{{ $t('mcpServers.title') }}</h3>
         <p class="description">
-          管理 MCP（Model Context Protocol）服务器配置。添加、编辑或删除 MCP 服务器以扩展 AI
-          的能力。
+          {{ $t('mcpServers.description') }}
         </p>
       </div>
       <a-button type="primary" @click="showAddModal" class="add-btn">
         <template #icon><PlusOutlined /></template>
-        添加服务器
+        {{ $t('mcpServers.buttons.addServer') }}
       </a-button>
     </div>
 
     <!-- 统计信息 -->
     <div class="stats-section" v-if="servers.length > 0">
       <span class="stats-text">
-        已配置 {{ servers.length }} 个 MCP 服务器： HTTP: {{ httpCount }} · SSE: {{ sseCount }} ·
-        StdIO: {{ stdioCount }}
+        {{ $t('mcpServers.stats.configured', { count: servers.length, http: httpCount, sse: sseCount, stdio: stdioCount }) }}
       </span>
     </div>
 
@@ -32,8 +30,8 @@
 
         <div class="cards-container">
           <div v-if="servers.length === 0" class="empty-state">
-            <a-empty description="暂无 MCP 服务器配置">
-              <a-button type="primary" @click="showAddModal">添加服务器</a-button>
+            <a-empty :description="$t('mcpServers.empty.noServers')">
+              <a-button type="primary" @click="showAddModal">{{ $t('mcpServers.buttons.addServer') }}</a-button>
             </a-empty>
           </div>
           <div v-else class="server-cards-grid">
@@ -64,12 +62,12 @@
 
               <div class="card-content">
                 <div class="server-description">
-                  {{ server.description || '暂无描述' }}
+                  {{ server.description || $t('mcpServers.empty.noDescription') }}
                 </div>
               </div>
 
               <div class="card-actions">
-                <a-tooltip title="查看详情">
+                <a-tooltip :title="$t('mcpServers.buttons.viewDetails')">
                   <a-button
                     type="text"
                     size="small"
@@ -77,10 +75,10 @@
                     class="action-btn"
                   >
                     <EyeOutlined />
-                    <span>详情</span>
+                    <span>{{ $t('mcpServers.buttons.details') }}</span>
                   </a-button>
                 </a-tooltip>
-                <a-tooltip title="测试连接">
+                <a-tooltip :title="$t('mcpServers.buttons.testConnection')">
                   <a-button
                     type="text"
                     size="small"
@@ -89,10 +87,10 @@
                     :loading="testLoading === server.name"
                   >
                     <ApiOutlined v-if="testLoading !== server.name" />
-                    <span>测试</span>
+                    <span>{{ $t('mcpServers.buttons.test') }}</span>
                   </a-button>
                 </a-tooltip>
-                <a-tooltip title="编辑配置">
+                <a-tooltip :title="$t('mcpServers.buttons.editConfig')">
                   <a-button
                     type="text"
                     size="small"
@@ -100,11 +98,11 @@
                     class="action-btn"
                   >
                     <EditOutlined />
-                    <span>编辑</span>
+                    <span>{{ $t('mcpServers.buttons.edit') }}</span>
                   </a-button>
                 </a-tooltip>
                 <a-tooltip
-                  :title="server.created_by === 'system' ? '内置 MCP 无法删除' : '删除服务器'"
+                  :title="server.created_by === 'system' ? $t('mcpServers.buttons.cannotDeleteBuiltin') : $t('mcpServers.buttons.deleteServer')"
                 >
                   <a-button
                     type="text"
@@ -115,7 +113,7 @@
                     class="action-btn"
                   >
                     <DeleteOutlined />
-                    <span>删除</span>
+                    <span>{{ $t('mcpServers.buttons.delete') }}</span>
                   </a-button>
                 </a-tooltip>
               </div>
@@ -128,7 +126,7 @@
     <!-- 添加/编辑服务器模态框 -->
     <a-modal
       v-model:open="formModalVisible"
-      :title="editMode ? '编辑 MCP 服务器' : '添加 MCP 服务器'"
+      :title="editMode ? $t('mcpServers.modal.editTitle') : $t('mcpServers.modal.addTitle')"
       @ok="handleFormSubmit"
       :confirmLoading="formLoading"
       @cancel="formModalVisible = false"
@@ -139,14 +137,14 @@
       <!-- 模式切换 -->
       <div class="mode-switch">
         <a-radio-group v-model:value="formMode" button-style="solid" size="small">
-          <a-radio-button value="form">表单模式</a-radio-button>
-          <a-radio-button value="json">JSON 模式</a-radio-button>
+          <a-radio-button value="form">{{ $t('mcpServers.modal.formMode') }}</a-radio-button>
+          <a-radio-button value="json">{{ $t('mcpServers.modal.jsonMode') }}</a-radio-button>
         </a-radio-group>
       </div>
 
       <!-- 表单模式 -->
       <a-form v-if="formMode === 'form'" layout="vertical" class="server-form">
-        <a-form-item label="服务器名称" required class="form-item">
+        <a-form-item :label="$t('mcpServers.form.serverName')" required class="form-item">
           <a-input
             v-model:value="form.name"
             placeholder="请输入服务器名称（唯一标识）"
@@ -273,7 +271,10 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { notification, Modal } from 'ant-design-vue'
+
+const { t } = useI18n()
 import {
   PlusOutlined,
   EditOutlined,

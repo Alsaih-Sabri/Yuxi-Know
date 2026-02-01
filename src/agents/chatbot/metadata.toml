@@ -1,9 +1,9 @@
-name = "智能聊天助手"
-description = "基础的AI对话助手，支持工具调用，MCP，并具备丰富的知识库。"
+name = "Smart Chat Assistant"
+description = "Basic AI conversation assistant with tool calling, MCP support, and rich knowledge base capabilities."
 examples = [
-    "你好，请介绍一下你自己",
-    "帮我写一封商务邮件",
-    "解释一下什么是机器学习",
-    "推荐几本好书",
-    "如何提高工作效率？"
+    "Hello, please introduce yourself",
+    "Help me write a business email",
+    "Explain what machine learning is",
+    "Recommend some good books",
+    "How to improve work efficiency?"
 ]

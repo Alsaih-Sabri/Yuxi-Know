@@ -7,7 +7,6 @@
     :disabled="disabled"
     :send-button-disabled="sendButtonDisabled"
     :placeholder="placeholder"
-    :force-multi-line="hasStateContent"
     @send="handleSend"
     @keydown="handleKeyDown"
   >
@@ -29,33 +28,25 @@
       />
     </template>
     <template #actions-left>
-      <div class="input-actions-left">
-        <!-- State Toggle Button -->
-        <div
-          v-if="hasStateContent"
-          class="state-toggle-btn"
-          :class="{ active: isPanelOpen }"
-          @click="$emit('toggle-panel')"
-          title="查看工作状态"
-        >
-          <FolderCode :size="14" />
-          <span>状态</span>
-        </div>
-      </div>
+      <AttachmentStatusIndicator
+        :attachments="currentAttachments"
+        :disabled="disabled"
+        @remove="handleAttachmentRemove"
+      />
     </template>
   </MessageInputComponent>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { message } from 'ant-design-vue'
 import MessageInputComponent from '@/components/MessageInputComponent.vue'
 import ImagePreviewComponent from '@/components/ImagePreviewComponent.vue'
 import AttachmentOptionsComponent from '@/components/AttachmentOptionsComponent.vue'
+import AttachmentStatusIndicator from '@/components/AttachmentStatusIndicator.vue'
 import { threadApi } from '@/apis'
 import { AgentValidator } from '@/utils/agentValidator'
 import { handleChatError, handleValidationError } from '@/utils/errorHandler'
-import { FolderCode } from 'lucide-vue-next'
 
 const props = defineProps({
   modelValue: { type: String, default: '' },
@@ -66,32 +57,67 @@ const props = defineProps({
   supportsFileUpload: { type: Boolean, default: false },
   agentId: { type: String, default: '' },
   threadId: { type: String, default: null },
-  ensureThread: { type: Function, required: true },
-  hasStateContent: { type: Boolean, default: false },
-  isPanelOpen: { type: Boolean, default: false }
+  ensureThread: { type: Function, required: true }
 })
 
-const emit = defineEmits([
-  'update:modelValue',
-  'send',
-  'keydown',
-  'attachment-changed',
-  'toggle-panel'
-])
+const emit = defineEmits(['update:modelValue', 'send', 'keydown'])
 
 const inputRef = ref(null)
 const currentImage = ref(null)
+const attachmentState = reactive({
+  itemsByThread: {},
+  limits: null,
+  isUploading: false
+})
 
 const updateValue = (val) => {
   emit('update:modelValue', val)
 }
 
+const currentAttachments = computed(() => {
+  if (!props.threadId) return []
+  return attachmentState.itemsByThread[props.threadId] || []
+})
+
+const loadThreadAttachments = async (threadId, { silent = false } = {}) => {
+  if (!threadId) return
+  try {
+    const response = await threadApi.getThreadAttachments(threadId)
+    attachmentState.itemsByThread[threadId] = response.attachments || []
+    if (response.limits) {
+      attachmentState.limits = response.limits
+    }
+  } catch (error) {
+    if (silent) {
+      console.warn('Failed to load attachments:', error)
+    } else {
+      handleChatError(error, 'load')
+    }
+  }
+}
+
+const handleImageUpload = (imageData) => {
+  if (imageData && imageData.success) {
+    currentImage.value = imageData
+  }
+}
+
+const handleImageRemoved = () => {
+  currentImage.value = null
+}
+
+const handleImageUploadSuccess = () => {
+  if (inputRef.value) {
+    inputRef.value.closeOptions()
+  }
+}
+
 const handleAttachmentUpload = async (files) => {
   if (!files?.length) return
-  if (!AgentValidator.validateAgentIdWithError(props.agentId, '上传附件', handleValidationError))
+  if (!AgentValidator.validateAgentIdWithError(props.agentId, 'Upload attachment', handleValidationError))
     return
 
-  const preferredTitle = files[0]?.name || '新的对话'
+  const preferredTitle = files[0]?.name || 'New Conversation'
   let threadId = props.threadId
 
   if (!threadId) {
@@ -103,35 +129,33 @@ const handleAttachmentUpload = async (files) => {
   }
 
   if (!threadId) {
-    message.error('创建对话失败，无法上传附件')
+    message.error('Failed to create conversation, unable to upload attachment')
     return
   }
 
+  attachmentState.isUploading = true
   try {
     for (const file of files) {
       await threadApi.uploadThreadAttachment(threadId, file)
       message.success(`${file.name} 上传成功`)
     }
-    emit('attachment-changed')
+    await loadThreadAttachments(threadId, { silent: true })
   } catch (error) {
     handleChatError(error, 'upload')
+  } finally {
+    attachmentState.isUploading = false
   }
 }
 
-const handleImageUpload = (imageData) => {
-  if (imageData && imageData.success) {
-    currentImage.value = imageData
+const handleAttachmentRemove = async (fileId) => {
+  if (!fileId || !props.threadId) return
+  try {
+    await threadApi.deleteThreadAttachment(props.threadId, fileId)
+    await loadThreadAttachments(props.threadId, { silent: true })
+    message.success('附件已删除')
+  } catch (error) {
+    handleChatError(error, 'delete')
   }
-}
-
-const handleImageUploadSuccess = () => {
-  if (inputRef.value) {
-    inputRef.value.closeOptions()
-  }
-}
-
-const handleImageRemoved = () => {
-  currentImage.value = null
 }
 
 const handleSend = () => {
@@ -148,57 +172,18 @@ const handleKeyDown = (e) => {
   }
 }
 
+watch(
+  () => props.threadId,
+  (newId) => {
+    if (newId) {
+      loadThreadAttachments(newId, { silent: true })
+    }
+  },
+  { immediate: true }
+)
+
 defineExpose({
   focus: () => inputRef.value?.focus(),
   closeOptions: () => inputRef.value?.closeOptions()
 })
 </script>
-
-<style lang="less" scoped>
-.input-actions-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.state-toggle-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 8px;
-  height: 28px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--gray-600);
-  cursor: pointer;
-  transition: all 0.2s ease;
-  user-select: none;
-  background: transparent;
-  border: none;
-
-  &:hover {
-    color: var(--main-color);
-    background: var(--gray-100);
-  }
-
-  &.active {
-    color: var(--main-color);
-    background: var(--main-50);
-    font-weight: 500;
-  }
-
-  &:active {
-    transform: scale(0.95);
-  }
-
-  &.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    pointer-events: none;
-  }
-
-  span {
-    line-height: 1;
-  }
-}
-</style>

@@ -2,9 +2,9 @@
 <div align="center">
 <img width="140" height="140" alt="image" src="https://github.com/user-attachments/assets/299137b7-08d8-45b0-9feb-7b4ab35d7b48" />
 
-<h1>语析 - 基于大模型的知识库与知识图谱智能体开发平台</h1>
+<h1>Yuxi-Know - LLM-Based Knowledge Base & Knowledge Graph Agent Development Platform</h1>
 
-[![Stable](https://img.shields.io/badge/stable-v0.4.4-blue.svg)](https://github.com/xerrors/Yuxi-Know/tree/v0.4.4)
+[![Stable](https://img.shields.io/badge/stable-v0.4.3-blue.svg)](https://github.com/xerrors/Yuxi-Know/tree/v0.4.3)
 [![](https://img.shields.io/badge/Docker-2496ED?style=flat&logo=docker&logoColor=ffffff)](https://github.com/xerrors/Yuxi-Know/blob/main/docker-compose.yml)
 [![](https://img.shields.io/github/issues/xerrors/Yuxi-Know?color=F48D73)](https://github.com/xerrors/Yuxi-Know/issues)
 [![License](https://img.shields.io/github/license/bitcookies/winrar-keygen.svg?logo=github)](https://github.com/xerrors/Yuxi-Know/blob/main/LICENSE)
@@ -17,107 +17,82 @@
   <img src="https://trendshift.io/api/badge/repositories/15845" alt="Yuxi-Know | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
 </a>
 
-[**文档中心**](https://xerrors.github.io/Yuxi-Know/) |
-[**视频演示**](https://www.bilibili.com/video/BV1DF14BTETq/)
+[**Documentation**](https://xerrors.github.io/Yuxi-Know/) |
+[**Video Demo**](https://www.bilibili.com/video/BV1DF14BTETq/)
 
 </div>
 
 
-## 核心特性
+## Core Features
 
-- **智能体开发**：基于 LangGraph v1 的多智能体架构，支持子智能体、工具调用与中间件机制
-- **知识库（RAG）**：多格式文档上传，支持 Embedding / Rerank 配置及知识库评估
-- **知识图谱**：基于 LightRAG 的图谱构建与可视化，支持属性图谱并参与智能体推理
-- **平台与工程化**：Vue + FastAPI 架构，支持暗黑模式、Docker 与生产级部署
+- **Agent Development**: Multi-agent architecture based on LangGraph v1, supporting sub-agents, tool calling, and middleware mechanisms
+- **Knowledge Base (RAG)**: Multi-format document upload with Embedding/Rerank configuration and knowledge base evaluation
+- **Knowledge Graph**: Graph construction and visualization based on LightRAG, supporting property graphs and agent reasoning
+- **Platform & Engineering**: Vue + FastAPI architecture with dark mode, Docker, and production-grade deployment support
 
 
-## 你可以用语析做什么？
+## What Can You Do with Yuxi-Know?
 
-- 构建 **面向真实业务的 RAG + 知识图谱智能体**
-- 将 PDF / Word / Markdown / 图片快速转化为可推理的知识库
-- 自动（LightRAG）或手动构建知识图谱，并用于智能体推理
-- 使用 LangGraph v1 构建多智能体 / 子智能体系统
+- Build **RAG + Knowledge Graph agents for real business scenarios**
+- Quickly transform PDF/Word/Markdown/Images into reasoning-capable knowledge bases
+- Automatically (LightRAG) or manually construct knowledge graphs for agent reasoning
+- Use LangGraph v1 to build multi-agent/sub-agent systems
 
-## 最新动态
+## Recent Updates
 
-<details>
-<summary>[2026/01/24] v0.5.0-beta 版本发布</summary>
+- **[2025/12/19] v0.4.0 Release**
+  <details>
+  <summary>View detailed changelog</summary>
 
-### 新增
+  ### New Features
+  - Added agent middleware for file uploads, see [documentation](https://xerrors.github.io/Yuxi-Know/latest/advanced/agents-config.html#%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E4%B8%AD%E9%97%B4%E4%BB%B6)
+  - Added multimodal model support (currently images only), see [documentation](https://xerrors.github.io/Yuxi-Know/latest/advanced/agents-config.html#%E5%A4%9A%E6%A8%A1%E6%80%81%E5%9B%BE%E7%89%87%E6%94%AF%E6%8C%81)
+  - Added DeepAgents agent (Deep Analysis Agent) with todo, files rendering support and file download
+  - Added mind map generation from knowledge base files（[#335](https://github.com/xerrors/Yuxi-Know/pull/335#issuecomment-3530976425)）
+  - Added example question generation from knowledge base files（[#335](https://github.com/xerrors/Yuxi-Know/pull/335#issuecomment-3530976425)）
+  - Added folder/archive upload support for knowledge bases（[#335](https://github.com/xerrors/Yuxi-Know/pull/335#issuecomment-3530976425)）
+  - Added custom model support and dashscope rerank/embeddings models
+  - Added image support for document parsing (MinerU Official, Docs, Markdown Zip formats)
+  - Added dark mode and overall UI improvements（[#343](https://github.com/xerrors/Yuxi-Know/pull/343)）
+  - Added knowledge base evaluation with benchmark import or auto-generation (Milvus only), see [documentation](https://xerrors.github.io/Yuxi-Know/latest/intro/evaluation.html)
+  - Added duplicate file handling: prompts in upload area whether to delete old file
+  - Added production deployment scripts with fixed Python dependencies for improved stability
+  - Optimized graph visualization with unified data structure using G6, supports property graph file uploads, see [documentation](https://xerrors.github.io/Yuxi-Know/latest/intro/knowledge-base.html#_1-%E4%BB%A5%E4%B8%89%E5%85%83%E7%BB%84%E5%BD%A2%E5%BC%8F%E5%AF%BC%E5%85%A5)
+  - Optimized DBManager/ConversationManager with async operations
+  - Optimized knowledge base detail page for clarity and enhanced file download
 
-- 优化 OCR 体验并新增对 Deepseek OCR 的支持
-- 优化 RAG 检索，支持根据文件 pattern 来检索（Agentic Mode）
-- 重构智能体对于“工具变更/模型变更”的处理逻辑，无需导入更复杂的中间件
-- 重构知识库的 Agentic 配置逻辑，与 Tools 解耦
-- 将工具与知识库解耦，在 context 中就完成解耦，虽然最终都是在 Agent 中的 get_tools 中获取
-- 优化chunk逻辑，移除 QA 分割，集成到普通分块中，并优化可视化逻辑
-- 重构知识库处理逻辑，分为 上传—解析—入库 三个阶段
-- 重构 MCP 相关配置，使用数据库来控制 [#469](https://github.com/xerrors/Yuxi-Know/pull/469)
-- 使用 docling 解析 office 文件（docx/xlsx/pptx）
-- 优化后端的依赖，减少镜像体积 [#428](https://github.com/xerrors/Yuxi-Know/issues/428)
-- 优化 liaghtrag 的知识库调用结果，提供 content/graph/both 多个选项
-- 优化数据库查询工具，可通过设计环境变量添加描述，让模型更好的调用
+  ### Fixes
+  - Fixed reranker model not actually taking effect
+  - Fixed message disappearing after interruption and improved exception handling
+  - Fixed tool call status remaining in calling state when result is empty (despite successful call)
+  - Fixed retrieval configuration not taking effect
 
-### 修复
+  ### Breaking Changes
 
-- 修复知识图谱上传的向量配置错误，并新增模型选择以及 batch size 选择
-- 修复部分场景下获取工具列表报错 [#470](https://github.com/xerrors/Yuxi-Know/pull/470)
-- 修改方法备注信息 [#478](https://github.com/xerrors/Yuxi-Know/pull/478)
-- 修复多次 human-in-the-loop 的渲染解析问题 [#453](https://github.com/xerrors/Yuxi-Know/issues/453) [#475](https://github.com/xerrors/Yuxi-Know/pull/475)
+  - Removed Chroma support (marked as removed in current version)
+  - Removed TogetherAI from model configuration presets
+  </details>
 
-</details>
+- **[2025/11/05] v0.3.0 Release**
+  <details>
+  <summary>View detailed changelog</summary>
 
-<details>
-<summary>[2025/12/19] v0.4.0 版本发布</summary>
+  - Full adaptation to LangChain/LangGraph v1 features, using create_agent for agent entry
+  - Document parsing upgrade, adapted to mineru-2.6 and mineru-api
+  - More agent development tools: middleware, sub-agents - simpler and easier to use
+  </details>
 
-### 新增
-- 新增对于上传附件的智能体中间件，详见[文档](https://xerrors.github.io/Yuxi-Know/latest/advanced/agents-config.html#%E6%96%87%E4%BB%B6%E4%B8%8A%E4%BC%A0%E4%B8%AD%E9%97%B4%E4%BB%B6)
-- 新增多模态模型支持（当前仅支持图片），详见[文档](https://xerrors.github.io/Yuxi-Know/latest/advanced/agents-config.html#%E5%A4%9A%E6%A8%A1%E6%80%81%E5%9B%BE%E7%89%87%E6%94%AF%E6%8C%81)
-- 新建 DeepAgents 智能体（深度分析智能体），支持 todo，files 等渲染，支持文件的下载。
-- 新增基于知识库文件生成思维导图功能（[#335](https://github.com/xerrors/Yuxi-Know/pull/335#issuecomment-3530976425)）
-- 新增基于知识库文件生成示例问题功能（[#335](https://github.com/xerrors/Yuxi-Know/pull/335#issuecomment-3530976425)）
-- 新增知识库支持文件夹/压缩包上传的功能（[#335](https://github.com/xerrors/Yuxi-Know/pull/335#issuecomment-3530976425)）
-- 新增自定义模型支持、新增 dashscope rerank/embeddings 模型的支持
-- 新增文档解析的图片支持，已支持 MinerU Officical、Docs、Markdown Zip 格式
-- 新增暗色模式支持并调整整体 UI（[#343](https://github.com/xerrors/Yuxi-Know/pull/343)）
-- 新增知识库评估功能，支持导入评估基准或者自动构建评估基准（目前仅支持 Milvus 类型知识库）详见[文档](https://xerrors.github.io/Yuxi-Know/latest/intro/evaluation.html)
-- 新增同名文件处理逻辑：遇到同名文件则在上传区域提示，是否删除旧文件
-- 新增生产环境部署脚本，固定 python 依赖版本，提升部署稳定性
-- 优化图谱可视化方式，统一图谱数据结构，统一使用基于 G6 的可视化方式，同时支持上传带属性的图谱文件，详见[文档](https://xerrors.github.io/Yuxi-Know/latest/intro/knowledge-base.html#_1-%E4%BB%A5%E4%B8%89%E5%85%83%E7%BB%84%E5%BD%A2%E5%BC%8F%E5%AF%BC%E5%85%A5)
-- 优化 DBManager / ConversationManager，支持异步操作
-- 优化 知识库详情页面，更加简洁清晰，增强文件下载功能
 
-### 修复
-- 修复重排序模型实际未生效的问题
-- 修复消息中断后消息消失的问题，并改善异常效果
-- 修复当前版本如果调用结果为空的时候，工具调用状态会一直处于调用状态，尽管调用是成功的
-- 修复检索配置实际未生效的问题
-
-### 破坏性更新
-
-- 移除 Chroma 的支持，当前版本标记为移除
-- 移除模型配置预设的 TogetherAI
-</details>
-
-<details>
-<summary>[2025/11/05] v0.3.0 版本发布</summary>
-
-- 全面适配 LangChain/LangGraph v1 版本的特性，使用 create_agent 创建智能体入口。
-- 文档解析升级，适配 mineru-2.6 以及 mineru-api。
-- 更多智能体开发套件 中间件、子智能体，更简洁，更易上手。
-</details>
-
-<img width="1848" height="430" alt="image" src="https://github.com/user-attachments/assets/96e781bf-5aaa-4fb9-90de-b1b0a1626817" />
+<img width="2592" height="610" alt="image" src="https://github.com/user-attachments/assets/92898cc6-b1f0-4f1d-9491-75297bdfacaa" />
 
 
 
+## Quick Start
 
-## 快速开始
-
-克隆代码，并初始化
+Clone the repository and initialize:
 
 ```
-git clone --branch v0.4.4 --depth 1 https://github.com/xerrors/Yuxi-Know.git
+git clone --branch v0.4.3 --depth 1 https://github.com/xerrors/Yuxi-Know.git
 cd Yuxi-Know
 
 # Linux/macOS
@@ -127,32 +102,49 @@ cd Yuxi-Know
 .\scripts\init.ps1
 ```
 
-然后需要使用 docker 启动项目
+Start the project with Docker:
 
 ```
 docker compose up --build
 ```
 
-等待启动完成后，访问 `http://localhost:5173`
+After startup completes, visit `http://localhost:5173`
 
-## 示例与演示
+## Internationalization Support
+
+Yuxi-Know now supports full English and Chinese bilingual interface:
+
+- **Complete UI Translation**: All frontend components translated to English
+- **Backend Configuration**: Bilingual field descriptions for settings
+- **Agent Metadata**: English names and descriptions for all built-in agents
+- **Language Switcher**: Toggle between English and Chinese in the UI
+
+The translation work includes:
+- ✅ Navigation, headers, and status bars
+- ✅ Chat interface and conversation management
+- ✅ Knowledge base and file management
+- ✅ Agent configuration and settings
+- ✅ Model providers and MCP servers
+- ✅ All modals, forms, and error messages
+
+## Examples & Demos
 
 
 <img width="4420" height="2510" alt="image" src="https://github.com/user-attachments/assets/76d58c8f-e4ef-4373-8ab6-7c80da568910" />
 <br>
 <img width="10116" height="5751" alt="11111" src="https://github.com/user-attachments/assets/d3e4fe09-fa48-4686-93ea-2c50300ade21" />
-<br>
+<br>    
 <img width="10116" height="5751" alt="22222" src="https://github.com/user-attachments/assets/734a7cce-8b38-48ae-8e21-ca88996e5dde" />
 
-<br>
+<br>    
 <img width="10116" height="5751" alt="1212" src="https://github.com/user-attachments/assets/06d56525-69bf-463a-8360-286b2cf8796f" />
-<br>
+<br>    
 <img width="10116" height="5751" alt="44444" src="https://github.com/user-attachments/assets/e390ec4b-8690-4aee-bbb2-3536f7f67dc9" />
 
 
-## 参与贡献
+## Contributing
 
-感谢所有贡献者的支持！
+Thanks to all contributors for their support!
 
 <a href="https://github.com/xerrors/Yuxi-Know/contributors">
   <img src="https://contrib.rocks/image?repo=xerrors/Yuxi-Know&max=100&columns=15" />
@@ -163,16 +155,16 @@ docker compose up --build
 
 [![Star History Chart](https://api.star-history.com/svg?repos=xerrors/Yuxi-Know)](https://star-history.com/#xerrors/Yuxi-Know)
 
-## 📄 许可证
+## 📄 License
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
 <div align="center">
 
-**如果这个项目对您有帮助，请不要忘记给我们一个 ⭐️**
+**If this project helps you, please don't forget to give us a ⭐️**
 
-[报告问题](https://github.com/xerrors/Yuxi-Know/issues) | [功能请求](https://github.com/xerrors/Yuxi-Know/issues) | [讨论](https://github.com/xerrors/Yuxi-Know/discussions)
+[Report Issues](https://github.com/xerrors/Yuxi-Know/issues) | [Feature Requests](https://github.com/xerrors/Yuxi-Know/issues) | [Discussions](https://github.com/xerrors/Yuxi-Know/discussions)
 
 </div>

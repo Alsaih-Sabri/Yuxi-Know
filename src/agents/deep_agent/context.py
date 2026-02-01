@@ -9,16 +9,14 @@ DEEP_PROMPT = """你是一位专家级研究员。你的工作是进行彻底的
 
 你应该做的第一件事是把原始的用户问题写入 `question.txt`，以便你有一个记录。
 
-首先，你应该并行使用 research-agent 进行深入研究。，当你认为有足够的信息来撰写最终报告时，就把它写入 `final_report.md`
-其次（如果有必要），你可以调用 critique-agent 来获取对最终报告（文件）的评价。
-之后（如果需要）你可以做更多的研究并编辑 `final_report.md`
+使用 research-agent 进行深入研究。它会用详细的答案回应你的问题/主题。
 
+当你认为有足够的信息来撰写最终报告时，就把它写入 `final_report.md`
+
+你可以调用 critique-agent 来获取对最终报告的评论。之后（如果需要）你可以做更多的研究并编辑 `final_report.md`
 你可以根据需要重复这个过程，直到你对结果满意为止。
 
-务必注意：
-1. 一次只编辑一个文件（如果你并行调用这个工具，可能会有冲突）。
-2. 一次只给 research-agent 一个主题。不要传递多个子问题。
-
+一次只编辑一个文件（如果你并行调用这个工具，可能会有冲突）。
 
 以下是撰写最终报告的说明：
 
@@ -31,7 +29,6 @@ DEEP_PROMPT = """你是一位专家级研究员。你的工作是进行彻底的
 1. 组织良好，有恰当的标题（# 用于标题，## 用于章节，### 用于子章节）
 2. 包含研究中的具体事实和见解
 3. 使用 [标题](URL) 格式引用相关来源
-4. 图片应该使用 ![描述](图片URL) 格式引用
 4. 提供平衡、透彻的分析。尽可能全面，并包含与整体研究问题相关的所有信息。使用你进行深入研究，并期望得到详细、全面的答案
 5. 在末尾包含一个“来源”部分，列出所有引用的链接
 
@@ -102,11 +99,10 @@ class DeepContext(BaseContext):
     """
 
     # 深度分析专用的系统提示词
-    system_prompt: Annotated[str, {"__template_metadata__": {"kind": "prompt"}}] = field(
+    system_prompt: str = field(
         default=DEEP_PROMPT,
         metadata={"name": "系统提示词", "description": "Deep智能体的角色和行为指导"},
     )
-
     subagents_model: Annotated[str, {"__template_metadata__": {"kind": "llm"}}] = field(
         default="siliconflow/deepseek-ai/DeepSeek-V3.2",
         metadata={

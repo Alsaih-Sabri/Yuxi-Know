@@ -5,10 +5,10 @@
       <div class="toolbar-left">
         <!-- 基准选择 -->
         <div class="benchmark-selector">
-          <label class="selector-label">评估基准</label>
+          <label class="selector-label">{{ $t('ragEvaluation.toolbar.benchmark') }}</label>
           <a-select
             v-model:value="selectedBenchmarkId"
-            placeholder="请选择评估基准"
+            :placeholder="$t('ragEvaluation.toolbar.selectBenchmark')"
             style="width: 240px"
             @change="onBenchmarkChanged"
             :loading="benchmarksLoading"
@@ -18,7 +18,7 @@
               :key="benchmark.benchmark_id"
               :value="benchmark.benchmark_id"
             >
-              {{ benchmark.name }} ({{ benchmark.question_count }} 个问题)
+              {{ benchmark.name }} ({{ $t('ragEvaluation.toolbar.questionCount', { count: benchmark.question_count }) }})
             </a-select-option>
           </a-select>
           <a-button
@@ -28,7 +28,7 @@
             @click="() => loadBenchmarks(true)"
             :icon="h(ReloadOutlined)"
             class="refresh-benchmarks-btn"
-            title="刷新评估基准列表"
+            :title="$t('ragEvaluation.toolbar.refreshBenchmarks')"
           />
         </div>
       </div>
@@ -43,7 +43,7 @@
           :disabled="!selectedBenchmark"
           size="middle"
         >
-          开始评估
+          {{ $t('ragEvaluation.toolbar.startEvaluation') }}
         </a-button>
       </div>
     </div>
@@ -62,9 +62,7 @@
           <a-col :span="12">
             <a-form-item
               :label="
-                selectedBenchmark.has_gold_answers
-                  ? '答案生成模型（可选）'
-                  : '答案生成模型（当前基准无需）'
+                selectedBenchmark.has_gold_answers ? $t('ragEvaluation.models.answerGeneration') : $t('ragEvaluation.models.answerGenerationNotNeeded')
               "
             >
               <ModelSelectorComponent
@@ -80,9 +78,7 @@
           <a-col :span="12">
             <a-form-item
               :label="
-                selectedBenchmark.has_gold_answers
-                  ? '答案评判模型（可选）'
-                  : '答案评判模型（当前基准无需）'
+                selectedBenchmark.has_gold_answers ? $t('ragEvaluation.models.answerJudge') : $t('ragEvaluation.models.answerJudgeNotNeeded')
               "
             >
               <ModelSelectorComponent
@@ -99,9 +95,9 @@
 
       <template v-if="!selectedBenchmark">
         <div class="empty-state">
-          <a-empty description="请在顶部选择评估基准或前往基准管理">
+          <a-empty :description="$t('ragEvaluation.empty.selectBenchmark')">
             <a-space>
-              <a-button @click="$emit('switch-to-benchmarks')"> 前往基准管理 </a-button>
+              <a-button @click="$emit('switch-to-benchmarks')"> {{ $t('ragEvaluation.empty.goToBenchmarks') }} </a-button>
             </a-space>
           </a-empty>
         </div>
@@ -403,8 +399,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, h } from 'vue'
-import { message, Modal } from 'ant-design-vue'
+import { ref, reactive, computed, watch, onMounted, h } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { message } from 'ant-design-vue'
+
+const { t } = useI18n()
 import { evaluationApi } from '@/apis/knowledge_api'
 import ModelSelectorComponent from '@/components/ModelSelectorComponent.vue'
 import SearchConfigModal from './SearchConfigModal.vue'

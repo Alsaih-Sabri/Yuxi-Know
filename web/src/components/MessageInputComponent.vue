@@ -9,12 +9,7 @@
     </div>
 
     <div class="expand-options" v-if="hasOptionsLeft">
-      <a-popover
-        v-model:open="optionsExpanded"
-        placement="bottomLeft"
-        trigger="click"
-        :overlay-inner-style="{ padding: '4px' }"
-      >
+      <a-popover v-model:open="optionsExpanded" placement="bottomLeft" trigger="click">
         <template #content>
           <slot name="options-left">
             <div class="no-options">没有配置 options</div>
@@ -73,6 +68,7 @@ import {
 } from '@ant-design/icons-vue'
 
 const inputRef = ref(null)
+const isSingleLine = ref(true)
 const optionsExpanded = ref(false)
 const singleLineHeight = ref(0) // Add this
 // 用于防抖的定时器
@@ -109,23 +105,11 @@ const props = defineProps({
   customClasses: {
     type: Object,
     default: () => ({})
-  },
-  forceMultiLine: {
-    type: Boolean,
-    default: false
   }
 })
 
 const emit = defineEmits(['update:modelValue', 'send', 'keydown'])
 const slots = useSlots()
-
-// Update isSingleLine logic to respect forceMultiLine
-const isSingleLineMode = ref(true)
-const isSingleLine = computed(() => {
-  if (props.forceMultiLine) return false
-  return isSingleLineMode.value
-})
-
 const hasOptionsLeft = computed(() => {
   const slot = slots['options-left']
   if (!slot) {
@@ -220,10 +204,10 @@ const checkLineCount = () => {
   }
 
   const shouldBeMultiLine = hasNewlines || contentExceedsWidth
-  isSingleLineMode.value = !shouldBeMultiLine
+  isSingleLine.value = !shouldBeMultiLine
 
   // 根据模式调整高度
-  if (shouldBeMultiLine || props.forceMultiLine) {
+  if (shouldBeMultiLine) {
     // 多行模式：让textarea自适应内容高度
     textarea.style.height = 'auto'
     textarea.style.height = `${Math.max(textarea.scrollHeight, singleLineHeight.value)}px`
@@ -327,6 +311,7 @@ defineExpose({
     justify-self: start;
     display: flex;
     align-items: center;
+    margin-right: 8px;
     gap: 8px;
   }
 
@@ -366,7 +351,6 @@ defineExpose({
       align-self: center;
       white-space: nowrap;
       overflow: hidden;
-      margin-bottom: 0rem;
     }
 
     .expand-options,
@@ -403,7 +387,6 @@ defineExpose({
   background-color: transparent;
   border: none;
   margin: 0;
-  margin-bottom: 0.5rem;
   color: var(--gray-1000);
   font-size: 15px;
   outline: none;

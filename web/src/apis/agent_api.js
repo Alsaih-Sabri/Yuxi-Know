@@ -1,13 +1,4 @@
-import {
-  apiGet,
-  apiPost,
-  apiDelete,
-  apiPut,
-  apiAdminGet,
-  apiAdminPost,
-  apiAdminDelete,
-  apiRequest
-} from './base'
+import { apiGet, apiPost, apiDelete, apiPut, apiAdminGet, apiAdminPost, apiRequest } from './base'
 import { useUserStore } from '@/stores/user'
 
 /**
@@ -145,23 +136,6 @@ export const agentApi = {
     return apiAdminPost(url, config)
   },
 
-  getAgentConfigs: (agentId) => apiGet(`/api/chat/agent/${agentId}/configs`),
-
-  getAgentConfigProfile: (agentId, configId) =>
-    apiGet(`/api/chat/agent/${agentId}/configs/${configId}`),
-
-  createAgentConfigProfile: (agentId, payload) =>
-    apiAdminPost(`/api/chat/agent/${agentId}/configs`, payload),
-
-  updateAgentConfigProfile: (agentId, configId, payload) =>
-    apiPut(`/api/chat/agent/${agentId}/configs/${configId}`, payload),
-
-  setAgentConfigDefault: (agentId, configId) =>
-    apiAdminPost(`/api/chat/agent/${agentId}/configs/${configId}/set_default`, {}),
-
-  deleteAgentConfigProfile: (agentId, configId) =>
-    apiAdminDelete(`/api/chat/agent/${agentId}/configs/${configId}`),
-
   /**
    * 设置默认智能体
    * @param {string} agentId - 智能体ID
@@ -239,24 +213,24 @@ export const threadApi = {
   },
 
   /**
-   * 创建新对话线程
-   * @param {string} agentId - 智能体ID
-   * @param {string} title - 对话标题
-   * @param {Object} metadata - 元数据
+   * Create new conversation thread
+   * @param {string} agentId - Agent ID
+   * @param {string} title - Conversation title
+   * @param {Object} metadata - Metadata
    * @returns {Promise} - 创建结果
    */
   createThread: (agentId, title, metadata) =>
     apiPost('/api/chat/thread', {
       agent_id: agentId,
-      title: title || '新的对话',
+      title: title || 'New Conversation',
       metadata: metadata || {}
     }),
 
   /**
-   * 更新对话线程
-   * @param {string} threadId - 对话线程ID
-   * @param {string} title - 对话标题
-   * @param {string} description - 对话描述
+   * Update conversation thread
+   * @param {string} threadId - Thread ID
+   * @param {string} title - Conversation title
+   * @param {string} description - Conversation description
    * @returns {Promise} - 更新结果
    */
   updateThread: (threadId, title, description) =>
