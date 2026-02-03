@@ -20,15 +20,22 @@ from src.utils import hashstr, logger
 class MinerUOfficialParser(BaseDocumentProcessor):
     """MinerU 官方 API 解析器"""
 
-    def __init__(self, api_key: str | None = None):
-        self.api_key = api_key or os.getenv("MINERU_API_KEY")
-        if not self.api_key:
-            raise DocumentParserException("MINERU_API_KEY 环境变量未设置", "mineru_official", "missing_api_key")
+    def __init__(self, access_key_id: str | None = None, secret_access_key: str | None = None):
+        self.access_key_id = access_key_id or os.getenv("MINERU_ACCESS_KEY_ID")
+        self.secret_access_key = secret_access_key or os.getenv("MINERU_SECRET_ACCESS_KEY")
+        
+        if not self.access_key_id or not self.secret_access_key:
+            raise DocumentParserException(
+                "MINERU_ACCESS_KEY_ID and MINERU_SECRET_ACCESS_KEY environment variables must be set",
+                "mineru_official",
+                "missing_credentials"
+            )
 
         self.api_base = "https://mineru.net/api/v4"
         self.headers = {
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.api_key}",
+            "X-Access-Key-Id": self.access_key_id,
+            "X-Secret-Access-Key": self.secret_access_key,
         }
 
     def get_service_name(self) -> str:

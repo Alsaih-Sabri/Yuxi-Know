@@ -370,7 +370,8 @@ const ocrHealthStatus = ref({
   mineru_ocr: { status: 'unknown', message: '' },
   mineru_official: { status: 'unknown', message: '' },
   paddlex_ocr: { status: 'unknown', message: '' },
-  deepseek_ocr: { status: 'unknown', message: '' }
+  deepseek_ocr: { status: 'unknown', message: '' },
+  google_vision_ocr: { status: 'unknown', message: '' }
 })
 
 // OCR健康检查状态
@@ -501,6 +502,14 @@ const enableOcrOptions = computed(() => [
     disabled:
       ocrHealthStatus.value?.deepseek_ocr?.status === 'unavailable' ||
       ocrHealthStatus.value?.deepseek_ocr?.status === 'error'
+  },
+  {
+    value: 'google_vision_ocr',
+    label: getGoogleVisionOcrLabel(),
+    title: 'Google Cloud Vision OCR',
+    disabled:
+      ocrHealthStatus.value?.google_vision_ocr?.status === 'unavailable' ||
+      ocrHealthStatus.value?.google_vision_ocr?.status === 'error'
   }
 ])
 
@@ -517,6 +526,8 @@ const selectedOcrStatus = computed(() => {
       return ocrHealthStatus.value?.paddlex_ocr?.status || 'unknown'
     case 'deepseek_ocr':
       return ocrHealthStatus.value?.deepseek_ocr?.status || 'unknown'
+    case 'google_vision_ocr':
+      return ocrHealthStatus.value?.google_vision_ocr?.status || 'unknown'
     default:
       return null
   }
@@ -535,6 +546,8 @@ const selectedOcrMessage = computed(() => {
       return ocrHealthStatus.value?.paddlex_ocr?.message || ''
     case 'deepseek_ocr':
       return ocrHealthStatus.value?.deepseek_ocr?.message || ''
+    case 'google_vision_ocr':
+      return ocrHealthStatus.value?.google_vision_ocr?.message || ''
     default:
       return ''
   }
@@ -562,6 +575,7 @@ const getMinerULabel = () => getOcrLabel('mineru_ocr', 'MinerU OCR')
 const getMinerUOfficialLabel = () => getOcrLabel('mineru_official', 'MinerU Official API')
 const getPaddleXLabel = () => getOcrLabel('paddlex_ocr', 'PP-StructureV3')
 const getDeepSeekOcrLabel = () => getOcrLabel('deepseek_ocr', 'DeepSeek OCR')
+const getGoogleVisionOcrLabel = () => getOcrLabel('google_vision_ocr', 'Google Vision OCR')
 
 // 验证OCR服务可用性
 const validateOcrService = () => {

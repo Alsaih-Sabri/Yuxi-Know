@@ -52,6 +52,11 @@ cache
 *.local.js
 *.local.yaml
 
+# Google Cloud service account credentials
+*-*.json
+gen-lang-client-*.json
+client_secret_*.json
+
 
 *.pdf
 src/data

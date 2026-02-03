@@ -111,16 +111,16 @@
         <template v-if="!departmentManagement.editMode">
           <div class="admin-section-title">
             <TeamOutlined />
-            <span>部门管理员</span>
+            <span>{{ t('departmentManagement.departmentAdmin') }}</span>
           </div>
           <p class="admin-section-hint">
-            创建部门时必须同时创建管理员，该管理员将负责管理本部门用户
+            {{ t('departmentManagement.adminCreationHint') }}
           </p>
 
-          <a-form-item label="管理员用户ID" required class="form-item">
+          <a-form-item :label="t('departmentManagement.adminUserId')" required class="form-item">
             <a-input
               v-model:value="departmentManagement.form.adminUserId"
-              placeholder="请输入管理员用户ID（3-20位字母/数字/下划线）"
+              :placeholder="t('departmentManagement.adminUserIdPlaceholder')"
               size="large"
               :maxlength="20"
               @blur="checkAdminUserId"
@@ -128,31 +128,31 @@
             <div v-if="departmentManagement.form.userIdError" class="error-text">
               {{ departmentManagement.form.userIdError }}
             </div>
-            <div v-else class="help-text">此ID将用于登录</div>
+            <div v-else class="help-text">{{ t('departmentManagement.userIdLoginHint') }}</div>
           </a-form-item>
 
-          <a-form-item label="密码" required class="form-item">
+          <a-form-item :label="t('departmentManagement.password')" required class="form-item">
             <a-input-password
               v-model:value="departmentManagement.form.adminPassword"
-              placeholder="请输入管理员密码"
+              :placeholder="t('departmentManagement.passwordPlaceholder')"
               size="large"
               :maxlength="50"
             />
           </a-form-item>
 
-          <a-form-item label="确认密码" required class="form-item">
+          <a-form-item :label="t('departmentManagement.confirmPassword')" required class="form-item">
             <a-input-password
               v-model:value="departmentManagement.form.adminConfirmPassword"
-              placeholder="请再次输入密码"
+              :placeholder="t('departmentManagement.confirmPasswordPlaceholder')"
               size="large"
               :maxlength="50"
             />
           </a-form-item>
 
-          <a-form-item label="手机号（可选）" class="form-item">
+          <a-form-item :label="t('departmentManagement.phoneOptional')" class="form-item">
             <a-input
               v-model:value="departmentManagement.form.adminPhone"
-              placeholder="请输入手机号（可用于登录）"
+              :placeholder="t('departmentManagement.phonePlaceholder')"
               size="large"
               :maxlength="11"
             />

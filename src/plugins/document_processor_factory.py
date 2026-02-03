@@ -8,6 +8,7 @@ from typing import Any
 
 from src.plugins.deepseek_ocr_parser import DeepSeekOCRParser
 from src.plugins.document_processor_base import BaseDocumentProcessor
+from src.plugins.google_vision_ocr_parser import GoogleVisionOCRParser
 from src.plugins.mineru_official_parser import MinerUOfficialParser
 from src.plugins.mineru_parser import MinerUParser
 from src.plugins.paddlex_parser import PaddleXDocumentParser
@@ -28,6 +29,7 @@ class DocumentProcessorFactory:
         "mineru_official": MinerUOfficialParser,
         "paddlex_ocr": PaddleXDocumentParser,
         "deepseek_ocr": DeepSeekOCRParser,
+        "google_vision_ocr": GoogleVisionOCRParser,
     }
 
     @classmethod
@@ -42,6 +44,7 @@ class DocumentProcessorFactory:
                 - "mineru_official": MinerU 官方云服务 API 文档解析
                 - "paddlex_ocr": PP-StructureV3 版面解析
                 - "deepseek_ocr": DeepSeek-OCR SiliconFlow API
+                - "google_vision_ocr": Google Cloud Vision OCR API
             **kwargs: 处理器初始化参数
 
         Returns:
