@@ -180,10 +180,62 @@ docker compose -f docker-compose.dokploy.yml ps
 ```
 
 **Common fixes:**
-- Wait longer (Neo4j takes ~30s to start)
+- Wait longer (Milvus takes ~3 minutes, Neo4j ~30s)
 - Check environment variables are set
 - Verify database passwords match
 - Check network connectivity between services
+
+### Issue: Milvus Unhealthy / Dependency Failed
+
+**Error:** `dependency milvus failed to start: container milvus is unhealthy`
+
+**Cause:** Milvus takes 2-3 minutes to fully start. Health check may timeout.
+
+**Solutions:**
+
+1. **Wait and check logs:**
+```bash
+# Check Milvus logs
+docker logs milvus -f
+
+# Check dependencies
+docker logs milvus-etcd
+docker logs milvus-minio
+
+# Wait for "Milvus Proxy successfully started" message
+```
+
+2. **Increase timeouts** (already done in docker-compose.dokploy.yml):
+   - `start_period: 180s` - Gives Milvus 3 minutes before health checks start
+   - `retries: 10` - More retry attempts
+   - `interval: 30s` - Check every 30 seconds
+
+3. **Check dependencies are healthy:**
+```bash
+docker ps --filter "name=milvus"
+# All should show "healthy" status
+```
+
+4. **Manual restart if stuck:**
+```bash
+# Restart just Milvus
+docker compose -f docker-compose.dokploy.yml restart milvus
+
+# Or restart all
+docker compose -f docker-compose.dokploy.yml restart
+```
+
+5. **Clean start if corrupted:**
+```bash
+# Stop all
+docker compose -f docker-compose.dokploy.yml down
+
+# Remove Milvus data (WARNING: deletes data!)
+rm -rf docker/volumes/milvus/milvus/*
+
+# Start fresh
+docker compose -f docker-compose.dokploy.yml up -d
+```
 
 ## Network Issues
 
