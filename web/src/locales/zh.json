@@ -110,6 +110,14 @@
     "lightMode": "浅色模式",
     "systemTheme": "跟随系统"
   },
+  "startup": {
+    "title": "服务器启动中",
+    "connecting": "正在连接服务器...",
+    "loadingDatabase": "正在加载知识库...",
+    "initializingAgents": "正在初始化智能体...",
+    "almostReady": "即将完成...",
+    "hint": "首次启动可能需要60秒"
+  },
   "agent": {
     "title": "智能体",
     "create": "创建智能体",

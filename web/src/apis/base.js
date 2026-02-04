@@ -7,14 +7,25 @@ import { message } from 'ant-design-vue'
  */
 
 /**
- * 发送API请求的基础函数
+ * 等待指定时间
+ * @param {number} ms - 等待毫秒数
+ */
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+/**
+ * 发送API请求的基础函数（带重试机制）
  * @param {string} url - API端点
  * @param {Object} options - 请求选项
  * @param {boolean} requiresAuth - 是否需要认证头
  * @param {string} responseType - 响应类型: 'json' | 'text' | 'blob'
+ * @param {number} retryCount - 当前重试次数（内部使用）
  * @returns {Promise} - 请求结果
  */
-export async function apiRequest(url, options = {}, requiresAuth = true, responseType = 'json') {
+export async function apiRequest(url, options = {}, requiresAuth = true, responseType = 'json', retryCount = 0) {
+  const MAX_RETRIES = 3
+  const RETRY_DELAY = 1000 // 1 second base delay
   try {
     const isFormData = options?.body instanceof FormData
     // 默认请求配置
@@ -37,7 +48,19 @@ export async function apiRequest(url, options = {}, requiresAuth = true, respons
     }
 
     // 发送请求
-    const response = await fetch(url, requestOptions)
+    let response
+    try {
+      response = await fetch(url, requestOptions)
+    } catch (fetchError) {
+      // 网络错误或连接被拒绝（后端可能还在启动）
+      if (retryCount < MAX_RETRIES && (fetchError.message.includes('Failed to fetch') || fetchError.message.includes('NetworkError'))) {
+        const delay = RETRY_DELAY * Math.pow(2, retryCount) // 指数退避
+        console.log(`Backend not ready, retrying in ${delay}ms... (attempt ${retryCount + 1}/${MAX_RETRIES})`)
+        await sleep(delay)
+        return apiRequest(url, options, requiresAuth, responseType, retryCount + 1)
+      }
+      throw new Error('Unable to connect to server. Please wait a moment and try again.')
+    }
 
     // 处理API返回的错误
     if (!response.ok) {
@@ -101,7 +124,14 @@ export async function apiRequest(url, options = {}, requiresAuth = true, respons
       } else if (response.status === 403) {
         throw new Error('没有权限执行此操作')
       } else if (response.status === 500) {
-        throw new Error('Server 500 Error, please check the log use `docker logs api-dev`')
+        // 如果是启动阶段的500错误，尝试重试
+        if (retryCount < MAX_RETRIES) {
+          const delay = RETRY_DELAY * Math.pow(2, retryCount)
+          console.log(`Server error (500), retrying in ${delay}ms... (attempt ${retryCount + 1}/${MAX_RETRIES})`)
+          await sleep(delay)
+          return apiRequest(url, options, requiresAuth, responseType, retryCount + 1)
+        }
+        throw new Error('Server error. Please refresh the page or check logs with `docker logs api-dev`')
       }
 
       throw new Error(errorMessage)

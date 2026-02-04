@@ -7,7 +7,7 @@ const messages = {
   zh
 }
 
-// Get saved language from localStorage or detect browser language
+// Get saved language from localStorage or default to English
 // This runs synchronously before app mount
 function getDefaultLocale() {
   // Check localStorage first (user preference)
@@ -20,11 +20,7 @@ function getDefaultLocale() {
     // localStorage might not be available
   }
 
-  // Detect browser language
-  const browserLang = navigator.language?.toLowerCase() || 'en'
-  if (browserLang.startsWith('zh')) {
-    return 'zh'
-  }
+  // Default to English (users can switch language using the language switcher)
   return 'en'
 }
 

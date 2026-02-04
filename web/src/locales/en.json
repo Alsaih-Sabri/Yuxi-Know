@@ -162,6 +162,14 @@
     "lightMode": "Light Mode",
     "systemTheme": "System"
   },
+  "startup": {
+    "title": "Starting Server",
+    "connecting": "Connecting to server...",
+    "loadingDatabase": "Loading knowledge bases...",
+    "initializingAgents": "Initializing AI agents...",
+    "almostReady": "Almost ready...",
+    "hint": "This may take up to 60 seconds on first startup"
+  },
   "agent": {
     "title": "Agent",
     "create": "Create Agent",
