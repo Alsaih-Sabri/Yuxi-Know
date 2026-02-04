@@ -241,7 +241,7 @@ const loginBgImage = computed(() => {
 const brandName = computed(() => {
   const rawName = infoStore.branding?.name ?? ''
   const trimmed = rawName.trim()
-  return trimmed || 'Yuxi-Know'
+  return trimmed || 'ParseMind'
 })
 const brandSubtitle = computed(() => {
   const rawSubtitle = infoStore.branding?.subtitle ?? ''

@@ -13,7 +13,7 @@ export const useInfoStore = defineStore('info', () => {
   const organization = computed(
     () =>
       infoConfig.value.organization || {
-        name: 'Jiangnan Yuxi',
+        name: 'ParseMind',
         logo: '/favicon.svg',
         avatar: '/avatar.jpg'
       }
@@ -23,10 +23,10 @@ export const useInfoStore = defineStore('info', () => {
   const branding = computed(
     () =>
       infoConfig.value.branding || {
-        name: 'Yuxi-Know',
-        title: 'Yuxi-Know',
-        subtitle: 'LLM-powered Knowledge Base Management Tool',
-        description: 'Combining knowledge base and knowledge graph for more accurate and comprehensive answers'
+        name: 'ParseMind',
+        title: 'ParseMind',
+        subtitle: 'Parse Knowledge, Power Intelligence',
+        description: 'AI-powered knowledge base with intelligent parsing and knowledge graph technology'
       }
   )
 
@@ -91,7 +91,7 @@ export const useInfoStore = defineStore('info', () => {
   const footer = computed(
     () =>
       infoConfig.value.footer || {
-        copyright: '© Jiangnan Yuxi 2025 [WIP] v0.12.138'
+        copyright: '© ParseMind 2025 [WIP] v0.12.138'
       }
   )
 
