@@ -52,6 +52,14 @@ cache
 *.local.js
 *.local.yaml
 
+# Docker secrets (CRITICAL - never commit)
+docker/secrets/
+*.key
+*.pem
+*.crt
+*.p12
+*.pfx
+
 # Google Cloud service account credentials
 *-*.json
 gen-lang-client-*.json
