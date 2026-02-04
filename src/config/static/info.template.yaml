@@ -3,16 +3,16 @@
 
 # Organization Information
 organization:
-  name: "ParseMind"           # Full organization name
+  name: "Yuxi-Know"           # Full organization name
   logo: "/favicon.svg"        # Logo file path (place in web/public directory)
   avatar: "/avatar.jpg"       # Avatar file path (place in web/public directory)
   login_bg: "/login-bg.jpg"   # Login background image path (place in web/public directory)
 
 # Project Information
 branding:
-  name: "ParseMind"
-  title: "ParseMind: AI Knowledge Intelligence Platform"     # System title
-  subtitle: "Parse Knowledge, Power Intelligence"              # Subtitle
+  name: "Yuxi-Know"
+  title: "Yuxi-Know: Intelligent Knowledge Base Agent Platform"     # System title
+  subtitle: "LLM-Powered Knowledge Base Agent Platform"              # Subtitle
 
 features:
   - label: "GitHub Stars"
@@ -50,4 +50,4 @@ actions:
 
 # Footer Information
 footer:
-  copyright: "© ParseMind 2025 v0.4.3"
+  copyright: "© Yuxi-Know 2025 v0.4.3"
