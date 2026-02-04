@@ -53,6 +53,7 @@
                   <ModelSelectorComponent
                     @select-model="(spec) => handleModelChange(key, spec)"
                     :model_spec="agentConfig[key] || ''"
+                    :form-item-id="`form_item_${key}`"
                   />
                 </div>
 
@@ -61,6 +62,7 @@
                   <!-- Edit mode -->
                   <a-textarea
                     v-if="systemPromptEditMode"
+                    :id="`form_item_${key}`"
                     :value="agentConfig[key]"
                     @update:value="(val) => agentStore.updateAgentConfig({ [key]: val })"
                     :rows="10"
@@ -121,6 +123,7 @@
                 <!-- Boolean type -->
                 <a-switch
                   v-else-if="typeof agentConfig[key] === 'boolean'"
+                  :id="`form_item_${key}`"
                   :checked="agentConfig[key]"
                   @update:checked="(val) => agentStore.updateAgentConfig({ [key]: val })"
                 />
@@ -130,6 +133,7 @@
                   v-else-if="
                     value?.options.length > 0 && (value?.type === 'str' || value?.type === 'select')
                   "
+                  :id="`form_item_${key}`"
                   :value="agentConfig[key]"
                   @update:value="(val) => agentStore.updateAgentConfig({ [key]: val })"
                   class="config-select"
@@ -181,6 +185,7 @@
                 <!-- Number -->
                 <a-input-number
                   v-else-if="value?.type === 'number'"
+                  :id="`form_item_${key}`"
                   :value="agentConfig[key]"
                   @update:value="(val) => agentStore.updateAgentConfig({ [key]: val })"
                   :placeholder="getPlaceholder(key, value)"
@@ -190,6 +195,7 @@
                 <!-- Slider -->
                 <a-slider
                   v-else-if="value?.type === 'slider'"
+                  :id="`form_item_${key}`"
                   :value="agentConfig[key]"
                   @update:value="(val) => agentStore.updateAgentConfig({ [key]: val })"
                   :min="value.min"
@@ -201,6 +207,7 @@
                 <!-- Other types -->
                 <a-input
                   v-else
+                  :id="`form_item_${key}`"
                   :value="agentConfig[key]"
                   @update:value="(val) => agentStore.updateAgentConfig({ [key]: val })"
                   :placeholder="getPlaceholder(key, value)"

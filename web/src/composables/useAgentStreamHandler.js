@@ -142,12 +142,12 @@ export function useAgentStreamHandler({
         return true
 
       case 'interrupted':
-        // 中断状态，刷新消息历史
+        // Interrupted status, refresh message history
         console.warn('[Interrupted] case')
         if (threadState) {
           threadState.isStreaming = false
         }
-        // 如果有 message 字段，显示提示（例如：敏感内容检测）
+        // If message field exists, show notification (e.g., sensitive content detection)
         if (chunkMessage) {
           message.info(chunkMessage)
         }

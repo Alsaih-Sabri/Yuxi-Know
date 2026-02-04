@@ -7,23 +7,23 @@
         </div>
 
         <div class="approval-operation">
-          <span class="label">操作：</span>
+          <span class="label">{{ $t('approval.operation') }}:</span>
           <span class="operation-text">{{ operation }}</span>
         </div>
       </div>
 
       <div class="approval-actions">
         <button class="btn btn-reject" @click="handleReject" :disabled="isProcessing">
-          ✕ 拒绝
+          ✕ {{ $t('approval.reject') }}
         </button>
         <button class="btn btn-approve" @click="handleApprove" :disabled="isProcessing">
-          ✓ 批准
+          ✓ {{ $t('approval.approve') }}
         </button>
       </div>
 
       <div v-if="isProcessing" class="approval-processing">
         <span class="processing-spinner"></span>
-        处理中...
+        {{ $t('approval.processing') }}
       </div>
     </div>
   </transition>
@@ -31,6 +31,9 @@
 
 <script setup>
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
 
 const props = defineProps({
   visible: {
@@ -39,7 +42,7 @@ const props = defineProps({
   },
   question: {
     type: String,
-    default: '是否批准此操作？'
+    default: ''
   },
   operation: {
     type: String,

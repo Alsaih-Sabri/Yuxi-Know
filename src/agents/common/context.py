@@ -35,12 +35,12 @@ class BaseContext:
 
     thread_id: str = field(
         default_factory=lambda: str(uuid.uuid4()),
-        metadata={"name": "线程ID", "configurable": False, "description": "用来唯一标识一个对话线程"},
+        metadata={"name": "Thread ID", "configurable": False, "description": "Unique identifier for a conversation thread"},
     )
 
     user_id: str = field(
         default_factory=lambda: str(uuid.uuid4()),
-        metadata={"name": "用户ID", "configurable": False, "description": "用来唯一标识一个用户"},
+        metadata={"name": "User ID", "configurable": False, "description": "Unique identifier for a user"},
     )
 
     system_prompt: str = field(
@@ -54,33 +54,33 @@ class BaseContext:
             "- Only respond with general knowledge if the knowledge base search returns no results\n"
             "- Always prioritize knowledge base content over your general knowledge when available"
         ),
-        metadata={"name": "系统提示词", "description": "用来描述智能体的角色和行为"},
+        metadata={"name": "System Prompt", "description": "Describes the agent's role and behavior"},
     )
 
     model: Annotated[str, {"__template_metadata__": {"kind": "llm"}}] = field(
         default=sys_config.default_model,
         metadata={
-            "name": "智能体模型",
+            "name": "Agent Model",
             "options": [],
-            "description": "智能体的驱动模型，建议选择 Agent 能力较强的模型，不建议使用小参数模型。",
+            "description": "The agent's driving model. It is recommended to choose models with strong Agent capabilities. Small parameter models are not recommended.",
         },
     )
 
     tools: Annotated[list[dict], {"__template_metadata__": {"kind": "tools"}}] = field(
         default_factory=list,
         metadata={
-            "name": "工具",
+            "name": "Tools",
             "options": lambda: gen_tool_info(get_buildin_tools()),
-            "description": "内置的工具。",
+            "description": "Built-in tools.",
         },
     )
 
     knowledges: list[str] = field(
         default_factory=list,
         metadata={
-            "name": "知识库",
+            "name": "Knowledge Bases",
             "options": lambda: [k["name"] for k in knowledge_base.get_retrievers().values()],
-            "description": "知识库列表，可以在左侧知识库页面中创建知识库。",
+            "description": "Knowledge base list. You can create knowledge bases in the left sidebar.",
             "type": "list",  # Explicitly mark as list type for frontend if needed
         },
     )
@@ -88,11 +88,11 @@ class BaseContext:
     mcps: list[str] = field(
         default_factory=list,
         metadata={
-            "name": "MCP服务器",
+            "name": "MCP Servers",
             "options": lambda: get_mcp_server_names(),
             "description": (
-                "MCP服务器列表，建议使用支持 SSE 的 MCP 服务器，"
-                "如果需要使用 uvx 或 npx 运行的服务器，也请在项目外部启动 MCP 服务器，并在项目中配置 MCP 服务器。"
+                "MCP server list. It is recommended to use MCP servers that support SSE. "
+                "If you need to use servers running with uvx or npx, please start the MCP server outside the project and configure it in the project."
             ),
         },
     )

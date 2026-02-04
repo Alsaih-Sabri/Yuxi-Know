@@ -1,19 +1,19 @@
 <template>
   <div class="dashboard-container">
-    <!-- 顶部状态条 -->
+    <!-- Top Status Bar -->
 
-    <!-- 现代化顶部统计栏 -->
+    <!-- Modern Top Statistics Bar -->
     <div class="modern-stats-header">
       <StatusBar />
       <StatsOverviewComponent :basic-stats="basicStats" />
     </div>
 
-    <!-- Grid布局的主要内容区域 -->
+    <!-- Main Content Area with Grid Layout -->
     <div class="dashboard-grid">
-      <!-- 调用统计模块 - 占据2x1网格 -->
+      <!-- Call Statistics Module - Occupies 2x1 grid -->
       <CallStatsComponent :loading="loading" ref="callStatsRef" />
 
-      <!-- 用户活跃度分析 - 占据1x1网格 -->
+      <!-- User Activity Analysis - Occupies 1x1 grid -->
       <div class="grid-item user-stats">
         <UserStatsComponent
           :user-stats="allStatsData?.users"
@@ -22,7 +22,7 @@
         />
       </div>
 
-      <!-- AI智能体分析 - 占据1x1网格 -->
+      <!-- AI Agent Analysis - Occupies 1x1 grid -->
       <div class="grid-item agent-stats">
         <AgentStatsComponent
           :agent-stats="allStatsData?.agents"
@@ -31,7 +31,7 @@
         />
       </div>
 
-      <!-- 工具调用监控 - 占据1x1网格 -->
+      <!-- Tool Call Monitoring - Occupies 1x1 grid -->
       <div class="grid-item tool-stats">
         <ToolStatsComponent
           :tool-stats="allStatsData?.tools"
@@ -40,7 +40,7 @@
         />
       </div>
 
-      <!-- 知识库使用情况 - 占据1x1网格 -->
+      <!-- Knowledge Base Usage - Occupies 1x1 grid -->
       <div class="grid-item knowledge-stats">
         <KnowledgeStatsComponent
           :knowledge-stats="allStatsData?.knowledge"
@@ -49,7 +49,7 @@
         />
       </div>
 
-      <!-- 对话记录 - 占据1x1网格 -->
+      <!-- Conversation Records - Occupies 1x1 grid -->
       <div class="grid-item conversations">
         <a-card class="conversations-section" :title="$t('dashboard.conversationRecords')" :loading="loading">
           <template #extra>
@@ -119,7 +119,7 @@
       </div>
     </div>
 
-    <!-- 反馈模态框 -->
+    <!-- Feedback Modal -->
     <FeedbackModalComponent ref="feedbackModal" />
   </div>
 </template>
@@ -131,7 +131,7 @@ import { message } from 'ant-design-vue'
 import { dashboardApi } from '@/apis/dashboard_api'
 import dayjs, { parseToShanghai } from '@/utils/time'
 
-// 导入子组件
+// Import child components
 import StatusBar from '@/components/StatusBar.vue'
 import UserStatsComponent from '@/components/dashboard/UserStatsComponent.vue'
 import ToolStatsComponent from '@/components/dashboard/ToolStatsComponent.vue'
@@ -143,10 +143,10 @@ import FeedbackModalComponent from '@/components/dashboard/FeedbackModalComponen
 
 const { t } = useI18n()
 
-// 组件引用
+// Component references
 const feedbackModal = ref(null)
 
-// 统计数据 - 使用新的响应式结构
+// Statistics data - Using new reactive structure
 const basicStats = ref({})
 const allStatsData = ref({
   users: null,
@@ -155,22 +155,22 @@ const allStatsData = ref({
   agents: null
 })
 
-// 过滤器
+// Filters
 const filters = reactive({
   user_id: '',
   agent_id: '',
   status: 'active'
 })
 
-// 对话列表
+// Conversation list
 const conversations = ref([])
 const loading = ref(false)
 const loadingDetail = ref(false)
 
-// 调用统计子组件引用
+// Call statistics child component reference
 const callStatsRef = ref(null)
 
-// 分页
+// Pagination
 const conversationPagination = reactive({
   current: 1,
   pageSize: 8,
@@ -180,7 +180,7 @@ const conversationPagination = reactive({
   showTotal: (total, range) => `${range[0]}-${range[1]} / ${total}`
 })
 
-// 表格列定义
+// Table column definitions
 const conversationColumns = computed(() => [
   {
     title: t('dashboard.conversationTitle'),
@@ -223,23 +223,23 @@ const conversationColumns = computed(() => [
   }
 ])
 
-// 子组件引用
+// Child component references
 const userStatsRef = ref(null)
 const toolStatsRef = ref(null)
 const knowledgeStatsRef = ref(null)
 const agentStatsRef = ref(null)
 
-// 加载统计数据 - 使用并行API调用
+// Load statistics data - Using parallel API calls
 const loadAllStats = async () => {
   loading.value = true
   try {
-    // 使用并行API调用获取所有统计数据
+    // Use parallel API calls to get all statistics data
     const response = await dashboardApi.getAllStats()
 
-    // 更新基础统计数据
+    // Update basic statistics data
     basicStats.value = response.basic
 
-    // 更新详细统计数据
+    // Update detailed statistics data
     allStatsData.value = {
       users: response.users,
       tools: response.tools,
@@ -247,19 +247,19 @@ const loadAllStats = async () => {
       agents: response.agents
     }
 
-    console.log('Dashboard 数据加载完成:', response)
+    console.log('Dashboard data loaded:', response)
     message.success(t('dashboard.dataLoadSuccess'))
   } catch (error) {
-    console.error('加载统计数据失败:', error)
+    console.error('Failed to load statistics data:', error)
     message.error(t('dashboard.dataLoadFailed'))
 
-    // 如果并行请求失败，尝试单独加载基础数据
+    // If parallel request fails, try loading basic data separately
     try {
       const basicResponse = await dashboardApi.getStats()
       basicStats.value = basicResponse
       message.warning(t('dashboard.detailedDataFailed'))
     } catch (basicError) {
-      console.error('加载基础统计数据也失败:', basicError)
+      console.error('Failed to load basic statistics data:', basicError)
       message.error(t('dashboard.dataLoadFailed'))
     }
   } finally {
@@ -267,10 +267,10 @@ const loadAllStats = async () => {
   }
 }
 
-// 保留原有的loadStats函数以兼容旧代码
+// Keep original loadStats function for backward compatibility
 const loadStats = loadAllStats
 
-// 加载对话列表
+// Load conversation list
 const loadConversations = async () => {
   try {
     const params = {
@@ -283,15 +283,15 @@ const loadConversations = async () => {
 
     const response = await dashboardApi.getConversations(params)
     conversations.value = response
-    // Note: 由于后端没有返回总数，这里暂时设置为当前数据长度
+    // Note: Since backend doesn't return total count, temporarily set to current data length
     conversationPagination.total = response.length
   } catch (error) {
-    console.error('加载对话列表失败:', error)
+    console.error('Failed to load conversation list:', error)
     message.error(t('dashboard.conversationLoadFailed'))
   }
 }
 
-// 日期格式化
+// Date formatting
 const formatDate = (dateString) => {
   if (!dateString) return '-'
   const parsed = parseToShanghai(dateString)
@@ -311,34 +311,34 @@ const formatDate = (dateString) => {
   return parsed.format('MM-DD')
 }
 
-// 查看对话详情
+// View conversation details
 const handleViewDetail = async (record) => {
   try {
     loadingDetail.value = true
     const detail = await dashboardApi.getConversationDetail(record.thread_id)
     console.log(detail)
   } catch (error) {
-    console.error('获取对话详情失败:', error)
+    console.error('Failed to get conversation details:', error)
     message.error(t('dashboard.detailLoadFailed'))
   } finally {
     loadingDetail.value = false
   }
 }
 
-// 处理过滤器变化
+// Handle filter changes
 const handleFilterChange = () => {
   conversationPagination.current = 1
   loadConversations()
 }
 
-// 处理表格变化
+// Handle table changes
 const handleTableChange = (pag) => {
   conversationPagination.current = pag.current
   conversationPagination.pageSize = pag.pageSize
   loadConversations()
 }
 
-// 清理函数 - 清理所有子组件的图表实例
+// Cleanup function - Clean up all child component chart instances
 const cleanupCharts = () => {
   if (userStatsRef.value?.cleanup) userStatsRef.value.cleanup()
   if (toolStatsRef.value?.cleanup) userStatsRef.value.cleanup()
@@ -347,13 +347,13 @@ const cleanupCharts = () => {
   if (callStatsRef.value?.cleanup) callStatsRef.value.cleanup()
 }
 
-// 初始化
+// Initialize
 onMounted(() => {
   loadAllStats()
   loadConversations()
 })
 
-// 组件卸载时清理图表
+// Clean up charts on component unmount
 onUnmounted(() => {
   cleanupCharts()
 })
@@ -367,7 +367,7 @@ onUnmounted(() => {
   overflow-x: hidden;
 }
 
-// Dashboard 特有的网格布局
+// Dashboard specific grid layout
 .dashboard-grid {
   display: grid;
   padding: 16px;
@@ -395,7 +395,7 @@ onUnmounted(() => {
       }
     }
 
-    // 大页面布局：第一行 2x1 + 1x1，第二行 3x1x1
+    // Large page layout: First row 2x1 + 1x1, second row 3x1x1
     &.call-stats {
       grid-column: 1 / 3;
       grid-row: 1 / 2;
@@ -434,7 +434,7 @@ onUnmounted(() => {
   }
 }
 
-// Dashboard 特有的卡片样式
+// Dashboard specific card styles
 .conversations-section,
 .call-stats-section {
   background-color: var(--gray-0);
@@ -474,7 +474,7 @@ onUnmounted(() => {
   }
 }
 
-// Dashboard 特有的占位符样式
+// Dashboard specific placeholder styles
 .placeholder-content {
   display: flex;
   flex-direction: column;
@@ -513,7 +513,7 @@ onUnmounted(() => {
   }
 }
 
-// Dashboard 特有的对话记录样式
+// Dashboard specific conversation record styles
 .conversations-section {
   .conversation-title {
     color: var(--main-500);
@@ -534,7 +534,7 @@ onUnmounted(() => {
   }
 }
 
-// 调用统计模块样式
+// Call statistics module styles
 .call-stats-section {
   .call-stats-container {
     .call-summary {
@@ -582,7 +582,7 @@ onUnmounted(() => {
   }
 }
 
-// Dashboard 特有的响应式设计
+// Dashboard specific responsive design
 @media (max-width: 1200px) {
   .dashboard-grid {
     grid-template-columns: 1fr 1fr;
@@ -590,7 +590,7 @@ onUnmounted(() => {
     gap: 16px;
 
     .grid-item {
-      // 小页面布局：第一行 2x1，第二行和第三行各是 2x1x1
+      // Small page layout: First row 2x1, second and third rows are 2x1x1 each
       &.call-stats {
         grid-column: 1 / 3;
         grid-row: 1 / 2;

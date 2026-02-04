@@ -195,20 +195,20 @@ export const useDatabaseStore = defineStore('database', () => {
     })
 
     if (validFileIds.length === 0) {
-      message.info('没有可删除的文件')
+      message.info('No files available for deletion')
       return
     }
 
     Modal.confirm({
-      title: '批量删除文件',
-      content: `确定要删除选中的 ${validFileIds.length} 个文件吗？`,
-      okText: '确认',
-      cancelText: '取消',
+      title: 'Batch Delete Files',
+      content: `Are you sure you want to delete ${validFileIds.length} selected file(s)?`,
+      okText: 'Confirm',
+      cancelText: 'Cancel',
       onOk: async () => {
         state.batchDeleting = true
         let successCount = 0
         let failureCount = 0
-        let progressMessage = message.loading(`正在删除文件 0/${validFileIds.length}`, 0)
+        let progressMessage = message.loading(`Deleting files 0/${validFileIds.length}`, 0)
 
         try {
           for (let i = 0; i < validFileIds.length; i++) {
@@ -217,28 +217,28 @@ export const useDatabaseStore = defineStore('database', () => {
               await deleteFile(fileId)
               successCount++
             } catch (error) {
-              console.error(`删除文件 ${fileId} 失败:`, error)
+              console.error(`Failed to delete file ${fileId}:`, error)
               failureCount++
             }
             progressMessage?.()
             if (i + 1 < validFileIds.length) {
-              progressMessage = message.loading(`正在删除文件 ${i + 1}/${validFileIds.length}`, 0)
+              progressMessage = message.loading(`Deleting files ${i + 1}/${validFileIds.length}`, 0)
             }
           }
           progressMessage?.()
           if (successCount > 0 && failureCount === 0) {
-            message.success(`成功删除 ${successCount} 个文件`)
+            message.success(`Successfully deleted ${successCount} file(s)`)
           } else if (successCount > 0 && failureCount > 0) {
-            message.warning(`成功删除 ${successCount} 个文件，${failureCount} 个文件删除失败`)
+            message.warning(`Successfully deleted ${successCount} file(s), ${failureCount} file(s) failed`)
           } else if (failureCount > 0) {
-            message.error(`${failureCount} 个文件删除失败`)
+            message.error(`Failed to delete ${failureCount} file(s)`)
           }
           selectedRowKeys.value = []
           await getDatabaseInfo(undefined, true) // Skip query params for batch deletion
         } catch (error) {
           progressMessage?.()
-          console.error('批量删除出错:', error)
-          message.error('批量删除过程中发生错误')
+          console.error('Batch delete error:', error)
+          message.error('Error occurred during batch deletion')
         } finally {
           state.batchDeleting = false
         }

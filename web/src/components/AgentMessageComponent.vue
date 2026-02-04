@@ -3,7 +3,7 @@
     v-if="message.message_type === 'multimodal_image' && message.image_content"
     class="message-image"
   >
-    <img :src="`data:image/jpeg;base64,${message.image_content}`" alt="用户上传的图片" />
+    <img :src="`data:image/jpeg;base64,${message.image_content}`" :alt="$t('agentMessage.uploadedImage')" />
   </div>
   <div class="message-box" :class="[message.type, customClasses]">
     <!-- 用户消息 -->
@@ -29,7 +29,7 @@
           </template>
           <a-collapse-panel
             key="show"
-            :header="message.status == 'reasoning' ? '正在思考...' : '推理过程'"
+            :header="message.status == 'reasoning' ? $t('agentMessage.thinking') : $t('agentMessage.reasoning')"
             class="reasoning-header"
           >
             <p class="reasoning-content">{{ parsedData.reasoning_content }}</p>
@@ -55,12 +55,10 @@
       <!-- 错误提示块 -->
       <div v-if="displayError" class="error-hint">
         <span v-if="getErrorMessage">{{ getErrorMessage }}</span>
-        <span v-else-if="message.error_type === 'interrupted'">回答生成已中断</span>
-        <span v-else-if="message.error_type === 'unexpect'">生成过程中出现异常</span>
-        <span v-else-if="message.error_type === 'content_guard_blocked'"
-          >检测到敏感内容，已中断输出</span
-        >
-        <span v-else>{{ message.error_type || '未知错误' }}</span>
+        <span v-else-if="message.error_type === 'interrupted'">{{ $t('agentMessage.errors.interrupted') }}</span>
+        <span v-else-if="message.error_type === 'unexpect'">{{ $t('agentMessage.errors.unexpected') }}</span>
+        <span v-else-if="message.error_type === 'content_guard_blocked'">{{ $t('agentMessage.errors.contentBlocked') }}</span>
+        <span v-else>{{ message.error_type || $t('agentMessage.errors.unknown') }}</span>
       </div>
 
       <div v-if="validToolCalls && validToolCalls.length > 0" class="tool-calls-container">
@@ -74,10 +72,8 @@
       </div>
 
       <div v-if="message.isStoppedByUser" class="retry-hint">
-        你停止生成了本次回答
-        <span class="retry-link" @click="emit('retryStoppedMessage', message.id)"
-          >重新编辑问题</span
-        >
+        {{ $t('agentMessage.stoppedByUser') }}
+        <span class="retry-link" @click="emit('retryStoppedMessage', message.id)">{{ $t('agentMessage.editQuestion') }}</span>
       </div>
 
       <div
@@ -206,16 +202,16 @@ const getErrorMessage = computed(() => {
     return props.message.extra_metadata.error_message
   }
 
-  // 对于已知的错误类型，返回默认提示
+  // For known error types, return default messages
   switch (props.message.error_type) {
     case 'interrupted':
-      return '回答生成已中断'
+      return t('agentMessage.errors.interruptedDefault')
     case 'content_guard_blocked':
-      return '检测到敏感内容，已中断输出'
+      return t('agentMessage.errors.contentBlockedDefault')
     case 'unexpect':
-      return '生成过程中出现异常'
+      return t('agentMessage.errors.unexpectedDefault')
     case 'agent_error':
-      return '智能体获取失败'
+      return t('agentMessage.errors.agentErrorDefault')
     default:
       return null
   }

@@ -52,11 +52,11 @@ class TableListModel(BaseModel):
     pass
 
 
-@tool(name_or_callable="查询表名及说明", args_schema=TableListModel)
+@tool(name_or_callable="List Tables", args_schema=TableListModel)
 def mysql_list_tables() -> str:
-    """获取数据库中的所有表名
+    """Get all table names in the database.
 
-    这个工具用来列出当前数据库中所有的表名，帮助你了解数据库的结构。
+    This tool lists all table names in the current database to help you understand the database structure.
     """
     try:
         conn_manager = get_connection_manager()
@@ -68,7 +68,7 @@ def mysql_list_tables() -> str:
             tables = cursor.fetchall()
 
             if not tables:
-                return "数据库中没有找到任何表"
+                return "No tables found in the database"
 
             # 提取表名
             table_names = []
@@ -89,35 +89,35 @@ def mysql_list_tables() -> str:
             #         table_info.append(f"- {table_name} (无法获取行数)")
 
             all_table_names = "\n".join(table_names)
-            result = f"数据库中的表:\n{all_table_names}"
+            result = f"Tables in database:\n{all_table_names}"
             if db_note := conn_manager.config.get("description"):
-                result = f"数据库说明: {db_note}\n\n" + result
+                result = f"Database description: {db_note}\n\n" + result
             logger.info(f"Retrieved {len(table_names)} tables from database")
             return result
 
     except Exception as e:
-        error_msg = f"获取表名失败: {str(e)}"
+        error_msg = f"Failed to get table names: {str(e)}"
         logger.error(error_msg)
         return error_msg
 
 
 class TableDescribeModel(BaseModel):
-    """获取表结构的参数模型"""
+    """Parameter model for getting table structure"""
 
-    table_name: str = Field(description="要查询的表名", example="users")
+    table_name: str = Field(description="Table name to query", example="users")
 
 
-@tool(name_or_callable="描述表", args_schema=TableDescribeModel)
-def mysql_describe_table(table_name: Annotated[str, "要查询结构的表名"]) -> str:
-    """获取指定表的详细结构信息
+@tool(name_or_callable="Describe Table", args_schema=TableDescribeModel)
+def mysql_describe_table(table_name: Annotated[str, "Table name to query structure"]) -> str:
+    """Get detailed structure information of a specified table.
 
-    这个工具用来查看表的字段信息、数据类型、是否允许NULL、默认值、键类型等。
-    帮助你了解表的结构，以便编写正确的SQL查询。
+    This tool shows field information, data types, NULL constraints, default values, key types, etc.
+    Helps you understand the table structure to write correct SQL queries.
     """
     try:
         # 验证表名安全性
         if not MySQLSecurityChecker.validate_table_name(table_name):
-            return "表名包含非法字符，请检查表名"
+            return "Table name contains illegal characters, please check the table name"
 
         conn_manager = get_connection_manager()
 
@@ -127,7 +127,7 @@ def mysql_describe_table(table_name: Annotated[str, "要查询结构的表名"])
             columns = cursor.fetchall()
 
             if not columns:
-                return f"表 {table_name} 不存在或没有字段"
+                return f"Table {table_name} does not exist or has no fields"
 
             # 获取字段备注信息
             column_comments: dict[str, str] = {}
@@ -149,8 +149,8 @@ def mysql_describe_table(table_name: Annotated[str, "要查询结构的表名"])
                 logger.warning(f"Failed to fetch column comments for table {table_name}: {e}")
 
             # 格式化输出
-            result = f"表 `{table_name}` 的结构:\n\n"
-            result += "字段名\t\t类型\t\tNULL\t键\t默认值\t\t额外\t备注\n"
+            result = f"Structure of table `{table_name}`:\n\n"
+            result += "Field\t\tType\t\tNULL\tKey\tDefault\t\tExtra\tComment\n"
             result += "-" * 80 + "\n"
 
             for col in columns:
@@ -174,7 +174,7 @@ def mysql_describe_table(table_name: Annotated[str, "要查询结构的表名"])
                 indexes = cursor.fetchall()
 
                 if indexes:
-                    result += "\n索引信息:\n"
+                    result += "\nIndex information:\n"
                     index_dict = {}
                     for idx in indexes:
                         key_name = idx["Key_name"]
@@ -191,39 +191,39 @@ def mysql_describe_table(table_name: Annotated[str, "要查询结构的表名"])
             return result
 
     except Exception as e:
-        error_msg = f"获取表 {table_name} 结构失败: {str(e)}"
+        error_msg = f"Failed to get structure of table {table_name}: {str(e)}"
         logger.error(error_msg)
         return error_msg
 
 
 class QueryModel(BaseModel):
-    """执行SQL查询的参数模型"""
+    """Parameter model for executing SQL queries"""
 
-    sql: str = Field(description="要执行的SQL查询语句（只能是SELECT语句）", example="SELECT * FROM users WHERE id = 1")
-    timeout: int | None = Field(default=60, description="查询超时时间（秒），默认60秒，最大600秒", ge=1, le=600)
+    sql: str = Field(description="SQL query statement to execute (SELECT only)", example="SELECT * FROM users WHERE id = 1")
+    timeout: int | None = Field(default=60, description="Query timeout in seconds, default 60s, max 600s", ge=1, le=600)
 
 
-@tool(name_or_callable="执行 SQL 查询", args_schema=QueryModel)
+@tool(name_or_callable="Execute SQL Query", args_schema=QueryModel)
 def mysql_query(
-    sql: Annotated[str, "要执行的SQL查询语句（只能是SELECT语句）"],
-    timeout: Annotated[int | None, "查询超时时间（秒），默认60秒，最大600秒"] = 60,
+    sql: Annotated[str, "SQL query statement to execute (SELECT only)"],
+    timeout: Annotated[int | None, "Query timeout in seconds, default 60s, max 600s"] = 60,
 ) -> str:
-    """执行只读的SQL查询语句
+    """Execute read-only SQL query statements.
 
-    这个工具用来执行SQL查询并返回结果。支持复杂的SELECT查询，包括JOIN、GROUP BY等。
-    注意：只能执行查询操作，不能修改数据。
+    This tool executes SQL queries and returns results. Supports complex SELECT queries including JOIN, GROUP BY, etc.
+    Note: Only query operations are allowed, data modification is not permitted.
 
-    参数:
-    - sql: SQL查询语句
-    - timeout: 查询超时时间（防止长时间运行的查询）
+    Args:
+        sql: SQL query statement
+        timeout: Query timeout (prevents long-running queries)
     """
     try:
         # 验证SQL安全性
         if not MySQLSecurityChecker.validate_sql(sql):
-            return "SQL语句包含不安全的操作或可能的注入攻击，请检查SQL语句"
+            return "SQL statement contains unsafe operations or potential injection attacks, please check the SQL statement"
 
         if not MySQLSecurityChecker.validate_timeout(timeout):
-            return "timeout参数必须在1-600之间"
+            return "timeout parameter must be between 1-600"
 
         conn_manager = get_connection_manager()
         connection = conn_manager.get_connection()
@@ -239,15 +239,15 @@ def mysql_query(
             raise
 
         if not result:
-            return "查询执行成功，但没有返回任何结果"
+            return "Query executed successfully, but no results returned"
 
         # 限制结果大小
         limited_result = limit_result_size(result, max_chars=10000)
 
         # 检查结果是否被截断
         if len(limited_result) < len(result):
-            warning = f"\n\n⚠️ 警告: 查询结果过大，只显示了前 {len(limited_result)} 行（共 {len(result)} 行）。\n"
-            warning += "建议使用更精确的查询条件或使用LIMIT子句来减少返回的数据量。"
+            warning = f"\n\n⚠️ Warning: Query result too large, only showing first {len(limited_result)} rows (total {len(result)} rows).\n"
+            warning += "Consider using more precise query conditions or LIMIT clause to reduce returned data."
         else:
             warning = ""
 
@@ -272,37 +272,37 @@ def mysql_query(
                 row_str = "| " + " | ".join(f"{str(row.get(col, '')):<{col_widths[col]}}" for col in columns) + " |"
                 rows.append(row_str)
 
-            result_str = f"查询结果（共 {len(limited_result)} 行）:\n\n"
+            result_str = f"Query results ({len(limited_result)} rows):\n\n"
             result_str += header + "\n" + separator + "\n"
             result_str += "\n".join(rows[:50])  # 最多显示50行
 
             if len(rows) > 50:
-                result_str += f"\n\n... 还有 {len(rows) - 50} 行未显示 ..."
+                result_str += f"\n\n... {len(rows) - 50} more rows not shown ..."
 
             result_str += warning
 
             logger.info(f"Query executed successfully, returned {len(limited_result)} rows")
             return result_str
 
-        return "查询执行成功，但返回数据为空"
+        return "Query executed successfully, but returned data is empty"
 
     except Exception as e:
-        error_msg = f"SQL查询执行失败: {str(e)}\n\n{sql}"
+        error_msg = f"SQL query execution failed: {str(e)}\n\n{sql}"
 
-        # 提供更有用的错误信息
+        # Provide more useful error information
         if "timeout" in str(e).lower():
-            error_msg += "\n\n💡 建议：查询超时了，请尝试以下方法：\n"
-            error_msg += "1. 减少查询的数据量（使用WHERE条件过滤）\n"
-            error_msg += "2. 使用LIMIT子句限制返回行数\n"
-            error_msg += "3. 增加timeout参数值（最大600秒）"
+            error_msg += "\n\n💡 Suggestion: Query timed out, try the following:\n"
+            error_msg += "1. Reduce query data volume (use WHERE conditions to filter)\n"
+            error_msg += "2. Use LIMIT clause to limit returned rows\n"
+            error_msg += "3. Increase timeout parameter value (max 600 seconds)"
         elif "table" in str(e).lower() and "doesn't exist" in str(e).lower():
-            error_msg += "\n\n💡 建议：表不存在，请使用 mysql_list_tables 查看可用的表名"
+            error_msg += "\n\n💡 Suggestion: Table doesn't exist, use mysql_list_tables to view available table names"
         elif "column" in str(e).lower() and "doesn't exist" in str(e).lower():
-            error_msg += "\n\n💡 建议：列不存在，请使用 mysql_describe_table 查看表结构"
+            error_msg += "\n\n💡 Suggestion: Column doesn't exist, use mysql_describe_table to view table structure"
         elif "not enough arguments for format string" in str(e).lower():
             error_msg += (
-                "\n\n💡 建议：SQL 中的百分号 (%) 被当作参数占位符使用。"
-                " 如需匹配包含百分号的文本，请将百分号写成双百分号 (%%) 或使用参数化查询。"
+                "\n\n💡 Suggestion: The percent sign (%) in SQL is being used as a parameter placeholder."
+                " To match text containing percent signs, use double percent signs (%%) or parameterized queries."
             )
 
         logger.error(error_msg)

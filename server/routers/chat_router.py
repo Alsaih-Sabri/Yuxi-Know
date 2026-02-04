@@ -227,7 +227,7 @@ async def save_partial_message(conv_mgr, thread_id, full_msg=None, error_message
         extra_metadata = {
             "error_type": error_type,
             "is_error": True,
-            "error_message": error_message or f"发生错误: {error_type}",
+            "error_message": error_message or f"Error occurred: {error_type}",
         }
         if full_msg:
             # 保存部分生成的AI消息

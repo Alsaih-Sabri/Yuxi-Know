@@ -146,20 +146,21 @@
       <a-form v-if="formMode === 'form'" layout="vertical" class="server-form">
         <a-form-item :label="$t('mcpServers.form.serverName')" required class="form-item">
           <a-input
+            id="form_item_name"
             v-model:value="form.name"
-            placeholder="请输入服务器名称（唯一标识）"
+            :placeholder="$t('mcpServers.form.serverNamePlaceholder')"
             :disabled="editMode"
           />
         </a-form-item>
 
-        <a-form-item label="描述" class="form-item">
-          <a-input v-model:value="form.description" placeholder="请输入服务器描述" />
+        <a-form-item :label="$t('mcpServers.form.description')" class="form-item">
+          <a-input id="form_item_description" v-model:value="form.description" :placeholder="$t('mcpServers.form.descriptionPlaceholder')" />
         </a-form-item>
 
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item label="传输类型" required class="form-item">
-              <a-select v-model:value="form.transport">
+            <a-form-item :label="$t('mcpServers.form.transportType')" required class="form-item">
+              <a-select id="form_item_transport" v-model:value="form.transport">
                 <a-select-option value="streamable_http">streamable_http</a-select-option>
                 <a-select-option value="sse">sse</a-select-option>
                 <a-select-option value="stdio">stdio</a-select-option>
@@ -167,30 +168,32 @@
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item label="图标" class="form-item">
-              <a-input v-model:value="form.icon" placeholder="输入 emoji，如 🧠" :maxlength="2" />
+            <a-form-item :label="$t('mcpServers.form.icon')" class="form-item">
+              <a-input id="form_item_icon" v-model:value="form.icon" :placeholder="$t('mcpServers.form.iconPlaceholder')" :maxlength="2" />
             </a-form-item>
           </a-col>
         </a-row>
 
         <!-- HTTP 类型 -->
         <template v-if="form.transport === 'streamable_http' || form.transport === 'sse'">
-          <a-form-item label="服务器 URL" required class="form-item">
-            <a-input v-model:value="form.url" placeholder="https://example.com/mcp" />
+          <a-form-item :label="$t('mcpServers.form.serverUrl')" required class="form-item">
+            <a-input id="form_item_url" v-model:value="form.url" :placeholder="$t('mcpServers.form.serverUrlPlaceholder')" />
           </a-form-item>
 
-          <a-form-item label="HTTP 请求头" class="form-item">
+          <a-form-item :label="$t('mcpServers.form.httpHeaders')" class="form-item">
             <a-textarea
+              id="form_item_headers"
               v-model:value="form.headersText"
-              placeholder='JSON 格式，如：{"Authorization": "Bearer xxx"}'
+              :placeholder="$t('mcpServers.form.httpHeadersPlaceholder')"
               :rows="3"
             />
           </a-form-item>
 
           <a-row :gutter="16">
             <a-col :span="12">
-              <a-form-item label="HTTP 超时（秒）" class="form-item">
+              <a-form-item :label="$t('mcpServers.form.httpTimeout')" class="form-item">
                 <a-input-number
+                  id="form_item_timeout"
                   v-model:value="form.timeout"
                   :min="1"
                   :max="300"
@@ -199,8 +202,9 @@
               </a-form-item>
             </a-col>
             <a-col :span="12">
-              <a-form-item label="SSE 读取超时（秒）" class="form-item">
+              <a-form-item :label="$t('mcpServers.form.sseReadTimeout')" class="form-item">
                 <a-input-number
+                  id="form_item_sse_read_timeout"
                   v-model:value="form.sse_read_timeout"
                   :min="1"
                   :max="300"
@@ -213,25 +217,27 @@
 
         <!-- StdIO 类型 -->
         <template v-if="form.transport === 'stdio'">
-          <a-form-item label="命令" required class="form-item">
-            <a-input v-model:value="form.command" placeholder="例如：npx 或 /path/to/server" />
+          <a-form-item :label="$t('mcpServers.form.command')" required class="form-item">
+            <a-input id="form_item_command" v-model:value="form.command" :placeholder="$t('mcpServers.form.commandPlaceholder')" />
           </a-form-item>
 
-          <a-form-item label="参数" class="form-item">
+          <a-form-item :label="$t('mcpServers.form.args')" class="form-item">
             <a-select
+              id="form_item_args"
               v-model:value="form.args"
               mode="tags"
-              placeholder="输入参数后回车添加，如：-m"
+              :placeholder="$t('mcpServers.form.argsPlaceholder')"
               style="width: 100%"
             />
           </a-form-item>
         </template>
 
-        <a-form-item label="标签" class="form-item">
+        <a-form-item :label="$t('mcpServers.form.tags')" class="form-item">
           <a-select
+            id="form_item_tags"
             v-model:value="form.tags"
             mode="tags"
-            placeholder="输入标签后回车添加"
+            :placeholder="$t('mcpServers.form.tagsPlaceholder')"
             style="width: 100%"
           />
         </a-form-item>
@@ -242,20 +248,12 @@
         <a-textarea
           v-model:value="jsonContent"
           :rows="15"
-          placeholder='请输入 JSON 配置，格式如：
-{
-  "name": "my-server",
-  "transport": "streamable_http",
-  "url": "https://example.com/mcp",
-  "description": "服务器描述",
-  "headers": {"Authorization": "Bearer xxx"},
-  "tags": ["工具", "AI"]
-}'
+:placeholder="$t('mcpServers.form.jsonPlaceholder')"
           class="json-textarea"
         />
         <div class="json-actions">
-          <a-button size="small" @click="formatJson">格式化</a-button>
-          <a-button size="small" @click="parseJsonToForm">解析到表单</a-button>
+          <a-button size="small" @click="formatJson">{{ $t('mcpServers.form.formatJson') }}</a-button>
+          <a-button size="small" @click="parseJsonToForm">{{ $t('mcpServers.form.parseToForm') }}</a-button>
         </div>
       </div>
     </a-modal>

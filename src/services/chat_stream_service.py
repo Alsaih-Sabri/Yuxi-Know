@@ -109,7 +109,7 @@ async def save_partial_message(
         extra_metadata = {
             "error_type": error_type,
             "is_error": True,
-            "error_message": error_message or f"发生错误: {error_type}",
+            "error_message": error_message or f"Error occurred: {error_type}",
         }
         if full_msg:
             msg_dict = full_msg.model_dump() if hasattr(full_msg, "model_dump") else {}

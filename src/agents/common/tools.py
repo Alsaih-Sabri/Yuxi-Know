@@ -26,7 +26,7 @@ def get_tavily_search():
         from langchain_tavily import TavilySearch
 
         _tavily_search_instance = TavilySearch()
-        _tavily_search_instance.metadata = {"name": "Tavily 网页搜索"}
+        _tavily_search_instance.metadata = {"name": "Tavily Web Search"}
     return _tavily_search_instance
 
 
@@ -52,7 +52,7 @@ def calculator(a: float, b: float, operation: str) -> float:
 
 @tool
 async def text_to_img_demo(text: str) -> str:
-    """【测试用】使用模型生成图片， 会返回图片的URL"""
+    """[Test] Generate images using AI model, returns the image URL"""
 
     url = "https://api.siliconflow.cn/v1/images/generations"
 

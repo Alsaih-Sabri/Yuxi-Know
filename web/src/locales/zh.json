@@ -884,24 +884,54 @@
   },
   "agentChat": {
     "actions": {
-      "newChat": "新对话",
+      "newChat": "新建对话",
       "selectAgent": "选择智能体",
       "state": "状态",
       "viewState": "查看工作状态",
-      "noState": "暂无工作状态"
+      "noState": "无工作状态"
     },
     "loading": {
-      "messages": "正在加载消息...",
+      "messages": "加载消息中...",
       "generating": "正在生成回复..."
     },
-    "greeting": "您好，我是{agentName}！",
+    "greeting": "你好，我是 {agentName}！",
     "input": {
-      "placeholder": "输入问题..."
+      "placeholder": "输入你的问题..."
     },
-    "note": "请注意辨别内容的可靠性",
+    "note": "请核实内容的可靠性",
     "agent": {
       "default": "智能体",
-      "loading": "智能体加载中……"
+      "loading": "加载智能体中..."
+    },
+    "messages": {
+      "interrupted": "已中断对话生成"
+    },
+    "errors": {
+      "invalidApproval": "无效的审批请求",
+      "threadNotFound": "无法找到对应的对话线程"
+    }
+  },
+  "approval": {
+    "operation": "操作",
+    "approve": "批准",
+    "reject": "拒绝",
+    "processing": "处理中..."
+  },
+  "agentMessage": {
+    "uploadedImage": "用户上传的图片",
+    "thinking": "正在思考...",
+    "reasoning": "推理过程",
+    "stoppedByUser": "你停止生成了本次回答",
+    "editQuestion": "重新编辑问题",
+    "errors": {
+      "interrupted": "回答生成已中断",
+      "interruptedDefault": "回答生成已中断",
+      "unexpected": "生成过程中出现异常",
+      "unexpectedDefault": "生成过程中出现异常",
+      "contentBlocked": "检测到敏感内容，已中断输出",
+      "contentBlockedDefault": "检测到敏感内容，已中断输出",
+      "agentErrorDefault": "智能体获取失败",
+      "unknown": "未知错误"
     }
   },
   "agentConfig": {
@@ -1021,7 +1051,13 @@
       "args": "参数",
       "argsPlaceholder": "输入参数后回车添加，如：-m",
       "tags": "标签",
-      "tagsPlaceholder": "输入标签后回车添加"
+      "tagsPlaceholder": "输入标签后回车添加",
+      "commandPlaceholder": "例如：npx 或 /path/to/server",
+      "serverUrlPlaceholder": "https://example.com/mcp",
+      "httpHeadersPlaceholder": "JSON 格式，如：{\"Authorization\": \"Bearer xxx\"}",
+      "jsonPlaceholder": "请输入 JSON 配置，格式如：\n{\n  \"name\": \"my-server\",\n  \"transport\": \"streamable_http\",\n  \"url\": \"https://example.com/mcp\",\n  \"description\": \"服务器描述\",\n  \"headers\": {\"Authorization\": \"Bearer xxx\"},\n  \"tags\": [\"工具\", \"AI\"]\n}",
+      "formatJson": "格式化",
+      "parseToForm": "解析到表单"
     }
   },
   "knowledgeBaseCard": {

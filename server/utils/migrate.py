@@ -421,5 +421,5 @@ def check_and_migrate(db_path: str):
         migrator.run_migrations()
         return True
     except Exception as e:
-        logger.error(f"数据库迁移过程中发生错误: {e}")
+        logger.error(f"Error occurred during database migration: {e}")
         return False

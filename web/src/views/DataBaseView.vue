@@ -264,13 +264,13 @@ const loadSupportedKbTypes = async () => {
   try {
     const data = await typeApi.getKnowledgeBaseTypes()
     supportedKbTypes.value = data.kb_types
-    console.log('支持的知识库类型:', supportedKbTypes.value)
+    console.log('Supported knowledge base types:', supportedKbTypes.value)
   } catch (error) {
-    console.error('加载知识库类型失败:', error)
-    // 如果加载失败，设置默认类型
+    console.error('Failed to load knowledge base types:', error)
+    // If loading fails, set default type
     supportedKbTypes.value = {
       lightrag: {
-        description: '基于图检索的知识库，支持实体关系构建和复杂查询',
+        description: 'Graph-based knowledge base supporting entity relationship construction and complex queries',
         class_name: 'LightRagKB'
       }
     }
@@ -321,14 +321,14 @@ const formatCreatedTime = (createdAt) => {
 
 // 处理知识库类型改变
 const handleKbTypeChange = (type) => {
-  console.log('知识库类型改变:', type)
+  console.log('Knowledge base type changed:', type)
   resetNewDatabase()
   newDatabase.kb_type = type
 }
 
 // 处理LLM选择
 const handleLLMSelect = (spec) => {
-  console.log('LLM选择:', spec)
+  console.log('LLM selected:', spec)
   if (typeof spec !== 'string' || !spec) return
 
   const index = spec.indexOf('/')

@@ -973,6 +973,36 @@
     "agent": {
       "default": "Agent",
       "loading": "Loading agent..."
+    },
+    "messages": {
+      "interrupted": "Generation interrupted"
+    },
+    "errors": {
+      "invalidApproval": "Invalid approval request",
+      "threadNotFound": "Cannot find the conversation thread"
+    }
+  },
+  "approval": {
+    "operation": "Operation",
+    "approve": "Approve",
+    "reject": "Reject",
+    "processing": "Processing..."
+  },
+  "agentMessage": {
+    "uploadedImage": "Uploaded image",
+    "thinking": "Thinking...",
+    "reasoning": "Reasoning process",
+    "stoppedByUser": "You stopped generating this response",
+    "editQuestion": "Edit question",
+    "errors": {
+      "interrupted": "Answer generation interrupted",
+      "interruptedDefault": "Answer generation interrupted",
+      "unexpected": "An exception occurred during generation",
+      "unexpectedDefault": "An exception occurred during generation",
+      "contentBlocked": "Sensitive content detected, output interrupted",
+      "contentBlockedDefault": "Sensitive content detected, output interrupted",
+      "agentErrorDefault": "Failed to retrieve agent",
+      "unknown": "Unknown error"
     }
   },
   "agentConfig": {
@@ -1085,6 +1115,7 @@
       "icon": "Icon",
       "iconPlaceholder": "Enter emoji, e.g. 🧠",
       "serverUrl": "Server URL",
+      "serverUrlPlaceholder": "https://example.com/mcp",
       "httpHeaders": "HTTP Headers",
       "httpTimeout": "HTTP Timeout (seconds)",
       "sseReadTimeout": "SSE Read Timeout (seconds)",
@@ -1092,7 +1123,12 @@
       "args": "Arguments",
       "argsPlaceholder": "Enter argument and press Enter to add, e.g.: -m",
       "tags": "Tags",
-      "tagsPlaceholder": "Enter tag and press Enter to add"
+      "tagsPlaceholder": "Enter tag and press Enter to add",
+      "commandPlaceholder": "e.g.: npx or /path/to/server",
+      "httpHeadersPlaceholder": "JSON format, e.g.: {\"Authorization\": \"Bearer xxx\"}",
+      "jsonPlaceholder": "Enter JSON configuration, format:\n{\n  \"name\": \"my-server\",\n  \"transport\": \"streamable_http\",\n  \"url\": \"https://example.com/mcp\",\n  \"description\": \"Server description\",\n  \"headers\": {\"Authorization\": \"Bearer xxx\"},\n  \"tags\": [\"tool\", \"AI\"]\n}",
+      "formatJson": "Format",
+      "parseToForm": "Parse to Form"
     }
   },
   "knowledgeBaseCard": {

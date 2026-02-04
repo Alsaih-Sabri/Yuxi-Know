@@ -701,7 +701,7 @@ const selectChat = async (chatId) => {
   if (
     !AgentValidator.validateAgentIdWithError(
       currentAgentId.value,
-      '选择对话',
+      'select chat',
       handleValidationError
     )
   )
@@ -737,7 +737,7 @@ const deleteChat = async (chatId) => {
   if (
     !AgentValidator.validateAgentIdWithError(
       currentAgentId.value,
-      '删除对话',
+      'delete chat',
       handleValidationError
     )
   )
@@ -844,10 +844,10 @@ const handleSendOrStop = async (payload) => {
     // 中断后刷新消息历史，确保显示最新的状态
     try {
       await fetchThreadMessages({ agentId: currentAgentId.value, threadId: threadId, delay: 500 })
-      message.info('已中断对话生成')
+      message.info(t('agentChat.messages.interrupted'))
     } catch (error) {
-      console.error('刷新消息历史失败:', error)
-      message.info('已中断对话生成')
+      console.error('Failed to refresh message history:', error)
+      message.info(t('agentChat.messages.interrupted'))
     }
     return
   }
@@ -860,14 +860,14 @@ const handleApprovalWithStream = async (approved) => {
 
   const threadId = approvalState.threadId
   if (!threadId) {
-    message.error('无效的审批请求')
+    message.error(t('agentChat.errors.invalidApproval'))
     approvalState.showModal = false
     return
   }
 
   const threadState = getThreadState(threadId)
   if (!threadState) {
-    message.error('无法找到对应的对话线程')
+    message.error(t('agentChat.errors.threadNotFound'))
     approvalState.showModal = false
     return
   }

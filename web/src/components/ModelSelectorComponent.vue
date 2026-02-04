@@ -1,6 +1,6 @@
 <template>
   <a-dropdown trigger="click">
-    <div class="model-select" :class="modelSelectClasses" @click.prevent>
+    <div class="model-select" :class="modelSelectClasses" @click.prevent :id="formItemId">
       <div class="model-select-content">
         <div class="model-info">
           <a-tooltip :title="displayModelText" placement="right">
@@ -75,6 +75,10 @@ const props = defineProps({
     type: String,
     default: 'small',
     validator: (value) => ['small', 'middle', 'large'].includes(value)
+  },
+  formItemId: {
+    type: String,
+    default: ''
   }
 })
 
