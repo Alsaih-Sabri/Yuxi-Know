@@ -69,8 +69,8 @@ services:
       target: production
     image: yuxi-web:0.4.prod
     container_name: web-prod
-    ports:
-      - "80:80"
+    #ports:
+    #  - "80:80"
     depends_on:
       - api
     networks:
