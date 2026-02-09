@@ -1,30 +1,52 @@
 """Deep Agent - 基于create_deep_agent的深度分析智能体"""
 
+from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend
 from deepagents.middleware.filesystem import FilesystemMiddleware
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from deepagents.middleware.subagents import SubAgentMiddleware
 from langchain.agents import create_agent
-from langchain.agents.middleware import ModelRequest, SummarizationMiddleware, TodoListMiddleware, dynamic_prompt
+from langchain.agents.middleware import (
+    TodoListMiddleware,
+)
 
 from src.agents.common import BaseAgent, load_chat_model
-from src.agents.common.middlewares import inject_attachment_context
+from src.agents.common.middlewares import (
+    RuntimeConfigMiddleware,
+    SummaryOffloadMiddleware,
+    save_attachments_to_fs,
+)
 from src.agents.common.tools import get_tavily_search
+from src.services.mcp_service import get_tools_from_all_servers
 
 from .context import DeepContext
-from .prompts import DEEP_PROMPT
+
+
+def _create_filesystem_backend_factory(rt) -> CompositeBackend:
+    """创建混合文件存储后端工厂函数（供 FilesystemMiddleware 使用）。
+
+    /attachments/* 路由到真实文件系统（供附件中间件使用）
+    其他路径使用 StateBackend（内存存储，用于临时文件和大结果卸载）
+
+    注意：rt (runtime) 由 FilesystemMiddleware 在调用时自动传入。
+    """
+    return CompositeBackend(
+        default=StateBackend(rt),  # 传入 runtime 创建实例
+        routes={
+            "/attachments/": FilesystemBackend(root_dir=".", virtual_mode=False),
+        },
+    )
 
 
 def _get_research_sub_agent(search_tools: list) -> dict:
     """Get research sub-agent config with search tools."""
     return {
         "name": "research-agent",
-        "description": ("Use search tools to research deeper questions. Write research results to topic research files."),
+        "description": ("利用搜索工具，用于研究更深入的问题。将调研结果写入到主题研究文件中。"),
         "system_prompt": (
-            "You are a focused researcher. Your job is to research based on the user's questions. "
-            "Conduct thorough research, then reply to the user's questions with detailed answers. Only your final answer will be passed to the user. "
-            "They won't know anything else except your final message, so your final report should be your final message! "
-            "Save research results to topic research files in /sub_research/xxx.md. "
-            "IMPORTANT: All research, todo lists, and reports MUST be in ENGLISH."
+            "你是一位专注的研究员。你的工作是根据用户的问题进行研究。"
+            "进行彻底的研究，然后用详细的答案回复用户的问题，只有你的最终答案会被传递给用户。"
+            "除了你的最终信息，他们不会知道任何其他事情，所以你的最终报告应该就是你的最终信息！"
+            "将调研结果保存到主题研究文件中 /sub_research/xxx.md 中。"
         ),
         "tools": search_tools,
     }
@@ -32,36 +54,29 @@ def _get_research_sub_agent(search_tools: list) -> dict:
 
 critique_sub_agent = {
     "name": "critique-agent",
-    "description": "Used to critique the final report. Give this agent some information about how you want it to critique the report.",
+    "description": "用于评论最终报告。给这个代理一些关于你希望它如何评论报告的信息。",
     "system_prompt": (
-        "You are a focused editor. Your task is to critique a report.\n\n"
-        "You can find this report in `final_report.md`.\n\n"
-        "You can find the question/topic for this report in `question.txt`.\n\n"
-        "Users may ask you to critique specific aspects of the report. Please reply to users with detailed critiques, pointing out areas in the report that can be improved.\n\n"
-        "If it helps you critique the report, you can use search tools to search for information\n\n"
-        "Do not write to `final_report.md` yourself.\n\n"
-        "Things to check:\n"
-        "- Check if the headings for each section are appropriate\n"
-        "- Check if the report is written like a paper or textbook - it should be text-based, not just a bullet point list!\n"
-        "- Check if the report is comprehensive. If any paragraphs or sections are too short, or missing important details, point them out.\n"
-        "- Check if the article covers key areas of the industry, ensures overall understanding, and doesn't miss important parts.\n"
-        "- Check if the article deeply analyzes causes, impacts, and trends, providing valuable insights\n"
-        "- Check if the article sticks to the research topic and directly answers the question\n"
-        "- Check if the article is well-structured, fluent in language, and easy to understand.\n"
-        "IMPORTANT: All critiques and feedback MUST be in ENGLISH."
+        "你是一位专注的编辑。你的任务是评论一份报告。\n\n"
+        "你可以在 `final_report.md` 找到这份报告。\n\n"
+        "你可以在 `question.txt` 找到这份报告的问题/主题。\n\n"
+        "用户可能会要求评论报告的特定方面。请用详细的评论回复用户，指出报告中可以改进的地方。\n\n"
+        "如果有助于你评论报告，你可以使用搜索工具来搜索信息\n\n"
+        "不要自己写入 `final_report.md`。\n\n"
+        "需要检查的事项：\n"
+        "- 检查每个部分的标题是否恰当\n"
+        "- 检查报告的写法是否像论文或教科书——它应该是以文本为主，不要只是一个项目符号列表！\n"
+        "- 检查报告是否全面。如果任何段落或部分过短，或缺少重要细节，请指出来。\n"
+        "- 检查文章是否涵盖了行业的关键领域，确保了整体理解，并且没有遗漏重要部分。\n"
+        "- 检查文章是否深入分析了原因、影响和趋势，提供了有价值的见解\n"
+        "- 检查文章是否紧扣研究主题并直接回答问题\n"
+        "- 检查文章是否结构清晰、语言流畅、易于理解。"
     ),
 }
 
 
-@dynamic_prompt
-def context_aware_prompt(request: ModelRequest) -> str:
-    """从 runtime context 动态生成系统提示词"""
-    return DEEP_PROMPT + "\n\n\n" + request.runtime.context.system_prompt
-
-
 class DeepAgent(BaseAgent):
-    name = "Deep Analysis Agent"
-    description = "An intelligent agent with planning, deep analysis, and sub-agent collaboration capabilities, capable of handling complex multi-step tasks"
+    name = "深度分析智能体"
+    description = "具备规划、深度分析和子智能体协作能力的智能体，可以处理复杂的多步骤任务"
     context_schema = DeepContext
     capabilities = [
         "file_upload",
@@ -90,56 +105,58 @@ class DeepAgent(BaseAgent):
 
     async def get_graph(self, **kwargs):
         """构建 Deep Agent 的图"""
-        if self.graph:
-            return self.graph
-
         # 获取上下文配置
         context = self.context_schema.from_file(module_name=self.module_name)
 
         model = load_chat_model(context.model)
         sub_model = load_chat_model(context.subagents_model)
-        tools = await self.get_tools()
+        search_tools = await self.get_tools()
+        all_mcp_tools = await get_tools_from_all_servers()
+        # 合并搜索工具和 MCP 工具
 
         # Build subagents with search tools
-        research_sub_agent = _get_research_sub_agent(tools)
+        research_sub_agent = _get_research_sub_agent(search_tools)
+
+        summary_middleware = SummaryOffloadMiddleware(
+            model=model,
+            trigger=("tokens", 160000),
+            trim_tokens_to_summarize=None,
+            summary_offload_threshold=1000,
+            max_retention_ratio=0.6,
+        )
+
+        subagents_middleware = SubAgentMiddleware(
+            default_model=sub_model,
+            default_tools=search_tools,
+            subagents=[critique_sub_agent, research_sub_agent],
+            default_middleware=[
+                FilesystemMiddleware(backend=_create_filesystem_backend_factory),
+                RuntimeConfigMiddleware(
+                    model_context_name="subagents_model",
+                    enable_model_override=True,
+                    enable_system_prompt_override=False,
+                    enable_tools_override=False,
+                ),
+                PatchToolCallsMiddleware(),
+                summary_middleware,
+            ],
+            general_purpose_agent=True,
+        )
 
         # 使用 create_deep_agent 创建深度智能体
         graph = create_agent(
             model=model,
-            tools=tools,
             system_prompt=context.system_prompt,
             middleware=[
-                context_aware_prompt,  # 动态系统提示词
-                inject_attachment_context,  # 附件上下文注入
+                FilesystemMiddleware(backend=_create_filesystem_backend_factory),
+                RuntimeConfigMiddleware(extra_tools=all_mcp_tools),
+                save_attachments_to_fs,  # 附件保存到文件系统
                 TodoListMiddleware(),
-                FilesystemMiddleware(),
-                SubAgentMiddleware(
-                    default_model=sub_model,
-                    default_tools=tools,
-                    subagents=[critique_sub_agent, research_sub_agent],
-                    default_middleware=[
-                        TodoListMiddleware(),  # 子智能体也有 todo 列表
-                        FilesystemMiddleware(),  # 当前的两个文件系统是隔离的
-                        SummarizationMiddleware(
-                            model=sub_model,
-                            trigger=("tokens", 110000),
-                            keep=("messages", 10),
-                            trim_tokens_to_summarize=None,
-                        ),
-                        PatchToolCallsMiddleware(),
-                    ],
-                    general_purpose_agent=True,
-                ),
-                SummarizationMiddleware(
-                    model=model,
-                    trigger=("tokens", 110000),
-                    keep=("messages", 10),
-                    trim_tokens_to_summarize=None,
-                ),
                 PatchToolCallsMiddleware(),
+                subagents_middleware,
+                summary_middleware,
             ],
             checkpointer=await self._get_checkpointer(),
         )
 
-        self.graph = graph
         return graph
