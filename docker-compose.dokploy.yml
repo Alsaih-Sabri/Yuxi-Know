@@ -43,6 +43,7 @@ services:
       - MODEL_DIR_IN_DOCKER=/models
       - RUNNING_IN_DOCKER=true
       - ENVIRONMENT=production
+      - ENABLE_DOCS=${ENABLE_DOCS:-false}
       - NO_PROXY=localhost,127.0.0.1,milvus,graph,milvus-minio,milvus-etcd,etcd,minio,mineru,paddlex,api.siliconflow.cn
       - no_proxy=localhost,127.0.0.1,milvus,graph,milvus-minio,milvus-etcd,etcd,minio,mineru,paddlex,api.siliconflow.cn
     command: uv run --no-dev uvicorn server.main:app --host 0.0.0.0 --port 5050

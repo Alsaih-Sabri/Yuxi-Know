@@ -42,6 +42,7 @@ class Config(BaseModel):
     enable_content_guard: bool = Field(default=False, description="Enable Content Guard|是否启用内容审查")
     enable_content_guard_llm: bool = Field(default=False, description="Use LLM for Content Guard|是否启用LLM内容审查")
     enable_web_search: bool = Field(default=False, description="Enable Web Search|是否启用网络搜索")
+    enable_api_docs: bool = Field(default=False, description="Enable API Docs in Production|是否生产环境启用API文档")
 
     # ============================================================
     # 模型配置
@@ -109,6 +110,7 @@ class Config(BaseModel):
     _config_file: Path | None = None
     _user_modified_fields: set[str] = set()
     _modified_providers: set[str] = set()  # 记录具体修改的模型提供商
+    _docs_disable_task: Any = None  # 用于API文档自动关闭的定时任务
 
     model_config = {"arbitrary_types_allowed": True, "extra": "allow"}
 
@@ -224,6 +226,10 @@ class Config(BaseModel):
         # 检查网络搜索
         if os.getenv("TAVILY_API_KEY"):
             self.enable_web_search = True
+
+        # Initialize API docs toggle from environment
+        if os.getenv("ENABLE_DOCS", "false").lower() == "true":
+            self.enable_api_docs = True
 
         # 获取可用的模型提供商
         self.valuable_model_provider = [k for k, v in self.model_provider_status.items() if v]
@@ -562,6 +568,29 @@ class Config(BaseModel):
         except Exception as e:
             logger.error(f"Failed to save custom providers to {custom_config_file}: {e}")
 
+
+    async def enable_docs_with_timeout(self, timeout_minutes: int = 30):
+        """Temporarily enable API docs for a specified duration."""
+        import asyncio
+
+        # Cancel existing task if any
+        if self._docs_disable_task and not self._docs_disable_task.done():
+            self._docs_disable_task.cancel()
+        
+        # Enable docs
+        self.enable_api_docs = True
+        logger.info(f"API Docs enabled for {timeout_minutes} minutes")
+
+        # Create new task
+        async def disable_after_timeout():
+            try:
+                await asyncio.sleep(timeout_minutes * 60)
+                self.enable_api_docs = False
+                logger.info("API Docs automatically disabled after timeout")
+            except asyncio.CancelledError:
+                logger.info("API Docs timeout timer cancelled")
+        
+        self._docs_disable_task = asyncio.create_task(disable_after_timeout())
 
 # 全局配置实例
 config = Config()

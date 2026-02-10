@@ -25,7 +25,29 @@ RATE_LIMIT_ENDPOINTS = {("/api/auth/token", "POST")}
 _login_attempts: defaultdict[str, deque[float]] = defaultdict(deque)
 _attempt_lock = asyncio.Lock()
 
-app = FastAPI(lifespan=lifespan)
+import os
+
+from src.config.app import config
+
+# Determine if we are in production
+is_production = os.getenv("ENVIRONMENT", "development").lower() == "production"
+
+# For runtime toggling, we must register the endpoints at startup.
+# We will control access via the APIDocsMiddleware.
+docs_url = "/docs"
+redoc_url = "/redoc"
+openapi_url = "/openapi.json"
+
+# In strict production mode where we might unwantedly expose them even with middleware failure,
+# we could disable them here. But for the requested "switch feature", we need them registered.
+# Use middleware to strict block.
+
+app = FastAPI(
+    lifespan=lifespan,
+    docs_url=docs_url,
+    redoc_url=redoc_url,
+    openapi_url=openapi_url
+)
 app.include_router(router, prefix="/api")
 
 # CORS 设置
@@ -116,8 +138,26 @@ class AuthMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# 文档访问控制中间件
+class APIDocsMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        if path in ["/docs", "/redoc", "/openapi.json"]:
+            # Check if docs are enabled in config (dynamic)
+            # In production, default is disabled. In dev, default is enabled.
+            # But we respect the config value which can be toggled at runtime.
+            
+            # If we are in production and it's disabled, return 404
+            if is_production and not config.enable_api_docs:
+                return JSONResponse(status_code=404, content={"detail": "Not Found"})
+                
+        return await call_next(request)
+
 # 添加访问日志中间件（记录请求处理时间）
 app.add_middleware(AccessLogMiddleware)
+
+# 添加文档访问控制中间件
+app.add_middleware(APIDocsMiddleware)
 
 # 添加鉴权中间件
 app.add_middleware(LoginRateLimitMiddleware)

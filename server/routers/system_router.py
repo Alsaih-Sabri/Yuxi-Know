@@ -51,6 +51,29 @@ async def update_config_batch(items: dict = Body(...), current_user: User = Depe
     return config.dump_config()
 
 
+@system.post("/config/docs")
+async def toggle_api_docs(
+    enabled: bool = Body(..., embed=True),
+    timeout_minutes: int = Body(30, embed=True),
+    current_user: User = Depends(get_admin_user)
+) -> dict:
+    """
+    Toggle API documentation visibility.
+    If enabling, optionally set a timeout (default 30 mins) after which it auto-disables.
+    """
+    if enabled:
+        await config.enable_docs_with_timeout(timeout_minutes)
+        message = f"API Docs enabled for {timeout_minutes} minutes"
+    else:
+        # Cancel any existing task
+        if config._docs_disable_task and not config._docs_disable_task.done():
+            config._docs_disable_task.cancel()
+        config.enable_api_docs = False
+        message = "API Docs disabled"
+    
+    return {"status": "success", "message": message, "enabled": config.enable_api_docs}
+
+
 @system.get("/logs")
 async def get_system_logs(levels: str | None = None, current_user: User = Depends(get_admin_user)):
     """获取系统日志
