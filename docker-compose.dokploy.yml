@@ -68,10 +68,10 @@ services:
     # Dokploy/Traefik handles port mapping - don't expose ports directly
     # If running standalone (not on Dokploy), uncomment these:
     # ports:
-    #   - "5173:5173"
+    #   - "80:80"
     #   - "443:443"
     expose:
-      - "5173"
+      - "80"
     depends_on:
       - api
     networks:
