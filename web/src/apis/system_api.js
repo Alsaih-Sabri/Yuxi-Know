@@ -59,6 +59,19 @@ export const configApi = {
       ? `/api/system/logs?levels=${encodeURIComponent(levels)}`
       : '/api/system/logs'
     return apiAdminGet(url)
+  },
+
+  /**
+   * Toggle API documentation visibility
+   * @param {boolean} enabled - Whether to enable or disable docs
+   * @param {number} timeoutMinutes - Timeout in minutes (optional, default 30)
+   * @returns {Promise} - Toggle result
+   */
+  toggleApiDocs: async (enabled, timeoutMinutes = 30) => {
+    return apiAdminPost('/api/system/config/docs', {
+      enabled,
+      timeout_minutes: timeoutMinutes
+    })
   }
 }
 

@@ -84,6 +84,30 @@
       </div>
     </div>
 
+    <!-- API Documentation Section -->
+    <h3 class="section-title">API Documentation</h3>
+    <div class="section">
+      <div class="card">
+        <span class="label">Enable API Documentation</span>
+        <a-switch
+          :checked="configStore.config?.enable_api_docs"
+          @change="handleApiDocsToggle"
+        />
+      </div>
+      <div class="card" v-if="configStore.config?.enable_api_docs">
+        <span class="label">Auto-disable Timer (minutes)</span>
+        <div style="display: flex; align-items: center; gap: 8px;">
+           <a-input-number
+            v-model:value="apiDocsTimeout"
+            :min="1"
+            :max="1440"
+            style="width: 100px"
+          />
+          <a-button size="small" type="primary" @click="updateApiDocsTimeout">Update Timer</a-button>
+        </div>
+      </div>
+    </div>
+
     <!-- 服务链接部分 -->
     <h3 v-if="userStore.isAdmin" class="section-title">{{ $t('basicSettings.serviceLinks') }}</h3>
     <div v-if="userStore.isAdmin">
@@ -166,10 +190,12 @@
 </template>
 
 <script setup>
-import { computed, h } from 'vue'
+import { computed, h, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { message } from 'ant-design-vue'
 import { useConfigStore } from '@/stores/config'
 import { useUserStore } from '@/stores/user'
+import { configApi } from '@/apis/system_api'
 import { GlobalOutlined } from '@ant-design/icons-vue'
 import ModelSelectorComponent from '@/components/ModelSelectorComponent.vue'
 import EmbeddingModelSelector from '@/components/EmbeddingModelSelector.vue'
@@ -177,6 +203,30 @@ import EmbeddingModelSelector from '@/components/EmbeddingModelSelector.vue'
 const { t, locale } = useI18n()
 const configStore = useConfigStore()
 const userStore = useUserStore()
+
+const apiDocsTimeout = ref(30)
+
+const handleApiDocsToggle = async (checked) => {
+  try {
+    await configApi.toggleApiDocs(checked, apiDocsTimeout.value)
+    // Update local state immediately for better UX, though store refresh will confirm it
+    if (configStore.config) {
+      configStore.config.enable_api_docs = checked
+    }
+    message.success(checked ? `API Docs enabled for ${apiDocsTimeout.value} minutes` : 'API Docs disabled')
+    configStore.refreshConfig()
+  } catch (error) {
+    message.error('Failed to toggle API docs: ' + error.message)
+  }
+}
+
+const updateApiDocsTimeout = async () => {
+  if (configStore.config?.enable_api_docs) {
+    // Re-enable with new timeout
+    await handleApiDocsToggle(true)
+  }
+}
+
 
 // Get config items with language-specific descriptions
 const items = computed(() => {
