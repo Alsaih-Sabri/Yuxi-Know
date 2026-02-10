@@ -229,7 +229,8 @@ class Config(BaseModel):
         self.valuable_model_provider = [k for k, v in self.model_provider_status.items() if v]
 
         if not self.valuable_model_provider:
-            raise ValueError("No model provider available, please check your `.env` file.")
+            logger.warning("No model provider available. Please configure model providers in .env or settings.")
+            # raise ValueError("No model provider available, please check your `.env` file.")
 
     def save(self):
         """保存配置到 TOML 文件（仅保存用户修改的字段）"""
