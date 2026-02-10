@@ -71,3 +71,7 @@ docs/vibe
 .cursorrules
 
 /models
+
+# OpenMemory - IDE/Assistant specific rules
+CLAUDE.md
+AGENTS.md

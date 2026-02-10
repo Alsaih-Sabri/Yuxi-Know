@@ -12,6 +12,9 @@ services:
       - ./saves:/app/saves
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    env_file:
+      - path: .env
+        required: false
     environment:
       - HOST_IP=${HOST_IP:-}
       - NEO4J_URI=${NEO4J_URI:-bolt://graph:7687}
@@ -51,7 +54,7 @@ services:
     command: uv run --no-dev uvicorn server.main:app --host 0.0.0.0 --port 5050
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:5050/api/system/health || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://localhost:5050/api/system/health || exit 1" ]
       interval: 30s
       timeout: 15s
       retries: 8
@@ -88,7 +91,7 @@ services:
       - ./docker/volumes/neo4j/data:/data
       - ./docker/volumes/neo4j/logs:/var/lib/neo4j/logs
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:7474 || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://localhost:7474 || exit 1" ]
       interval: 20s
       timeout: 10s
       retries: 5
@@ -114,7 +117,7 @@ services:
       - ./docker/volumes/milvus/etcd:/etcd
     command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
     healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
+      test: [ "CMD", "etcdctl", "endpoint", "health" ]
       interval: 60s
       timeout: 30s
       retries: 5
@@ -134,7 +137,7 @@ services:
       - ./docker/volumes/milvus/minio_config:/root/.minio
     command: minio server /minio_data --address 0.0.0.0:9000 --console-address 0.0.0.0:9001
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
       interval: 60s
       timeout: 30s
       retries: 5
@@ -146,7 +149,7 @@ services:
   milvus:
     image: milvusdb/milvus:v2.5.6
     container_name: milvus
-    command: ["milvus", "run", "standalone"]
+    command: [ "milvus", "run", "standalone" ]
     security_opt:
       - seccomp:unconfined
     environment:
@@ -157,7 +160,7 @@ services:
       - ./docker/volumes/milvus/milvus:/var/lib/milvus
       - ./docker/volumes/milvus/logs:/var/lib/milvus/logs
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9091/healthz" ]
       interval: 60s
       start_period: 120s
       timeout: 30s
@@ -179,25 +182,26 @@ services:
     container_name: mineru
     profiles:
       - all
+    env_file:
+      - path: .env
+        required: false
     environment:
       MINERU_MODEL_SOURCE: local
     entrypoint: mineru-vllm-server
-    command:
-      --host 0.0.0.0
-      --port 30000
+    command: --host 0.0.0.0 --port 30000
     ulimits:
       memlock: -1
       stack: 67108864
     ipc: host
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:30000/health || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://localhost:30000/health || exit 1" ]
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
-              capabilities: [gpu]
+              device_ids: [ "0" ]
+              capabilities: [ gpu ]
     networks:
       - app-network
     restart: unless-stopped
@@ -210,12 +214,13 @@ services:
     container_name: mineru-api
     profiles:
       - all
+    env_file:
+      - path: .env
+        required: false
     environment:
       MINERU_MODEL_SOURCE: local
     entrypoint: mineru-api
-    command:
-      --host 0.0.0.0
-      --port 30001
+    command: --host 0.0.0.0 --port 30001
     ulimits:
       memlock: -1
       stack: 67108864
@@ -237,10 +242,13 @@ services:
     container_name: paddlex-ocr
     profiles:
       - all
+    env_file:
+      - path: .env
+        required: false
     volumes:
       - ./docker/volumes/paddlex:/paddlex
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/health || exit 1"]
+      test: [ "CMD-SHELL", "curl -f http://localhost:8080/health || exit 1" ]
       interval: 20s
       timeout: 10s
       retries: 5
@@ -250,8 +258,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ['0']
-              capabilities: [gpu]
+              device_ids: [ '0' ]
+              capabilities: [ gpu ]
     networks:
       - app-network
     restart: unless-stopped
