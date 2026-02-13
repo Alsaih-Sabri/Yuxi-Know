@@ -13,18 +13,17 @@ import asyncio
 import contextlib
 import os
 import sys
+import uuid
 from pathlib import Path
+
+import httpx
+from dotenv import load_dotenv
 
 # 添加项目根目录到 Python 路径
 PROJECT_ROOT = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# 加载 .env 文件
-from dotenv import load_dotenv
 load_dotenv(PROJECT_ROOT / ".env")
-
-import httpx
-import uuid
 
 
 # API 配置
@@ -58,9 +57,9 @@ class APITester:
 
     async def login(self) -> bool:
         """登录获取 token"""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"1. 正在登录: {self.username}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         async with self._client() as client:
             response = await client.post(
@@ -82,9 +81,9 @@ class APITester:
 
     async def create_thread(self, agent_id: str) -> str:
         """创建对话线程"""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"2. 创建对话线程 (agent_id: {agent_id})")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         async with self._client() as client:
             response = await client.post(
@@ -104,9 +103,9 @@ class APITester:
 
     async def upload_attachment(self, thread_id: str, file_path: str) -> dict | None:
         """上传附件"""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"3. 上传附件: {file_path}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         if not os.path.exists(file_path):
             print(f"   ✗ 文件不存在: {file_path}")
@@ -123,7 +122,7 @@ class APITester:
 
         if response.status_code == 200:
             attachment = response.json()
-            print(f"   ✓ 上传成功!")
+            print("   ✓ 上传成功!")
             print(f"      file_id: {attachment.get('file_id')}")
             print(f"      file_name: {attachment.get('file_name')}")
             print(f"      status: {attachment.get('status')}")
@@ -134,9 +133,9 @@ class APITester:
 
     async def list_attachments(self, thread_id: str) -> list[dict]:
         """列出附件"""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"4. 列出附件 (thread_id: {thread_id})")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         async with self._client() as client:
             response = await client.get(
@@ -157,9 +156,9 @@ class APITester:
 
     async def get_agent_state(self, agent_id: str, thread_id: str) -> dict | None:
         """获取 agent state"""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"5. 获取 Agent State (agent_id: {agent_id}, thread_id: {thread_id})")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         async with self._client() as client:
             response = await client.get(
@@ -171,11 +170,11 @@ class APITester:
         if response.status_code == 200:
             state = response.json()
             agent_state = state.get("agent_state", {})
-            print(f"   ✓ 获取成功!")
+            print("   ✓ 获取成功!")
             print(f"      files: {len(agent_state.get('files', {}))} 个")
             print(f"      todos: {len(agent_state.get('todos', []))} 个")
             if agent_state.get("files"):
-                print(f"      文件列表:")
+                print("      文件列表:")
                 for path in agent_state["files"]:
                     file_info = agent_state["files"][path]
                     print(f"         - {path}: {len(file_info.get('content', []))} 行")
@@ -186,9 +185,9 @@ class APITester:
 
     async def send_chat_message(self, agent_id: str, thread_id: str, query: str) -> bool:
         """发送聊天消息（流式）"""
-        print(f"\n{'='*60}")
-        print(f"6. 发送聊天消息")
-        print(f"{'='*60}")
+        print(f"\n{'=' * 60}")
+        print("6. 发送聊天消息")
+        print(f"{'=' * 60}")
         print(f"   Query: {query}")
         print(f"   Thread ID: {thread_id}")
 
@@ -200,7 +199,7 @@ class APITester:
                 headers=self.headers,
             ) as response:
                 print(f"\n   响应状态: {response.status_code}")
-                print(f"   响应内容:")
+                print("   响应内容:")
                 async for chunk in response.aiter_lines():
                     if chunk:
                         print(f"      {chunk[:150]}...")
@@ -264,11 +263,7 @@ def hello():
         await tester.get_agent_state(agent_id, thread_id)
 
     # 7. 发送聊天消息测试
-    await tester.send_chat_message(
-        agent_id,
-        thread_id,
-        "你好，请简单介绍一下你自己。"
-    )
+    await tester.send_chat_message(agent_id, thread_id, "你好，请简单介绍一下你自己。")
 
     # 8. 再次获取 agent state (验证 todos 等状态)
     await asyncio.sleep(1)
@@ -279,9 +274,9 @@ def hello():
         os.remove(test_file_path)
         print(f"\n   测试文件已清理: {test_file_path}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("   测试完成!")
-    print(f"{'='*60}\n")
+    print(f"{'=' * 60}\n")
 
 
 if __name__ == "__main__":

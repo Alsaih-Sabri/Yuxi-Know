@@ -671,7 +671,16 @@ const fetchAgentState = async (agentId, threadId) => {
     // 确保更新 currentChatId 对应的 state，因为 currentAgentState 依赖它
     // 如果 currentChatId 为 null，使用传入的 threadId
     const targetChatId = currentChatId.value || threadId
-    console.log('[fetchAgentState] agentId:', agentId, 'threadId:', threadId, 'targetChatId:', targetChatId, 'agent_state:', JSON.stringify(res.agent_state || {})?.slice(0, 200))
+    console.log(
+      '[fetchAgentState] agentId:',
+      agentId,
+      'threadId:',
+      threadId,
+      'targetChatId:',
+      targetChatId,
+      'agent_state:',
+      JSON.stringify(res.agent_state || {})?.slice(0, 200)
+    )
     const ts = getThreadState(targetChatId)
     if (ts) {
       ts.agentState = res.agent_state || null
@@ -1088,7 +1097,14 @@ const handleAgentStateRefresh = async (threadId = null) => {
   if (!currentAgentId.value) return
   // 优先使用传入的 threadId，否则使用当前的 currentChatId
   let chatId = threadId || currentChatId.value
-  console.log('[handleAgentStateRefresh] input threadId:', threadId, 'currentChatId:', currentChatId.value, 'final chatId:', chatId)
+  console.log(
+    '[handleAgentStateRefresh] input threadId:',
+    threadId,
+    'currentChatId:',
+    currentChatId.value,
+    'final chatId:',
+    chatId
+  )
   if (!chatId) return
   await fetchAgentState(currentAgentId.value, chatId)
 }

@@ -151,14 +151,7 @@
 
 <script setup>
 import { computed, ref, onMounted, onUpdated, nextTick } from 'vue'
-import {
-  Download,
-  X,
-  FolderCode,
-  RefreshCw,
-  Folder,
-  FolderOpen
-} from 'lucide-vue-next'
+import { Download, X, FolderCode, RefreshCw, Folder, FolderOpen } from 'lucide-vue-next'
 import {
   CheckCircleOutlined,
   SyncOutlined,

@@ -121,7 +121,6 @@ const loadCallStats = async () => {
     await nextTick()
     renderCallStatsChart()
   } catch (error) {
-     
     console.error('加载调用统计数据失败:', error)
   } finally {
     callStatsLoading.value = false

@@ -31,9 +31,9 @@ def _make_attachment_path(file_name: str) -> str:
     """
     # 提取不带扩展名的部分
     base_name = file_name
-    for ext in ['.docx', '.txt', '.html', '.htm', '.pdf', '.md']:
+    for ext in [".docx", ".txt", ".html", ".htm", ".pdf", ".md"]:
         if file_name.lower().endswith(ext):
-            base_name = file_name[:-len(ext)]
+            base_name = file_name[: -len(ext)]
             break
 
     # 替换路径分隔符

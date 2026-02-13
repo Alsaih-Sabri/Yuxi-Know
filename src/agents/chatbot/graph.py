@@ -1,8 +1,7 @@
-from langchain.agents import create_agent
-from langchain.agents.middleware import ModelRetryMiddleware
-
 from deepagents.backends import StateBackend
 from deepagents.middleware.filesystem import FilesystemMiddleware
+from langchain.agents import create_agent
+from langchain.agents.middleware import ModelRetryMiddleware
 
 from src.agents.common import BaseAgent, load_chat_model
 from src.agents.common.middlewares import (
