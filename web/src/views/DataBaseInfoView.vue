@@ -653,7 +653,6 @@ const handleMouseUp = () => {
   :deep(.ant-tabs-nav) {
     margin-bottom: 0;
     // background-color: var(--gray-0);
-    border-bottom: 1px solid var(--gray-200);
   }
 
   :deep(.ant-tabs-extra-content) {
