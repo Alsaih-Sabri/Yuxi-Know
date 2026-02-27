@@ -132,13 +132,12 @@ def create_agent_composite_backend(runtime) -> CompositeBackend:
 
 
 def _get_visible_skills_from_runtime(runtime) -> list[str]:
-    state = getattr(runtime, "state", None)
-    if isinstance(state, dict):
-        snapshot = state.get("skill_session_snapshot")
-        if isinstance(snapshot, dict):
-            visible = snapshot.get("visible_skills")
-            if isinstance(visible, list):
-                return [slug for slug in visible if isinstance(slug, str) and is_valid_skill_slug(slug)]
+    context = getattr(runtime, "context", None)
+    snapshot = getattr(context, "skill_session_snapshot", None)
+    if isinstance(snapshot, dict):
+        visible = snapshot.get("visible_skills")
+        if isinstance(visible, list):
+            return [slug for slug in visible if isinstance(slug, str) and is_valid_skill_slug(slug)]
 
-    selected = getattr(runtime.context, "skills", None) or []
+    selected = getattr(context, "skills", None) or []
     return normalize_selected_skills(selected)
