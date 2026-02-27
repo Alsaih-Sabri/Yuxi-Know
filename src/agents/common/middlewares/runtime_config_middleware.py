@@ -18,7 +18,6 @@ from src.services.skill_resolver import (
     SkillSessionSnapshot,
     build_dependency_bundle,
     collect_prompt_metadata,
-    is_snapshot_match_selected_skills,
     normalize_selected_skills,
     resolve_session_snapshot,
 )
@@ -123,11 +122,44 @@ class RuntimeConfigMiddleware(AgentMiddleware):
             f"skills={skills_context_name}"
         )
 
+    async def abefore_agent(self, state: RuntimeConfigState, runtime) -> dict[str, Any] | None:
+        runtime_context = runtime.context
+        configured_skills = getattr(runtime_context, self.skills_context_name, None) or []
+        selected_skills = normalize_selected_skills(configured_skills)
+
+        try:
+            snapshot = await resolve_session_snapshot(selected_skills)
+        except Exception as e:
+            logger.warning(f"RuntimeConfigMiddleware: failed to resolve skill snapshot in abefore_agent: {e}")
+            snapshot = {
+                "selected_skills": selected_skills,
+                "visible_skills": [],
+                "prompt_metadata": {},
+                "dependency_map": {},
+            }
+
+        setattr(runtime_context, "skill_session_snapshot", snapshot)
+
+        if not self.enable_system_prompt_override or not self.enable_skills_prompt_override:
+            return None
+        if getattr(runtime_context, "_skills_prompt_injected", False):
+            return None
+        if not snapshot.get("visible_skills"):
+            return None
+
+        skills_meta = collect_prompt_metadata(snapshot, snapshot.get("visible_skills") or [])
+        skills_section = self._build_skills_section(skills_meta)
+        base_prompt = getattr(runtime_context, self.system_prompt_context_name, "") or ""
+        merged_prompt = f"{base_prompt}\n\n{skills_section}" if base_prompt else skills_section
+        setattr(runtime_context, self.system_prompt_context_name, merged_prompt)
+        setattr(runtime_context, "_skills_prompt_injected", True)
+        return None
+
     async def awrap_model_call(
         self, request: ModelRequest, handler: Callable[[ModelRequest], ModelResponse]
     ) -> ModelResponse:
         runtime_context = request.runtime.context
-        snapshot, request = await self._ensure_skill_snapshot(request)
+        snapshot = self._get_skill_snapshot_from_context(runtime_context)
         overrides: dict[str, Any] = {}
 
         # 1. 模型覆盖（可选）
@@ -164,20 +196,6 @@ class RuntimeConfigMiddleware(AgentMiddleware):
             cur_datetime = f"当前时间：{shanghai_now().strftime('%Y-%m-%d %H:%M:%S')} UTC"
             system_prompt = getattr(runtime_context, self.system_prompt_context_name, "") or ""
             merged_system_prompt = f"{cur_datetime}\n\n{system_prompt}"
-
-            configured_skills = getattr(runtime_context, self.skills_context_name, None) or []
-            if self.enable_skills_prompt_override and configured_skills:
-                if self._supports_skill_prompt(request):
-                    skills_for_prompt = configured_skills
-                    if snapshot and isinstance(snapshot.get("visible_skills"), list):
-                        skills_for_prompt = snapshot.get("visible_skills") or []
-                    skills_meta = collect_prompt_metadata(snapshot, skills_for_prompt)
-                    skills_section = self._build_skills_section(skills_meta)
-                    merged_system_prompt = f"{merged_system_prompt}\n\n{skills_section}"
-                else:
-                    logger.warning(
-                        "RuntimeConfigMiddleware: skills configured but read_file unavailable, skip skills prompt"
-                    )
 
             content_blocks = list(request.system_message.content_blocks) if request.system_message else []
             new_content = content_blocks + [{"type": "text", "text": merged_system_prompt}]
@@ -291,30 +309,6 @@ class RuntimeConfigMiddleware(AgentMiddleware):
         logger.debug(f"RuntimeConfigMiddleware: activated skill by read_file: {slug}")
         return self._merge_activated_skill_update(result, slug)
 
-    async def _ensure_skill_snapshot(self, request: ModelRequest) -> tuple[SkillSessionSnapshot | None, ModelRequest]:
-        runtime_context = request.runtime.context
-        configured_skills = getattr(runtime_context, self.skills_context_name, None) or []
-        normalized_skills = normalize_selected_skills(configured_skills)
-        state = request.state if isinstance(request.state, dict) else {}
-
-        snapshot = self._get_skill_snapshot_from_state(state)
-        if is_snapshot_match_selected_skills(snapshot, normalized_skills):
-            return snapshot, request
-
-        try:
-            snapshot = await resolve_session_snapshot(normalized_skills)
-        except Exception as e:
-            logger.warning(f"RuntimeConfigMiddleware: failed to resolve skill snapshot, fallback empty: {e}")
-            snapshot = None
-
-        if isinstance(request.state, dict):
-            if snapshot:
-                request.state["skill_session_snapshot"] = snapshot
-            else:
-                request.state.pop("skill_session_snapshot", None)
-
-        return snapshot, request
-
     def _extract_skill_slug_from_skill_md_path(self, file_path: Any) -> str | None:
         if not isinstance(file_path, str):
             return None
@@ -345,7 +339,7 @@ class RuntimeConfigMiddleware(AgentMiddleware):
         return result
 
     def _is_visible_skill_slug(self, request: ToolCallRequest, slug: str) -> bool:
-        snapshot = self._get_skill_snapshot_from_state(request.state)
+        snapshot = self._get_skill_snapshot_from_context(request.runtime.context)
         if snapshot:
             visible_skills = snapshot.get("visible_skills")
             if isinstance(visible_skills, list):
@@ -355,10 +349,8 @@ class RuntimeConfigMiddleware(AgentMiddleware):
         normalized = normalize_selected_skills(configured_skills)
         return slug in normalized
 
-    def _get_skill_snapshot_from_state(self, state: Any) -> SkillSessionSnapshot | None:
-        if not isinstance(state, dict):
-            return None
-        snapshot = state.get("skill_session_snapshot")
+    def _get_skill_snapshot_from_context(self, context: Any) -> SkillSessionSnapshot | None:
+        snapshot = getattr(context, "skill_session_snapshot", None)
         if not isinstance(snapshot, dict):
             return None
         visible_skills = snapshot.get("visible_skills")
@@ -366,13 +358,6 @@ class RuntimeConfigMiddleware(AgentMiddleware):
         if not isinstance(visible_skills, list) or not isinstance(selected_skills, list):
             return None
         return snapshot
-
-    def _supports_skill_prompt(self, request: ModelRequest) -> bool:
-        """仅当请求工具中包含 read_file 时，才注入 skills 指引。"""
-        for tool in request.tools or []:
-            if getattr(tool, "name", None) == "read_file":
-                return True
-        return False
 
     def _format_skills_locations(self, sources: list[str]) -> str:
         locations = []

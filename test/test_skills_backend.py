@@ -51,15 +51,16 @@ def test_composite_backend_mounts_skills_under_prefix(tmp_path, monkeypatch):
     monkeypatch.setattr(skills_backend, "get_skills_root_dir", lambda: tmp_path)
 
     runtime = SimpleNamespace(
-        context=SimpleNamespace(skills=["alpha"]),
-        state={
-            "skill_session_snapshot": {
+        context=SimpleNamespace(
+            skills=["alpha"],
+            skill_session_snapshot={
                 "selected_skills": ["alpha"],
                 "visible_skills": ["alpha", "beta"],
                 "prompt_metadata": {},
                 "dependency_map": {},
-            }
-        },
+            },
+        ),
+        state={},
     )
     composite = skills_backend.create_agent_composite_backend(runtime)
 
@@ -87,3 +88,25 @@ def test_composite_backend_fallbacks_to_context_skills_when_snapshot_missing(tmp
     skills_root = composite.ls_info("/skills/")
     skill_paths = sorted(entry.get("path") for entry in skills_root)
     assert skill_paths == ["/skills/alpha/"]
+
+
+def test_composite_backend_reads_visible_skills_from_runtime_context(tmp_path, monkeypatch):
+    _prepare_skills_dir(tmp_path)
+    monkeypatch.setattr(skills_backend, "get_skills_root_dir", lambda: tmp_path)
+
+    runtime = SimpleNamespace(
+        context=SimpleNamespace(
+            skills=["alpha"],
+            skill_session_snapshot={
+                "selected_skills": ["alpha"],
+                "visible_skills": ["alpha", "beta"],
+                "prompt_metadata": {},
+                "dependency_map": {},
+            },
+        ),
+        state=None,
+    )
+    composite = skills_backend.create_agent_composite_backend(runtime)
+    skills_root = composite.ls_info("/skills/")
+    skill_paths = sorted(entry.get("path") for entry in skills_root)
+    assert skill_paths == ["/skills/alpha/", "/skills/beta/"]
