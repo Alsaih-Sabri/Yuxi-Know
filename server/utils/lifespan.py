@@ -29,12 +29,6 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Failed to initialize MCP servers during startup: {e}")
 
-    # 初始化 Skills 缓存
-    try:
-        await init_skills_cache()
-    except Exception as e:
-        logger.error(f"Failed to initialize skills cache during startup: {e}")
-
     # 初始化知识库管理器
     try:
         await knowledge_base.initialize()

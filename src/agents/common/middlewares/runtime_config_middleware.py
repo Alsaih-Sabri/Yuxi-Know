@@ -14,11 +14,14 @@ from langgraph.types import Command
 from src.agents.common import load_chat_model
 from src.agents.common.tools import get_buildin_tools, get_kb_based_tools
 from src.services.mcp_service import get_enabled_mcp_tools
-from src.services.skill_service import (
-    get_dependency_bundle_for_activated_skills,
-    get_skill_prompt_metadata_by_slugs,
-    is_valid_skill_slug,
+from src.services.skill_resolver import (
+    SkillSessionSnapshot,
+    build_dependency_bundle,
+    collect_prompt_metadata,
+    normalize_selected_skills,
+    resolve_session_snapshot,
 )
+from src.services.skill_service import is_valid_skill_slug
 from src.utils.datetime_utils import shanghai_now
 from src.utils.logging_config import logger
 
@@ -40,6 +43,7 @@ def _activated_skills_reducer(left: list[str] | None, right: list[str] | None) -
 
 class RuntimeConfigState(AgentState):
     activated_skills: NotRequired[Annotated[list[str], _activated_skills_reducer]]
+    skill_session_snapshot: NotRequired[SkillSessionSnapshot]
 
 
 class RuntimeConfigMiddleware(AgentMiddleware):
@@ -118,10 +122,44 @@ class RuntimeConfigMiddleware(AgentMiddleware):
             f"skills={skills_context_name}"
         )
 
+    async def abefore_agent(self, state: RuntimeConfigState, runtime) -> dict[str, Any] | None:
+        runtime_context = runtime.context
+        configured_skills = getattr(runtime_context, self.skills_context_name, None) or []
+        selected_skills = normalize_selected_skills(configured_skills)
+
+        try:
+            snapshot = await resolve_session_snapshot(selected_skills)
+        except Exception as e:
+            logger.warning(f"RuntimeConfigMiddleware: failed to resolve skill snapshot in abefore_agent: {e}")
+            snapshot = {
+                "selected_skills": selected_skills,
+                "visible_skills": [],
+                "prompt_metadata": {},
+                "dependency_map": {},
+            }
+
+        setattr(runtime_context, "skill_session_snapshot", snapshot)
+
+        if not self.enable_system_prompt_override or not self.enable_skills_prompt_override:
+            return None
+        if getattr(runtime_context, "_skills_prompt_injected", False):
+            return None
+        if not snapshot.get("visible_skills"):
+            return None
+
+        skills_meta = collect_prompt_metadata(snapshot, snapshot.get("visible_skills") or [])
+        skills_section = self._build_skills_section(skills_meta)
+        base_prompt = getattr(runtime_context, self.system_prompt_context_name, "") or ""
+        merged_prompt = f"{base_prompt}\n\n{skills_section}" if base_prompt else skills_section
+        setattr(runtime_context, self.system_prompt_context_name, merged_prompt)
+        setattr(runtime_context, "_skills_prompt_injected", True)
+        return None
+
     async def awrap_model_call(
         self, request: ModelRequest, handler: Callable[[ModelRequest], ModelResponse]
     ) -> ModelResponse:
         runtime_context = request.runtime.context
+        snapshot = self._get_skill_snapshot_from_context(runtime_context)
         overrides: dict[str, Any] = {}
 
         # 1. 模型覆盖（可选）
@@ -131,10 +169,11 @@ class RuntimeConfigMiddleware(AgentMiddleware):
 
         # 2. 工具覆盖（可选）
         if self.enable_tools_override:
-            activated_skills = request.state.get("activated_skills", []) if request.state else []
+            state = request.state if isinstance(request.state, dict) else {}
+            activated_skills = state.get("activated_skills", [])
             if not isinstance(activated_skills, list):
                 activated_skills = []
-            deps_bundle = get_dependency_bundle_for_activated_skills(activated_skills)
+            deps_bundle = build_dependency_bundle(snapshot, activated_skills)
             enabled_tools = await self.get_tools_from_context(
                 runtime_context,
                 extra_tool_names=deps_bundle["tools"],
@@ -157,17 +196,6 @@ class RuntimeConfigMiddleware(AgentMiddleware):
             cur_datetime = f"当前时间：{shanghai_now().strftime('%Y-%m-%d %H:%M:%S')} UTC"
             system_prompt = getattr(runtime_context, self.system_prompt_context_name, "") or ""
             merged_system_prompt = f"{cur_datetime}\n\n{system_prompt}"
-
-            configured_skills = getattr(runtime_context, self.skills_context_name, None) or []
-            if self.enable_skills_prompt_override and configured_skills:
-                if self._supports_skill_prompt(request):
-                    skills_meta = get_skill_prompt_metadata_by_slugs(configured_skills)
-                    skills_section = self._build_skills_section(skills_meta)
-                    merged_system_prompt = f"{merged_system_prompt}\n\n{skills_section}"
-                else:
-                    logger.warning(
-                        "RuntimeConfigMiddleware: skills configured but read_file unavailable, skip skills prompt"
-                    )
 
             content_blocks = list(request.system_message.content_blocks) if request.system_message else []
             new_content = content_blocks + [{"type": "text", "text": merged_system_prompt}]
@@ -255,6 +283,9 @@ class RuntimeConfigMiddleware(AgentMiddleware):
         slug = self._extract_skill_slug_from_skill_md_path(file_path)
         if not slug:
             return result
+        if not self._is_visible_skill_slug(request, slug):
+            logger.warning(f"RuntimeConfigMiddleware: deny skill activation for invisible slug: {slug}")
+            return result
         logger.debug(f"RuntimeConfigMiddleware: activated skill by read_file: {slug}")
         return self._merge_activated_skill_update(result, slug)
 
@@ -271,6 +302,9 @@ class RuntimeConfigMiddleware(AgentMiddleware):
         file_path = args.get("file_path") if isinstance(args, dict) else None
         slug = self._extract_skill_slug_from_skill_md_path(file_path)
         if not slug:
+            return result
+        if not self._is_visible_skill_slug(request, slug):
+            logger.warning(f"RuntimeConfigMiddleware: deny skill activation for invisible slug: {slug}")
             return result
         logger.debug(f"RuntimeConfigMiddleware: activated skill by read_file: {slug}")
         return self._merge_activated_skill_update(result, slug)
@@ -304,12 +338,26 @@ class RuntimeConfigMiddleware(AgentMiddleware):
 
         return result
 
-    def _supports_skill_prompt(self, request: ModelRequest) -> bool:
-        """仅当请求工具中包含 read_file 时，才注入 skills 指引。"""
-        for tool in request.tools or []:
-            if getattr(tool, "name", None) == "read_file":
-                return True
-        return False
+    def _is_visible_skill_slug(self, request: ToolCallRequest, slug: str) -> bool:
+        snapshot = self._get_skill_snapshot_from_context(request.runtime.context)
+        if snapshot:
+            visible_skills = snapshot.get("visible_skills")
+            if isinstance(visible_skills, list):
+                return slug in visible_skills
+
+        configured_skills = getattr(request.runtime.context, self.skills_context_name, None) or []
+        normalized = normalize_selected_skills(configured_skills)
+        return slug in normalized
+
+    def _get_skill_snapshot_from_context(self, context: Any) -> SkillSessionSnapshot | None:
+        snapshot = getattr(context, "skill_session_snapshot", None)
+        if not isinstance(snapshot, dict):
+            return None
+        visible_skills = snapshot.get("visible_skills")
+        selected_skills = snapshot.get("selected_skills")
+        if not isinstance(visible_skills, list) or not isinstance(selected_skills, list):
+            return None
+        return snapshot
 
     def _format_skills_locations(self, sources: list[str]) -> str:
         locations = []
