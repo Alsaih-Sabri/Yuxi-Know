@@ -15,6 +15,8 @@ from src.agents.common.tools import get_tavily_search
 from src.services.mcp_service import get_tools_from_all_servers
 
 from .context import DeepContext
+from .prompts import DEEP_PROMPT
+from src.utils import logger
 
 
 def _create_fs_backend(rt):
@@ -81,11 +83,14 @@ class DeepAgent(BaseAgent):
         if tavily_search:
             tools.append(tavily_search)
 
-        # Assert that search tool is available for DeepAgent
-        assert tools, (
-            "DeepAgent requires at least one search tool. "
-            "Please configure TAVILY_API_KEY environment variable to enable web search."
-        )
+        # # Assert that search tool is available for DeepAgent
+        # assert tools, (
+        #     "DeepAgent requires at least one search tool. "
+        #     "Please configure TAVILY_API_KEY environment variable to enable web search."
+        # )
+        if not tools:
+            logger.warning("No search tools configured, DeepAgent will work without web search")
+            tools = []
         return tools
 
     async def get_graph(self, **kwargs):
