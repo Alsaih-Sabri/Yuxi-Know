@@ -659,6 +659,55 @@ async def get_document_content(db_id: str, doc_id: str, current_user: User = Dep
         return {"message": "Failed to get file content", "status": "failed"}
 
 
+@knowledge.delete("/databases/{db_id}/documents/batch")
+async def batch_delete_documents(db_id: str, file_ids: list[str] = Body(...), current_user: User = Depends(get_admin_user)):
+    """批量删除文档或文件夹"""
+    logger.debug(f"BATCH DELETE documents {file_ids} in {db_id}")
+    await _ensure_database_not_dify(db_id, "批量文档删除")
+    
+    deleted_count = 0
+    failed_items = []
+    
+    for doc_id in file_ids:
+        try:
+            file_meta_info = await knowledge_base.get_file_basic_info(db_id, doc_id)
+
+            # Check if it is a folder
+            is_folder = file_meta_info.get("meta", {}).get("is_folder", False)
+            if is_folder:
+                await knowledge_base.delete_folder(db_id, doc_id)
+                deleted_count += 1
+                continue
+
+            file_name = file_meta_info.get("meta", {}).get("filename")
+
+            # 尝试从MinIO删除文件，如果失败（例如旧知识库没有MinIO实例），则忽略
+            try:
+                minio_client = get_minio_client()
+                await minio_client.adelete_file("ref-" + db_id.replace("_", "-"), file_name)
+                logger.debug(f"成功从MinIO删除文件: {file_name}")
+            except Exception as minio_error:
+                logger.warning(f"从MinIO删除文件失败（可能是旧知识库）: {minio_error}")
+
+            # 无论MinIO删除是否成功，都继续从知识库删除
+            await knowledge_base.delete_file(db_id, doc_id)
+            deleted_count += 1
+        except Exception as e:
+            logger.error(f"批量删除过程中删除文档 {doc_id} 失败: {e}, {traceback.format_exc()}")
+            failed_items.append({"doc_id": doc_id, "error": str(e)})
+
+    if failed_items:
+        if deleted_count == 0:
+            raise HTTPException(status_code=400, detail=f"批量删除失败: 所有 {len(failed_items)} 个文件均未删除。")
+        return {
+            "message": f"部分删除成功: 已删除 {deleted_count} 个文件，失败 {len(failed_items)} 个", 
+            "deleted_count": deleted_count,
+            "failed_items": failed_items
+        }
+
+    return {"message": f"批量删除成功: 已删除 {deleted_count} 个文件", "deleted_count": deleted_count}
+
+
 @knowledge.delete("/databases/{db_id}/documents/{doc_id}")
 async def delete_document(db_id: str, doc_id: str, current_user: User = Depends(get_admin_user)):
     """删除文档或文件夹"""
