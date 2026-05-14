@@ -334,5 +334,22 @@ watch(
     font-size: 12px;
     line-height: 1.5;
   }
+
+  .svg-inline-render {
+    max-width: 100%;
+    height: auto;
+    overflow: auto;
+    margin: 12px 0;
+
+    svg {
+      max-width: 100%;
+      height: auto;
+    }
+  }
+
+  &.is-dark .svg-inline-render {
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+  }
 }
 </style>
