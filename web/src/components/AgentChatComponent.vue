@@ -277,9 +277,7 @@ const {
   selectedAgentConfigId,
   agentConfig,
   configurableItems,
-  availableKnowledgeBases,
-  availableMcps,
-  availableSkills
+  availableKnowledgeBases
 } = storeToRefs(agentStore)
 const { threads, currentThreadId, currentThread } = storeToRefs(chatThreadsStore)
 
@@ -433,10 +431,7 @@ const { mentionConfig } = useAgentMentionConfig({
   currentAgentState,
   currentThreadAttachments,
   configurableItems,
-  agentConfig,
-  availableKnowledgeBases,
-  availableMcps,
-  availableSkills
+  agentConfig
 })
 
 const currentThreadMessages = computed(() => threadMessages.value[currentChatId.value] || [])
