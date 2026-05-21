@@ -130,10 +130,6 @@ const props = defineProps({
     type: Object,
     default: () => ({})
   },
-  threadFiles: {
-    type: Array,
-    default: () => []
-  },
   threadId: {
     type: String,
     default: null
@@ -722,7 +718,6 @@ watch(useInlinePreview, (isInline) => {
   order: 3;
   flex-shrink: 0;
 }
-
 
 .tab-content {
   flex: 1;
