@@ -130,10 +130,6 @@ const props = defineProps({
     type: Object,
     default: () => ({})
   },
-  threadFiles: {
-    type: Array,
-    default: () => []
-  },
   threadId: {
     type: String,
     default: null
@@ -325,7 +321,9 @@ const refreshFileSystem = async () => {
         (entry) => entry?.is_dir && entry.name === DISPLAY_ROOT_DIRECTORY_NAME
       )
 
-      dynamicTreeData.value = displayRootEntry ? await loadDirectoryChildren(displayRootEntry.path) : []
+      dynamicTreeData.value = displayRootEntry
+        ? await loadDirectoryChildren(displayRootEntry.path)
+        : []
       expandedKeys.value = []
       selectedKeys.value = []
     } else {
@@ -722,7 +720,6 @@ watch(useInlinePreview, (isInline) => {
   order: 3;
   flex-shrink: 0;
 }
-
 
 .tab-content {
   flex: 1;
