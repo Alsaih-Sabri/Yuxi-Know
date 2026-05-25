@@ -77,7 +77,7 @@ class RemoteSkillSearchRequest(BaseModel):
 
 
 class SkillBatchDeleteRequest(BaseModel):
-    slugs: list[str] = Field(..., description="需要批量删除的 skill slug 列表")
+    slugs: list[str] = Field(..., max_length=50, description="需要批量删除的 skill slug 列表，最多支持 50 个")
 
 
 def _raise_from_value_error(e: ValueError) -> None:

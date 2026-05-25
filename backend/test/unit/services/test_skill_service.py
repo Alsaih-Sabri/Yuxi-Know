@@ -1054,6 +1054,13 @@ async def test_delete_skills_batch_ok(tmp_path: Path, monkeypatch: pytest.Monkey
 
 
 @pytest.mark.asyncio
+async def test_delete_skills_batch_limit_exceeded():
+    slugs = [f"skill-{i}" for i in range(51)]
+    with pytest.raises(ValueError, match="批量删除的技能数量不能超过 50 个"):
+        await svc.delete_skills_batch(None, slugs=slugs)
+
+
+@pytest.mark.asyncio
 async def test_delete_skill_concurrent_lock(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(svc.sys_config, "save_dir", str(tmp_path))
     (tmp_path / "skills" / "concurrent-skill").mkdir(parents=True, exist_ok=True)

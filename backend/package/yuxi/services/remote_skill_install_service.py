@@ -25,9 +25,9 @@ class RemoteSkillsBatchPreparation:
     temp_home: str | None
     results: list[dict]
 
-    def cleanup(self) -> None:
+    async def cleanup(self) -> None:
         if self.temp_home:
-            shutil.rmtree(self.temp_home, ignore_errors=True)
+            await asyncio.to_thread(shutil.rmtree, self.temp_home, ignore_errors=True)
 
 
 def _normalize_source(source: str) -> str:
@@ -152,7 +152,7 @@ async def list_remote_skills(source: str) -> list[dict[str, str]]:
             cwd=workdir,
         )
     finally:
-        shutil.rmtree(temp_home, ignore_errors=True)
+        await asyncio.to_thread(shutil.rmtree, temp_home, ignore_errors=True)
 
     skills = _parse_available_skills(output)
     if not skills:
@@ -219,7 +219,7 @@ async def install_remote_skill(
             created_by=created_by,
         )
     finally:
-        shutil.rmtree(temp_home, ignore_errors=True)
+        await asyncio.to_thread(shutil.rmtree, temp_home, ignore_errors=True)
 
 
 async def install_remote_skills_batch(
@@ -262,7 +262,7 @@ async def install_remote_skills_batch(
 
         return results
     finally:
-        preparation.cleanup()
+        await preparation.cleanup()
 
 
 async def prepare_remote_skills_batch(
@@ -327,7 +327,7 @@ async def prepare_remote_skills_batch(
 
         return RemoteSkillsBatchPreparation(temp_home=temp_home, results=results)
     except Exception:
-        shutil.rmtree(temp_home, ignore_errors=True)
+        await asyncio.to_thread(shutil.rmtree, temp_home, ignore_errors=True)
         raise
 
 
@@ -382,6 +382,6 @@ async def search_remote_skills(query: str) -> list[dict[str, str]]:
             cwd=workdir,
         )
     finally:
-        shutil.rmtree(temp_home, ignore_errors=True)
+        await asyncio.to_thread(shutil.rmtree, temp_home, ignore_errors=True)
 
     return _parse_search_skills(output)

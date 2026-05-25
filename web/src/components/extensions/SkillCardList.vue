@@ -141,7 +141,11 @@
                         :disabled="installingRemoteSkill"
                       >
                         <template #suffix>
-                          <a-dropdown :trigger="['click']" placement="bottomRight" overlay-class-name="history-dropdown-menu">
+                          <a-dropdown
+                            :trigger="['click']"
+                            placement="bottomRight"
+                            overlay-class-name="history-dropdown-menu"
+                          >
                             <div class="history-trigger-wrapper">
                               <a-tooltip title="历史仓库">
                                 <History
@@ -159,14 +163,22 @@
                                 <template v-else>
                                   <a-menu-item v-for="item in repoHistory" :key="item">
                                     <div class="history-item-menu-row">
-                                      <span class="history-item-text" :title="item">{{ item }}</span>
-                                      <span class="history-item-del-btn" @click.stop="deleteHistoryItem(item)">
+                                      <span class="history-item-text" :title="item">{{
+                                        item
+                                      }}</span>
+                                      <span
+                                        class="history-item-del-btn"
+                                        @click.stop="deleteHistoryItem(item)"
+                                      >
                                         <Trash2 :size="12" />
                                       </span>
                                     </div>
                                   </a-menu-item>
                                   <a-menu-divider />
-                                  <a-menu-item key="clear-all-history" class="clear-history-menu-item">
+                                  <a-menu-item
+                                    key="clear-all-history"
+                                    class="clear-history-menu-item"
+                                  >
                                     <div class="clear-history-btn-content">
                                       <Trash2 :size="12" class="clear-icon" />
                                       <span>清空历史记录</span>
@@ -372,9 +384,7 @@
               @click="startInstallRemoteSkills"
             >
               开始安装 (已选
-              {{
-                activeTab === 'repo' ? selectedRepoSkills.length : selectedSearchSkills.length
-              }}
+              {{ activeTab === 'repo' ? selectedRepoSkills.length : selectedSearchSkills.length }}
               个)
             </a-button>
           </div>
@@ -1121,12 +1131,13 @@ defineExpose({
     margin-right: -4px;
     border-radius: 4px;
     transition: background-color 0.2s ease;
-    
+
     &:hover {
       background-color: var(--gray-100);
     }
-    
-    &:focus, &:focus-visible {
+
+    &:focus,
+    &:focus-visible {
       outline: none;
     }
   }
@@ -1135,21 +1146,19 @@ defineExpose({
     color: var(--gray-400);
     transition: color 0.2s ease;
     outline: none;
-    
+
     &:hover {
       color: var(--main-color);
     }
-    
+
     &.has-history {
       color: var(--gray-500);
-      
+
       &:hover {
         color: var(--main-color);
       }
     }
   }
-
-
 
   .repo-hint-text {
     font-size: 12px;
@@ -1488,4 +1497,3 @@ defineExpose({
   }
 }
 </style>
-
