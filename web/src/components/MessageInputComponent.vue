@@ -293,7 +293,7 @@ const splitTextByQuery = (text, query) => {
   if (!text) return []
   if (!query) return [{ text, isMatch: false }]
 
-  const escapedQuery = query.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const regex = new RegExp(`(${escapedQuery})`, 'gi')
   const parts = text.split(regex)
 

@@ -554,8 +554,8 @@ defineExpose({
 
   &:hover,
   &:focus {
-    color: var(--main-700);
-    background: var(--main-50);
+    color: var(--gray-700);
+    background: var(--gray-50);
   }
 }
 

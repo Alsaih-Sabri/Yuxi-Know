@@ -131,7 +131,9 @@ const copySvgAsPng = async (svgEl, btn) => {
     try {
       await navigator.clipboard.writeText(svgContent)
       console.log('PNG 复制失败，已回退复制 SVG 源码')
-    } catch {}
+    } catch (fallbackErr) {
+      console.error('复制 SVG 源码失败:', fallbackErr)
+    }
   } finally {
     URL.revokeObjectURL(url)
   }

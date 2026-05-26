@@ -12,6 +12,9 @@ export const useThemeStore = defineStore('theme', () => {
       fontFamily:
         "'HarmonyOS Sans SC', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;",
       colorPrimary: '#24839b',
+      colorLink: 'var(--main-color)',
+      colorLinkHover: 'var(--main-600)',
+      colorLinkActive: 'var(--main-800)',
       borderRadius: 8,
       wireframe: false
     }

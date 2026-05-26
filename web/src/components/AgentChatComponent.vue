@@ -451,10 +451,6 @@ const supportsFiles = computed(() => {
 const currentAgentState = computed(() => {
   return currentChatId.value ? getThreadState(currentChatId.value)?.agentState || null : null
 })
-const currentThreadFiles = computed(() => {
-  if (!currentChatId.value) return []
-  return threadFilesMap.value[currentChatId.value] || []
-})
 const currentThreadAttachments = computed(() => {
   if (!currentChatId.value) return []
   return threadAttachmentsMap.value[currentChatId.value] || []

@@ -107,6 +107,41 @@
                     <div class="user-id-row">ID: {{ user.uid || '-' }}</div>
                   </div>
                 </div>
+
+                <a-dropdown :trigger="['click']" placement="bottomRight">
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item key="edit" @click.stop="showEditUserModal(user)">
+                        <span class="user-card-menu-item">
+                          <Pencil :size="14" />
+                          编辑用户
+                        </span>
+                      </a-menu-item>
+                      <a-menu-item
+                        key="delete"
+                        :disabled="isUserDeleteDisabled(user)"
+                        @click.stop="confirmDeleteUser(user)"
+                      >
+                        <span
+                          class="user-card-menu-item"
+                          :class="{ danger: !isUserDeleteDisabled(user) }"
+                        >
+                          <Trash2 :size="14" />
+                          删除用户
+                        </span>
+                      </a-menu-item>
+                    </a-menu>
+                  </template>
+                  <a-button
+                    type="text"
+                    size="small"
+                    class="card-menu-trigger lucide-icon-btn"
+                    aria-label="用户操作"
+                    @click.stop
+                  >
+                    <MoreVertical :size="16" />
+                  </a-button>
+                </a-dropdown>
               </div>
 
               <div class="card-content">
@@ -122,36 +157,6 @@
                   <span class="info-label">最后登录:</span>
                   <span class="info-value time-text">{{ formatTime(user.last_login) }}</span>
                 </div>
-              </div>
-
-              <div class="card-actions">
-                <a-tooltip title="编辑用户">
-                  <a-button
-                    type="text"
-                    size="small"
-                    @click="showEditUserModal(user)"
-                    class="action-btn lucide-icon-btn"
-                  >
-                    <Pencil :size="14" />
-                    <span>编辑</span>
-                  </a-button>
-                </a-tooltip>
-                <a-tooltip title="删除用户">
-                  <a-button
-                    type="text"
-                    size="small"
-                    danger
-                    @click="confirmDeleteUser(user)"
-                    :disabled="
-                      user.id === userStore.userId ||
-                      (user.role === 'superadmin' && userStore.userRole !== 'superadmin')
-                    "
-                    class="action-btn lucide-icon-btn"
-                  >
-                    <Trash2 :size="14" />
-                    <span>删除</span>
-                  </a-button>
-                </a-tooltip>
               </div>
             </div>
           </div>
@@ -262,7 +267,17 @@ import { reactive, onMounted, watch, computed } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { useUserStore } from '@/stores/user'
 import { departmentApi } from '@/apis'
-import { Plus, Pencil, Trash2, User, UserLock, UserStar, RefreshCw, Search } from 'lucide-vue-next'
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  User,
+  UserLock,
+  UserStar,
+  RefreshCw,
+  Search,
+  MoreVertical
+} from 'lucide-vue-next'
 import { formatDateTime } from '@/utils/time'
 
 const userStore = useUserStore()
@@ -421,6 +436,10 @@ watch(
 
 // 格式化时间显示
 const formatTime = (timeStr) => formatDateTime(timeStr)
+
+const isUserDeleteDisabled = (user) =>
+  user.id === userStore.userId ||
+  (user.role === 'superadmin' && userStore.userRole !== 'superadmin')
 
 // 获取用户列表
 const fetchUsers = async () => {
@@ -773,7 +792,6 @@ onMounted(async () => {
           border: 1px solid var(--gray-150);
           border-radius: 8px;
           padding: 12px;
-          padding-bottom: 6px;
 
           transition: all 0.2s ease;
           box-shadow: 0 1px 3px var(--shadow-1);
@@ -784,10 +802,16 @@ onMounted(async () => {
           }
 
           .card-header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 8px;
             margin-bottom: 10px;
 
             .user-info-main {
               display: flex;
+              flex: 1;
+              min-width: 0;
               gap: 12px;
               align-items: center;
 
@@ -878,6 +902,22 @@ onMounted(async () => {
                 }
               }
             }
+
+            .card-menu-trigger {
+              display: inline-flex;
+              align-items: center;
+              justify-content: center;
+              width: 28px;
+              height: 28px;
+              flex-shrink: 0;
+              color: var(--gray-600);
+
+              &:hover,
+              &:focus {
+                color: var(--gray-700);
+                background: var(--gray-50);
+              }
+            }
           }
 
           .card-content {
@@ -915,38 +955,6 @@ onMounted(async () => {
               }
             }
           }
-
-          .card-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 6px;
-            padding-top: 6px;
-            border-top: 1px solid var(--gray-25);
-
-            .action-btn {
-              display: flex;
-              align-items: center;
-              gap: 4px;
-              padding: 4px 8px;
-              border-radius: 6px;
-              transition: all 0.2s ease;
-              font-size: 12px;
-
-              span {
-                font-size: 12px;
-              }
-
-              &:hover {
-                background: var(--gray-25);
-              }
-
-              &.ant-btn-dangerous:hover {
-                background: var(--gray-25);
-                border-color: var(--color-error-500);
-                color: var(--color-error-500);
-              }
-            }
-          }
         }
       }
     }
@@ -962,6 +970,16 @@ onMounted(async () => {
     font-size: 13px;
     color: var(--gray-900);
     font-family: 'Monaco', 'Consolas', monospace;
+  }
+}
+
+.user-card-menu-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  &.danger {
+    color: var(--color-error-700);
   }
 }
 
