@@ -245,69 +245,65 @@
           message="修改配置仅影响后续构建；已构建的图谱不会自动重算，如需一致请重置后重新抽取。抽取器类型创建后不可修改。"
         />
         <a-form-item label="抽取器类型">
-          <div class="extractor-type-cards">
+          <div class="extractor-type-cards" role="radiogroup" aria-label="抽取器类型">
             <div
               v-for="option in extractorTypeOptions"
               :key="option.value"
               class="extractor-type-card"
               :class="{
                 active: graphConfigForm.extractor_type === option.value,
-                disabled: isEditingGraphConfig
+                disabled: isEditingGraphConfig || option.disabled
               }"
-              @click="selectExtractorType(option.value)"
+              role="radio"
+              :aria-checked="graphConfigForm.extractor_type === option.value"
+              :aria-disabled="isEditingGraphConfig || option.disabled"
+              :tabindex="isEditingGraphConfig || option.disabled ? -1 : 0"
+              @click="selectExtractorType(option)"
+              @keydown.enter.prevent="selectExtractorType(option)"
+              @keydown.space.prevent="selectExtractorType(option)"
             >
               <div class="card-header">
                 <component :is="option.icon" class="type-icon" />
                 <span class="type-title">{{ option.label }}</span>
               </div>
               <div class="card-description">{{ option.description }}</div>
+              <div v-if="option.helper" class="card-helper" :class="{ warning: option.disabled }">
+                {{ option.helper }}
+              </div>
             </div>
           </div>
         </a-form-item>
-        <template v-if="graphConfigForm.extractor_type === 'llm'">
-          <a-form-item label="模型">
-            <ModelSelectorComponent
-              :model_spec="graphConfigForm.model_spec"
-              placeholder="选择抽取模型"
-              @select-model="(spec) => (graphConfigForm.model_spec = spec)"
+        <a-form-item label="模型">
+          <ModelSelectorComponent
+            :model_spec="graphConfigForm.model_spec"
+            placeholder="选择抽取模型"
+            @select-model="(spec) => (graphConfigForm.model_spec = spec)"
+          />
+        </a-form-item>
+        <a-form-item label="Schema">
+          <a-textarea
+            v-model:value="graphConfigForm.schema"
+            :rows="6"
+            placeholder="描述实体类型、关系类型和属性约束。后端会把 Schema 拼接到固定抽取 Prompt 中。"
+          />
+        </a-form-item>
+        <div class="form-grid two-columns">
+          <a-form-item label="并发队列数">
+            <a-input-number
+              v-model:value="graphConfigForm.concurrency_count"
+              :min="1"
+              :max="1000"
+              :step="1"
+              style="width: 100%"
             />
           </a-form-item>
-          <a-form-item label="Schema">
-            <a-textarea
-              v-model:value="graphConfigForm.schema"
-              :rows="6"
-              placeholder="描述实体类型、关系类型和属性约束。后端会把 Schema 拼接到固定抽取 Prompt 中。"
-            />
-          </a-form-item>
-          <div class="form-grid two-columns">
-            <a-form-item label="并发队列数">
-              <a-input-number
-                v-model:value="graphConfigForm.concurrency_count"
-                :min="1"
-                :max="1000"
-                :step="1"
-                style="width: 100%"
-              />
-            </a-form-item>
-            <a-form-item label="模型参数 JSON">
-              <a-input
-                v-model:value="graphConfigForm.model_params_text"
-                placeholder='例如 {"temperature":0.1}'
-              />
-            </a-form-item>
-          </div>
-        </template>
-        <template v-else>
-          <a-form-item label="spaCy 模型">
-            <a-input v-model:value="graphConfigForm.spacy_model" placeholder="zh_core_web_sm" />
-          </a-form-item>
-          <a-form-item label="实体类型过滤">
+          <a-form-item label="模型参数 JSON">
             <a-input
-              v-model:value="graphConfigForm.entity_labels_text"
-              placeholder="可选，逗号分隔"
+              v-model:value="graphConfigForm.model_params_text"
+              placeholder='例如 {"temperature":0.1}'
             />
           </a-form-item>
-        </template>
+        </div>
       </a-form>
     </a-modal>
   </div>
@@ -317,6 +313,7 @@
 import { ref, computed, watch, nextTick, onUnmounted, reactive } from 'vue'
 import { useDatabaseStore } from '@/stores/database'
 import { useTaskerStore } from '@/stores/tasker'
+import { useConfigStore } from '@/stores/config'
 import {
   RefreshCw,
   Settings,
@@ -348,6 +345,7 @@ const props = defineProps({
 
 const store = useDatabaseStore()
 const taskerStore = useTaskerStore()
+const configStore = useConfigStore()
 
 const kbId = computed(() => store.kbId)
 const kbType = computed(() => store.database.kb_type)
@@ -373,13 +371,17 @@ const extractorTypeOptions = [
     value: 'llm',
     label: 'LLM',
     description: '使用大模型按 Schema 抽取实体和关系',
-    icon: BrainCircuit
+    helper: '当前唯一支持的图谱抽取方式',
+    icon: BrainCircuit,
+    disabled: false
   },
   {
-    value: 'spacy',
-    label: 'spaCy',
-    description: '【Beta】使用本地 NER 模型抽取实体',
-    icon: ScanText
+    value: 'more',
+    label: '更多',
+    description: '更多抽取方式正在拓展中',
+    helper: '拓展中',
+    icon: ScanText,
+    disabled: true
   }
 ]
 
@@ -466,9 +468,7 @@ const graphConfigForm = reactive({
   model_spec: '',
   schema: '',
   concurrency_count: 50,
-  model_params_text: '',
-  spacy_model: 'zh_core_web_sm',
-  entity_labels_text: ''
+  model_params_text: ''
 })
 
 const graph = reactive(useGraph(graphRef))
@@ -504,13 +504,6 @@ const loadGraphBuildStatus = async () => {
   }
 }
 
-const parseCommaSeparatedValues = (value) => {
-  return value
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
 const parseModelParams = () => {
   const text = graphConfigForm.model_params_text.trim()
   if (!text) return {}
@@ -528,18 +521,13 @@ const parseModelParams = () => {
 
 const fillGraphConfigForm = () => {
   const config = graphBuildStatus.value?.config
-  if (!config) return
-  const options = config.extractor_options || {}
-  graphConfigForm.extractor_type = config.extractor_type || 'llm'
-  graphConfigForm.model_spec = options.model_spec || ''
+  const options = config?.extractor_options || {}
+  graphConfigForm.extractor_type = 'llm'
+  graphConfigForm.model_spec = options.model_spec || configStore.config?.default_model || ''
   graphConfigForm.schema = options.schema || ''
-  graphConfigForm.concurrency_count = Number(options.concurrency_count || 5)
+  graphConfigForm.concurrency_count = Number(options.concurrency_count || 50)
   graphConfigForm.model_params_text = options.model_params
     ? JSON.stringify(options.model_params)
-    : ''
-  graphConfigForm.spacy_model = options.model || 'zh_core_web_sm'
-  graphConfigForm.entity_labels_text = Array.isArray(options.entity_labels)
-    ? options.entity_labels.join(', ')
     : ''
 }
 
@@ -548,26 +536,18 @@ const openGraphConfig = () => {
   showGraphConfig.value = true
 }
 
-const selectExtractorType = (type) => {
-  if (isEditingGraphConfig.value) return
-  graphConfigForm.extractor_type = type
+const selectExtractorType = (option) => {
+  if (isEditingGraphConfig.value || option.disabled) return
+  graphConfigForm.extractor_type = option.value
 }
 
 const buildExtractorOptions = () => {
-  if (graphConfigForm.extractor_type === 'spacy') {
-    return {
-      model: graphConfigForm.spacy_model,
-      entity_labels: parseCommaSeparatedValues(graphConfigForm.entity_labels_text)
-    }
-  }
-
-  const result = {
+  return {
     model_spec: graphConfigForm.model_spec,
     schema: graphConfigForm.schema.trim(),
-    concurrency_count: graphConfigForm.concurrency_count || 1,
+    concurrency_count: graphConfigForm.concurrency_count || 50,
     model_params: parseModelParams()
   }
-  return result
 }
 
 const configureGraphBuild = async () => {
@@ -575,7 +555,7 @@ const configureGraphBuild = async () => {
     document.activeElement?.blur()
     await nextTick()
     await graphBuildApi.configure(kbId.value, {
-      extractor_type: graphConfigForm.extractor_type,
+      extractor_type: 'llm',
       extractor_options: buildExtractorOptions()
     })
     message.success(isEditingGraphConfig.value ? '图谱抽取配置已更新' : '图谱抽取配置已保存')
@@ -1055,7 +1035,12 @@ onUnmounted(() => {
 
     &.disabled {
       cursor: not-allowed;
-      opacity: 0.78;
+      opacity: 0.72;
+      background: var(--gray-50);
+
+      &:hover {
+        border-color: var(--gray-150);
+      }
     }
 
     .card-header {
@@ -1082,6 +1067,16 @@ onUnmounted(() => {
       font-size: 13px;
       color: var(--gray-600);
       line-height: 1.5;
+    }
+
+    .card-helper {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--gray-500);
+
+      &.warning {
+        color: var(--color-warning-500);
+      }
     }
   }
 }

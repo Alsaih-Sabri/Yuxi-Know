@@ -5,7 +5,11 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from yuxi.knowledge.graphs.extractors import LLMGraphExtractor, normalize_extraction_result
+from yuxi.knowledge.graphs.extractors import (
+    GraphExtractorFactory,
+    LLMGraphExtractor,
+    normalize_extraction_result,
+)
 from yuxi.knowledge.graphs.milvus_graph_service import MilvusGraphService
 
 
@@ -86,6 +90,37 @@ def test_llm_graph_extractor_appends_schema_to_fixed_prompt():
     assert "抽取 Schema 约束" in prompt
     assert "实体类型只能是 Person 或 Organization" in prompt
     assert "文本：\n张三任职于公司" in prompt
+
+
+def test_graph_extractor_factory_supports_only_llm():
+    assert GraphExtractorFactory.supported_types() == ["llm"]
+
+
+def test_graph_extractor_factory_rejects_spacy():
+    with pytest.raises(ValueError, match="spacy"):
+        GraphExtractorFactory.create("spacy", {"model": "zh_core_web_sm"})
+
+
+@pytest.mark.asyncio
+async def test_milvus_graph_service_configure_rejects_spacy():
+    kb = SimpleNamespace(kb_type="milvus", additional_params={})
+
+    class Repo:
+        async def get_by_kb_id(self, kb_id):
+            return kb
+
+        async def update(self, kb_id, data):
+            raise AssertionError("unsupported extractor should not be persisted")
+
+    service = MilvusGraphService(kb_repo=Repo())
+
+    with pytest.raises(ValueError, match="不支持的图谱抽取器类型"):
+        await service.configure(
+            "kb_test",
+            extractor_type="spacy",
+            extractor_options={"model": "zh_core_web_sm"},
+            created_by="user_1",
+        )
 
 
 @pytest.mark.asyncio
