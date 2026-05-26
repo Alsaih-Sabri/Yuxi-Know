@@ -230,6 +230,31 @@ export const graphBuildApi = {
 }
 
 // =============================================================================
+// === 思维导图分组 ===
+// =============================================================================
+
+export const mindmapApi = {
+  getDatabases: async () => {
+    return apiAdminGet('/api/knowledge/mindmap/databases')
+  },
+
+  getDatabaseFiles: async (kbId) => {
+    return apiAdminGet(`/api/knowledge/databases/${kbId}/mindmap/files`)
+  },
+
+  generateMindmap: async (kbId, fileIds = [], userPrompt = '') => {
+    return apiAdminPost(`/api/knowledge/databases/${kbId}/mindmap/generate`, {
+      file_ids: fileIds,
+      user_prompt: userPrompt
+    })
+  },
+
+  getByDatabase: async (kbId) => {
+    return apiAdminGet(`/api/knowledge/databases/${kbId}/mindmap`)
+  }
+}
+
+// =============================================================================
 // === 查询分组 ===
 // =============================================================================
 

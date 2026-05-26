@@ -1,5 +1,5 @@
 """
-Integration tests for knowledge router and mindmap router endpoints.
+Integration tests for knowledge router endpoints.
 """
 
 from __future__ import annotations
@@ -384,13 +384,13 @@ async def test_dify_query_params_and_documents_readonly(test_client, admin_heade
 
 
 # =============================================================================
-# === Mindmap Router Tests ===
+# === Mindmap Tests ===
 # =============================================================================
 
 
 async def test_get_databases_overview(test_client, admin_headers, knowledge_database):
     """测试获取所有知识库概览"""
-    response = await test_client.get("/api/mindmap/databases", headers=admin_headers)
+    response = await test_client.get("/api/knowledge/mindmap/databases", headers=admin_headers)
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["message"] == "success"
@@ -405,7 +405,7 @@ async def test_get_databases_overview(test_client, admin_headers, knowledge_data
 async def test_get_database_files(test_client, admin_headers, knowledge_database):
     """测试获取知识库文件列表"""
     slug = knowledge_database["slug"]
-    response = await test_client.get(f"/api/mindmap/databases/{slug}/files", headers=admin_headers)
+    response = await test_client.get(f"/api/knowledge/databases/{slug}/mindmap/files", headers=admin_headers)
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["message"] == "success"
@@ -417,7 +417,7 @@ async def test_get_database_files(test_client, admin_headers, knowledge_database
 
 async def test_get_database_files_not_found(test_client, admin_headers):
     """测试获取不存在的知识库文件列表"""
-    response = await test_client.get("/api/mindmap/databases/nonexistent_slug/files", headers=admin_headers)
+    response = await test_client.get("/api/knowledge/databases/nonexistent_slug/mindmap/files", headers=admin_headers)
     assert response.status_code == 404
 
 
@@ -425,8 +425,8 @@ async def test_generate_mindmap_empty_files(test_client, admin_headers, knowledg
     """测试空文件列表生成思维导图"""
     slug = knowledge_database["slug"]
     response = await test_client.post(
-        "/api/mindmap/generate",
-        json={"slug": slug, "file_ids": [], "user_prompt": ""},
+        f"/api/knowledge/databases/{slug}/mindmap/generate",
+        json={"file_ids": [], "user_prompt": ""},
         headers=admin_headers,
     )
     # 空文件应该返回400错误
@@ -437,7 +437,7 @@ async def test_generate_mindmap_empty_files(test_client, admin_headers, knowledg
 async def test_get_database_mindmap_not_exists(test_client, admin_headers, knowledge_database):
     """测试获取不存在的思维导图"""
     slug = knowledge_database["slug"]
-    response = await test_client.get(f"/api/mindmap/database/{slug}", headers=admin_headers)
+    response = await test_client.get(f"/api/knowledge/databases/{slug}/mindmap", headers=admin_headers)
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["slug"] == slug
@@ -455,8 +455,8 @@ async def test_generate_and_get_mindmap(test_client, admin_headers, knowledge_da
 
     # 空文件场景 - 预期返回400错误
     generate_response = await test_client.post(
-        "/api/mindmap/generate",
-        json={"slug": slug, "file_ids": [], "user_prompt": ""},
+        f"/api/knowledge/databases/{slug}/mindmap/generate",
+        json={"file_ids": [], "user_prompt": ""},
         headers=admin_headers,
     )
     assert generate_response.status_code == 400
@@ -728,15 +728,17 @@ async def test_mindmap_permissions(test_client, standard_user, knowledge_databas
     slug = knowledge_database["slug"]
 
     # 普通用户应该无法访问
-    forbidden_list = await test_client.get("/api/mindmap/databases", headers=standard_user["headers"])
+    forbidden_list = await test_client.get("/api/knowledge/mindmap/databases", headers=standard_user["headers"])
     _assert_forbidden_response(forbidden_list)
 
-    forbidden_files = await test_client.get(f"/api/mindmap/databases/{slug}/files", headers=standard_user["headers"])
+    forbidden_files = await test_client.get(
+        f"/api/knowledge/databases/{slug}/mindmap/files", headers=standard_user["headers"]
+    )
     _assert_forbidden_response(forbidden_files)
 
     forbidden_generate = await test_client.post(
-        "/api/mindmap/generate",
-        json={"slug": slug, "file_ids": []},
+        f"/api/knowledge/databases/{slug}/mindmap/generate",
+        json={"file_ids": []},
         headers=standard_user["headers"],
     )
     _assert_forbidden_response(forbidden_generate)

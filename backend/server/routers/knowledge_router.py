@@ -20,6 +20,15 @@ from yuxi.knowledge.graphs.milvus_graph_service import GRAPH_TASK_TYPE, MilvusGr
 from yuxi.plugins.parser import Parser, SUPPORTED_FILE_EXTENSIONS, is_supported_file_extension
 from yuxi.knowledge.utils import calculate_content_hash
 from yuxi.knowledge.utils.kb_utils import is_minio_url, parse_minio_url
+from yuxi.knowledge.utils.mindmap_utils import (
+    MindmapGenerationError,
+    MindmapNotFoundError,
+    MindmapValidationError,
+    generate_database_mindmap,
+    get_database_mindmap_data,
+    get_mindmap_database_files,
+    get_mindmap_databases_overview,
+)
 from yuxi.services.model_cache import model_cache
 from yuxi.services.workspace_service import MAX_WORKSPACE_UPLOAD_SIZE_BYTES, resolve_workspace_file_path
 from yuxi.storage.postgres.models_business import User
@@ -227,6 +236,58 @@ async def get_accessible_databases(current_user: User = Depends(get_required_use
     except Exception as e:
         logger.error(f"获取可访问知识库列表失败: {e}, {traceback.format_exc()}")
         return {"message": f"获取可访问知识库列表失败: {str(e)}", "databases": []}
+
+
+def _raise_mindmap_http_exception(error: Exception, operation: str) -> None:
+    if isinstance(error, MindmapNotFoundError):
+        raise HTTPException(status_code=404, detail=str(error))
+    if isinstance(error, MindmapValidationError):
+        raise HTTPException(status_code=400, detail=str(error))
+    if isinstance(error, MindmapGenerationError):
+        raise HTTPException(status_code=500, detail=str(error))
+    logger.error(f"{operation}失败: {error}, {traceback.format_exc()}")
+    raise HTTPException(status_code=500, detail=f"{operation}失败: {str(error)}")
+
+
+@knowledge.get("/mindmap/databases")
+async def get_mindmap_databases(current_user: User = Depends(get_admin_user)):
+    """获取所有知识库的概览信息，用于思维导图界面选择。"""
+    try:
+        return await get_mindmap_databases_overview(current_user.uid)
+    except Exception as e:
+        _raise_mindmap_http_exception(e, "获取知识库列表")
+
+
+@knowledge.get("/databases/{kb_id}/mindmap/files")
+async def get_database_mindmap_files(kb_id: str, current_user: User = Depends(get_admin_user)):
+    """获取指定知识库的所有文件列表。"""
+    try:
+        return await get_mindmap_database_files(kb_id)
+    except Exception as e:
+        _raise_mindmap_http_exception(e, "获取文件列表")
+
+
+@knowledge.post("/databases/{kb_id}/mindmap/generate")
+async def generate_mindmap(
+    kb_id: str,
+    file_ids: list[str] | None = Body(default=None, description="选择的文件ID列表"),
+    user_prompt: str = Body(default="", description="用户自定义提示词"),
+    current_user: User = Depends(get_admin_user),
+):
+    """使用 AI 分析知识库文件，生成思维导图结构。"""
+    try:
+        return await generate_database_mindmap(kb_id, file_ids, user_prompt)
+    except Exception as e:
+        _raise_mindmap_http_exception(e, "生成思维导图")
+
+
+@knowledge.get("/databases/{kb_id}/mindmap")
+async def get_database_mindmap(kb_id: str, current_user: User = Depends(get_admin_user)):
+    """获取知识库关联的思维导图。"""
+    try:
+        return await get_database_mindmap_data(kb_id)
+    except Exception as e:
+        _raise_mindmap_http_exception(e, "获取知识库思维导图")
 
 
 @knowledge.get("/databases/{kb_id}")
