@@ -22,41 +22,124 @@
 
     <div v-if="fileItems.length" class="attachment-list">
       <div v-for="item in fileItems" :key="item.localId" class="attachment-item">
-        <div class="attachment-item-main">
-          <div class="attachment-name-row">
-            <span class="attachment-name">{{ item.fileName }}</span>
-            <a-tag :color="getStatusColor(item.status)">{{ getStatusLabel(item.status) }}</a-tag>
-          </div>
-          <div class="attachment-meta">
-            <span>{{ formatFileSize(item.fileSize) }}</span>
-            <span v-if="item.error" class="attachment-error">{{ item.error }}</span>
-            <span v-else-if="item.parseError" class="attachment-error">{{ item.parseError }}</span>
-            <span v-else-if="item.parsedObjectName" class="attachment-parsed">已生成解析附件</span>
-          </div>
+        <div class="attachment-file-icon" :style="{ color: getFileIconColor(item.fileName) }">
+          <component :is="getFileIcon(item.fileName)" />
         </div>
 
-        <div class="attachment-actions">
-          <template v-if="item.parseSupported && item.status !== 'uploading' && item.status !== 'error'">
-            <a-select
-              v-model:value="item.selectedParseMethod"
-              :options="getParseMethodOptions(item)"
-              size="small"
-              class="parse-select"
-              :disabled="item.status === 'parsing' || confirming"
-              @change="(value) => handleParseMethodChange(item.localId, value)"
-            />
+        <div class="attachment-item-content">
+          <div class="attachment-name-row">
+            <span class="attachment-name" :title="item.fileName">{{ item.fileName }}</span>
             <a-button
               size="small"
-              :loading="item.status === 'parsing'"
-              :disabled="!item.selectedParseMethod || confirming"
-              @click="handleParse(item)"
+              type="text"
+              class="remove-btn"
+              :disabled="confirming"
+              @click="removeItem(item.localId)"
             >
-              解析
+              <X :size="16" />
             </a-button>
-          </template>
-          <a-button size="small" type="text" :disabled="confirming" @click="removeItem(item.localId)">
-            移除
-          </a-button>
+          </div>
+
+          <div class="attachment-status-row">
+            <div class="attachment-status-meta">
+              <a-tag :color="getStatusColor(item.status)">{{ getStatusLabel(item.status) }}</a-tag>
+              <span>{{ formatFileSize(item.fileSize) }}</span>
+              <span v-if="item.error" class="attachment-error">{{ item.error }}</span>
+              <span v-else-if="item.parseError" class="attachment-error">{{
+                item.parseError
+              }}</span>
+            </div>
+
+            <a-popover
+              v-if="item.parseSupported && item.status !== 'uploading' && item.status !== 'error'"
+              v-model:open="item.parsePanelOpen"
+              placement="bottomRight"
+              trigger="click"
+              overlayClassName="attachment-parse-popover"
+              @openChange="(open) => handleParsePanelOpenChange(item.localId, open)"
+            >
+              <template #content>
+                <div class="parse-panel">
+                  <button
+                    v-for="method in getAvailableParseMethods(item)"
+                    :key="method"
+                    type="button"
+                    class="parse-method-option"
+                    :class="{ selected: item.selectedParseMethod === method }"
+                    :disabled="item.status === 'parsing' || confirming"
+                    @click="handleParseMethodChange(item.localId, method)"
+                  >
+                    <span class="parse-method-option-header">
+                      <span class="parse-method-name">{{ methodLabels[method] || method }}</span>
+                      <span
+                        class="parse-method-status"
+                        :class="`status-${getMethodStatus(method)}`"
+                      >
+                        {{ getMethodStatusLabel(method) }}
+                      </span>
+                    </span>
+                    <span class="parse-method-desc">{{ getMethodDescription(method) }}</span>
+                  </button>
+
+                  <div v-if="getUnavailableParseMethods(item).length" class="unavailable-methods">
+                    <button
+                      type="button"
+                      class="unavailable-toggle"
+                      @click="toggleUnavailableParseMethods(item.localId)"
+                    >
+                      <span>不可用选项（{{ getUnavailableParseMethods(item).length }}）</span>
+                      <ChevronUp v-if="item.unavailableMethodsExpanded" :size="14" />
+                      <ChevronDown v-else :size="14" />
+                    </button>
+
+                    <div v-if="item.unavailableMethodsExpanded" class="unavailable-method-list">
+                      <button
+                        v-for="method in getUnavailableParseMethods(item)"
+                        :key="method"
+                        type="button"
+                        class="parse-method-option disabled"
+                        disabled
+                      >
+                        <span class="parse-method-option-header">
+                          <span class="parse-method-name">{{
+                            methodLabels[method] || method
+                          }}</span>
+                          <span
+                            class="parse-method-status"
+                            :class="`status-${getMethodStatus(method)}`"
+                          >
+                            {{ getMethodStatusLabel(method) }}
+                          </span>
+                        </span>
+                        <span class="parse-method-desc">{{ getMethodDescription(method) }}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <a-button
+                    type="primary"
+                    size="small"
+                    block
+                    class="parse-start-btn"
+                    :loading="item.status === 'parsing'"
+                    :disabled="isParseDisabled(item)"
+                    @click="handleStartParse(item.localId)"
+                  >
+                    开始解析
+                  </a-button>
+                </div>
+              </template>
+
+              <a-button
+                size="small"
+                class="parse-trigger-btn"
+                :loading="item.status === 'parsing'"
+                :disabled="confirming"
+              >
+                解析
+              </a-button>
+            </a-popover>
+          </div>
         </div>
       </div>
     </div>
@@ -66,7 +149,10 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
+import { ChevronDown, ChevronUp, X } from 'lucide-vue-next'
 import { threadApi } from '@/apis'
+import { ocrApi } from '@/apis/system_api'
+import { getFileIcon, getFileIconColor } from '@/utils/file_utils'
 
 const props = defineProps({
   open: { type: Boolean, default: false },
@@ -89,7 +175,34 @@ const methodLabels = {
   deepseek_ocr: 'DeepSeek OCR'
 }
 
-const busy = computed(() => fileItems.value.some((item) => ['uploading', 'parsing'].includes(item.status)))
+const ocrMethodKeys = [
+  'rapid_ocr',
+  'mineru_ocr',
+  'mineru_official',
+  'pp_structure_v3_ocr',
+  'deepseek_ocr'
+]
+
+const defaultOcrHealthStatus = () =>
+  Object.fromEntries(ocrMethodKeys.map((method) => [method, { status: 'unknown', message: '' }]))
+
+const ocrHealthStatus = ref(defaultOcrHealthStatus())
+const ocrHealthChecking = ref(false)
+
+const methodStatusLabels = {
+  local: '无需 OCR',
+  healthy: '可用',
+  unavailable: '不可用',
+  unhealthy: '异常',
+  timeout: '超时',
+  error: '异常',
+  checking: '检查中',
+  unknown: '状态未知'
+}
+
+const busy = computed(() =>
+  fileItems.value.some((item) => ['uploading', 'parsing'].includes(item.status))
+)
 const confirmableItems = computed(() =>
   fileItems.value.filter((item) => ['uploaded', 'parsed'].includes(item.status))
 )
@@ -109,10 +222,7 @@ const getErrorMessage = (error, fallback = '操作失败') => {
   return error?.response?.data?.detail || error?.message || fallback
 }
 
-const getDefaultParseMethod = (methods) => {
-  if (!Array.isArray(methods) || methods.length === 0) return null
-  return methods.includes('disable') ? 'disable' : methods[0]
-}
+const getDefaultParseMethod = () => null
 
 const normalizeTmpUpload = (response) => ({
   tmpFileId: response.tmp_file_id,
@@ -133,6 +243,23 @@ const updateItem = (localId, patch) => {
   )
 }
 
+const checkOcrHealth = async () => {
+  if (ocrHealthChecking.value) return
+
+  ocrHealthChecking.value = true
+  try {
+    const healthData = await ocrApi.getHealth()
+    ocrHealthStatus.value = {
+      ...defaultOcrHealthStatus(),
+      ...(healthData?.services || {})
+    }
+  } catch (error) {
+    console.error('OCR健康检查失败:', error)
+  } finally {
+    ocrHealthChecking.value = false
+  }
+}
+
 const uploadFile = async (file) => {
   const localId = `${Date.now()}-${localIdSeed++}`
   const item = {
@@ -149,7 +276,11 @@ const uploadFile = async (file) => {
 
   try {
     const response = await threadApi.uploadTmpAttachment(file)
-    updateItem(localId, { ...normalizeTmpUpload(response), status: 'uploaded' })
+    const normalized = normalizeTmpUpload(response)
+    updateItem(localId, { ...normalized, status: 'uploaded' })
+    if (normalized.parseSupported) {
+      void checkOcrHealth()
+    }
   } catch (error) {
     updateItem(localId, {
       status: 'error',
@@ -163,12 +294,48 @@ const handleBeforeUpload = (file) => {
   return false
 }
 
-const getParseMethodOptions = (item) => {
-  return (item.parseMethods || []).map((method) => ({
-    label: methodLabels[method] || method,
-    value: method
-  }))
+const getMethodStatus = (method) => {
+  if (method === 'disable') return 'local'
+  const current = ocrHealthStatus.value?.[method]
+  if (ocrHealthChecking.value && (!current || current.status === 'unknown')) return 'checking'
+  return current?.status || 'unknown'
 }
+
+const getMethodStatusLabel = (method) => methodStatusLabels[getMethodStatus(method)] || '状态未知'
+
+const getMethodDescription = (method) => {
+  if (method === 'disable') return '使用文件内置文本层，不调用 OCR 服务'
+
+  const messageText = ocrHealthStatus.value?.[method]?.message
+  if (messageText) return messageText
+
+  const status = getMethodStatus(method)
+  const fallbackMap = {
+    healthy: '服务正常',
+    unavailable: '服务不可用',
+    unhealthy: '服务异常',
+    timeout: '服务检查超时',
+    error: '服务异常',
+    checking: '正在检查服务状态',
+    unknown: '服务状态未知'
+  }
+  return fallbackMap[status] || '服务状态未知'
+}
+
+const isUnavailableParseMethod = (method) =>
+  ['unavailable', 'error'].includes(getMethodStatus(method))
+
+const getAvailableParseMethods = (item) =>
+  (item.parseMethods || []).filter((method) => !isUnavailableParseMethod(method))
+
+const getUnavailableParseMethods = (item) =>
+  (item.parseMethods || []).filter((method) => isUnavailableParseMethod(method))
+
+const isParseDisabled = (item) =>
+  item.status === 'parsing' ||
+  !item.selectedParseMethod ||
+  confirming.value ||
+  isUnavailableParseMethod(item.selectedParseMethod)
 
 const clearParsedState = {
   parsedObjectName: null,
@@ -185,6 +352,13 @@ const handleParseMethodChange = (localId, selectedParseMethod) => {
     parseError: null,
     status: item?.status === 'parsed' ? 'uploaded' : item?.status
   })
+}
+
+const handleStartParse = (localId) => {
+  const item = fileItems.value.find((entry) => entry.localId === localId)
+  if (!item || isParseDisabled(item)) return
+  updateItem(localId, { parsePanelOpen: false })
+  void handleParse(item)
 }
 
 const handleParse = async (item) => {
@@ -221,6 +395,18 @@ const handleParse = async (item) => {
 
 const removeItem = (localId) => {
   fileItems.value = fileItems.value.filter((item) => item.localId !== localId)
+}
+
+const toggleUnavailableParseMethods = (localId) => {
+  const item = fileItems.value.find((entry) => entry.localId === localId)
+  updateItem(localId, { unavailableMethodsExpanded: !item?.unavailableMethodsExpanded })
+}
+
+const handleParsePanelOpenChange = (localId, open) => {
+  updateItem(localId, { parsePanelOpen: open })
+  if (open) {
+    void checkOcrHealth()
+  }
 }
 
 const handleConfirm = async () => {
@@ -290,7 +476,7 @@ const formatFileSize = (size) => {
 
 <style lang="less" scoped>
 .attachment-dropzone {
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
 .dropzone-title {
@@ -309,23 +495,35 @@ const formatFileSize = (size) => {
 .attachment-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   max-height: 360px;
+  margin-top: 16px;
   overflow: auto;
 }
 
 .attachment-item {
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
   gap: 12px;
-  padding: 10px;
+  padding: 12px;
   border: 1px solid var(--gray-100);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--gray-50);
 }
 
-.attachment-item-main {
+.attachment-file-icon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--gray-0);
+  font-size: 18px;
+}
+
+.attachment-item-content {
   min-width: 0;
   flex: 1;
 }
@@ -338,6 +536,7 @@ const formatFileSize = (size) => {
 }
 
 .attachment-name {
+  flex: 1;
   overflow: hidden;
   color: var(--gray-900);
   font-size: 13px;
@@ -346,32 +545,154 @@ const formatFileSize = (size) => {
   white-space: nowrap;
 }
 
-.attachment-meta {
+.remove-btn {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--gray-500);
+}
+
+.remove-btn:hover {
+  color: var(--color-error-500);
+  background: var(--color-error-50);
+}
+
+.attachment-status-row {
   display: flex;
-  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 6px;
   color: var(--gray-500);
   font-size: 12px;
+}
+
+.attachment-status-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .attachment-error {
   color: var(--color-error-700);
 }
 
-.attachment-parsed {
+.parse-trigger-btn {
+  flex: none;
+  margin-left: auto;
+}
+
+.parse-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 260px;
+}
+
+.parse-method-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-100);
+  border-radius: 8px;
+  background: var(--gray-0);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.parse-method-option:hover:not(:disabled) {
+  border-color: var(--main-color);
+  background: color-mix(in srgb, var(--main-color) 6%, var(--gray-0));
+}
+
+.parse-method-option.selected {
+  border-color: var(--main-color);
+  background: color-mix(in srgb, var(--main-color) 8%, var(--gray-0));
+}
+
+.parse-method-option.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.unavailable-methods,
+.unavailable-method-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.unavailable-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  color: var(--gray-500);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.unavailable-toggle:hover {
+  color: var(--gray-800);
+}
+
+.parse-method-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.parse-method-name {
+  color: var(--gray-900);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.parse-method-status {
+  flex: none;
+  font-size: 12px;
+}
+
+.parse-method-status.status-local,
+.parse-method-status.status-healthy {
   color: var(--color-success-700);
 }
 
-.attachment-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+.parse-method-status.status-unavailable,
+.parse-method-status.status-error {
+  color: var(--color-error-700);
 }
 
-.parse-select {
-  width: 150px;
+.parse-method-status.status-unhealthy,
+.parse-method-status.status-timeout,
+.parse-method-status.status-unknown,
+.parse-method-status.status-checking {
+  color: var(--color-warning-700);
+}
+
+.parse-method-desc {
+  color: var(--gray-500);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.parse-start-btn {
+  margin-top: 2px;
+}
+
+:global(.attachment-parse-popover .ant-popover-inner-content) {
+  padding: 10px;
 }
 </style>

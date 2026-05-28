@@ -76,25 +76,76 @@
               </a-tooltip>
             </div>
             <div class="setting-content">
-              <a-select
-                v-model:value="processingParams.ocr_engine"
-                :options="enableOcrOptions"
-                style="width: 100%"
-                class="ocr-select"
-                @dropdownVisibleChange="handleOcrDropdownVisibleChange"
-              />
-              <p class="param-description">
-                <template v-if="!isOcrEnabled"> 不启用 OCR，仅处理文本文件 </template>
-                <template v-else-if="selectedOcrStatus === 'healthy'">
-                  {{ selectedOcrMessage || '服务正常' }}
+              <a-popover
+                v-model:open="ocrPanelOpen"
+                placement="bottomLeft"
+                trigger="click"
+                overlayClassName="ocr-engine-popover"
+                @openChange="handleOcrPanelOpenChange"
+              >
+                <template #content>
+                  <div class="ocr-engine-panel">
+                    <button
+                      v-for="option in availableOcrOptions"
+                      :key="option.value"
+                      type="button"
+                      class="ocr-engine-option"
+                      :class="{ selected: processingParams.ocr_engine === option.value }"
+                      :disabled="chunkLoading"
+                      @click="selectOcrEngine(option.value)"
+                    >
+                      <span class="ocr-engine-option-header">
+                        <span class="ocr-engine-name">{{ option.label }}</span>
+                        <span
+                          class="ocr-engine-status"
+                          :class="`status-${getOcrStatus(option.value)}`"
+                        >
+                          {{ getOcrStatusLabel(option.value) }}
+                        </span>
+                      </span>
+                      <span class="ocr-engine-desc">{{ getOcrDescription(option.value) }}</span>
+                    </button>
+
+                    <div v-if="unavailableOcrOptions.length" class="unavailable-ocr-options">
+                      <button
+                        type="button"
+                        class="unavailable-toggle"
+                        @click="toggleUnavailableOcrOptions"
+                      >
+                        <span>不可用选项（{{ unavailableOcrOptions.length }}）</span>
+                        <ChevronUp v-if="unavailableOcrExpanded" :size="14" />
+                        <ChevronDown v-else :size="14" />
+                      </button>
+
+                      <div v-if="unavailableOcrExpanded" class="unavailable-ocr-list">
+                        <button
+                          v-for="option in unavailableOcrOptions"
+                          :key="option.value"
+                          type="button"
+                          class="ocr-engine-option disabled"
+                          disabled
+                        >
+                          <span class="ocr-engine-option-header">
+                            <span class="ocr-engine-name">{{ option.label }}</span>
+                            <span
+                              class="ocr-engine-status"
+                              :class="`status-${getOcrStatus(option.value)}`"
+                            >
+                              {{ getOcrStatusLabel(option.value) }}
+                            </span>
+                          </span>
+                          <span class="ocr-engine-desc">{{ getOcrDescription(option.value) }}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </template>
-                <template v-else-if="selectedOcrStatus === 'unknown'">
-                  点击刷新图标检查服务状态
-                </template>
-                <template v-else>
-                  {{ selectedOcrMessage || '服务异常' }}
-                </template>
-              </p>
+
+                <a-button class="ocr-engine-trigger" block :loading="ocrHealthChecking">
+                  <span>{{ selectedOcrEngineLabel }}</span>
+                  <ChevronDown :size="14" />
+                </a-button>
+              </a-popover>
             </div>
           </div>
         </div>
@@ -206,7 +257,13 @@
             <span class="workspace-current-path" :title="workspaceCurrentPath">
               {{ workspaceCurrentPath }}
             </span>
-            <span>已选择 {{ selectedWorkspacePaths.length }} 个文件，注意上传会扁平化上传，不保留文件层级结构</span>
+            <span
+              >已选择
+              {{
+                selectedWorkspacePaths.length
+              }}
+              个文件，注意上传会扁平化上传，不保留文件层级结构</span
+            >
           </div>
           <div class="workspace-actions">
             <a-button
@@ -836,6 +893,8 @@ const ocrHealthStatus = ref({
 
 // OCR健康检查状态
 const ocrHealthChecking = ref(false)
+const ocrPanelOpen = ref(false)
+const unavailableOcrExpanded = ref(false)
 
 // 解析参数
 const processingParams = ref({
@@ -911,105 +970,104 @@ const hasZipFiles = computed(() => {
   })
 })
 
-// 计算属性：OCR选项
-const enableOcrOptions = computed(() => [
+const ocrEngineOptions = [
   {
     value: 'disable',
     label: '不启用',
-    title: '不启用'
+    description: '不启用 OCR，仅处理文本文件'
   },
   {
     value: 'rapid_ocr',
-    label: getOcrLabel('rapid_ocr', 'RapidOCR (ONNX)'),
-    title: 'ONNX with RapidOCR',
-    disabled:
-      ocrHealthStatus.value?.rapid_ocr?.status === 'unavailable' ||
-      ocrHealthStatus.value?.rapid_ocr?.status === 'error'
+    label: 'RapidOCR (ONNX)',
+    description: 'ONNX with RapidOCR'
   },
   {
     value: 'mineru_ocr',
-    label: getOcrLabel('mineru_ocr', 'MinerU OCR'),
-    title: 'MinerU OCR',
-    disabled:
-      ocrHealthStatus.value?.mineru_ocr?.status === 'unavailable' ||
-      ocrHealthStatus.value?.mineru_ocr?.status === 'error'
+    label: 'MinerU OCR',
+    description: 'MinerU OCR'
   },
   {
     value: 'mineru_official',
-    label: getOcrLabel('mineru_official', 'MinerU Official API'),
-    title: 'MinerU Official API',
-    disabled:
-      ocrHealthStatus.value?.mineru_official?.status === 'unavailable' ||
-      ocrHealthStatus.value?.mineru_official?.status === 'error'
+    label: 'MinerU Official API',
+    description: 'MinerU Official API'
   },
   {
     value: 'pp_structure_v3_ocr',
-    label: getOcrLabel('pp_structure_v3_ocr', 'PP-Structure-V3'),
-    title: 'PP-Structure-V3',
-    disabled:
-      ocrHealthStatus.value?.pp_structure_v3_ocr?.status === 'unavailable' ||
-      ocrHealthStatus.value?.pp_structure_v3_ocr?.status === 'error'
+    label: 'PP-Structure-V3',
+    description: 'PP-Structure-V3'
   },
   {
     value: 'deepseek_ocr',
-    label: getOcrLabel('deepseek_ocr', 'DeepSeek OCR'),
-    title: 'DeepSeek OCR (SiliconFlow)',
-    disabled:
-      ocrHealthStatus.value?.deepseek_ocr?.status === 'unavailable' ||
-      ocrHealthStatus.value?.deepseek_ocr?.status === 'error'
+    label: 'DeepSeek OCR',
+    description: 'DeepSeek OCR (SiliconFlow)'
   }
-])
+]
 
-// 获取当前选中OCR服务的状态
-const selectedOcrStatus = computed(() => {
-  switch (processingParams.value.ocr_engine) {
-    case 'rapid_ocr':
-      return ocrHealthStatus.value?.rapid_ocr?.status || 'unknown'
-    case 'mineru_ocr':
-      return ocrHealthStatus.value?.mineru_ocr?.status || 'unknown'
-    case 'mineru_official':
-      return ocrHealthStatus.value?.mineru_official?.status || 'unknown'
-    case 'pp_structure_v3_ocr':
-      return ocrHealthStatus.value?.pp_structure_v3_ocr?.status || 'unknown'
-    case 'deepseek_ocr':
-      return ocrHealthStatus.value?.deepseek_ocr?.status || 'unknown'
-    default:
-      return null
-  }
-})
-
-// 获取当前选中OCR服务的状态消息
-const selectedOcrMessage = computed(() => {
-  switch (processingParams.value.ocr_engine) {
-    case 'rapid_ocr':
-      return ocrHealthStatus.value?.rapid_ocr?.message || ''
-    case 'mineru_ocr':
-      return ocrHealthStatus.value?.mineru_ocr?.message || ''
-    case 'mineru_official':
-      return ocrHealthStatus.value?.mineru_official?.message || ''
-    case 'pp_structure_v3_ocr':
-      return ocrHealthStatus.value?.pp_structure_v3_ocr?.message || ''
-    case 'deepseek_ocr':
-      return ocrHealthStatus.value?.deepseek_ocr?.message || ''
-    default:
-      return ''
-  }
-})
-
-// OCR服务状态图标映射
-const STATUS_ICONS = {
-  healthy: '✅',
-  unavailable: '❌',
-  unhealthy: '⚠️',
-  timeout: '⏰',
-  error: '⚠️',
-  unknown: '❓'
+const ocrStatusLabels = {
+  local: '不启用',
+  healthy: '可用',
+  unavailable: '不可用',
+  unhealthy: '异常',
+  timeout: '超时',
+  error: '异常',
+  checking: '检查中',
+  unknown: '状态未知'
 }
 
-// OCR选项标签生成通用函数
-const getOcrLabel = (serviceKey, displayName) => {
-  const status = ocrHealthStatus.value?.[serviceKey]?.status || 'unknown'
-  return `${STATUS_ICONS[status] || '❓'} ${displayName}`
+const getOcrStatus = (engine) => {
+  if (engine === 'disable') return 'local'
+  const current = ocrHealthStatus.value?.[engine]
+  if (ocrHealthChecking.value && (!current || current.status === 'unknown')) return 'checking'
+  return current?.status || 'unknown'
+}
+
+const getOcrStatusLabel = (engine) => ocrStatusLabels[getOcrStatus(engine)] || '状态未知'
+
+const getOcrDescription = (engine) => {
+  const option = ocrEngineOptions.find((item) => item.value === engine)
+  if (engine === 'disable') return option?.description || '不启用 OCR，仅处理文本文件'
+
+  const messageText = ocrHealthStatus.value?.[engine]?.message
+  if (messageText) return messageText
+
+  const status = getOcrStatus(engine)
+  const fallbackMap = {
+    healthy: '服务正常',
+    unavailable: '服务不可用',
+    unhealthy: '服务异常',
+    timeout: '服务检查超时',
+    error: '服务异常',
+    checking: '正在检查服务状态',
+    unknown: option?.description || '服务状态未知'
+  }
+  return fallbackMap[status] || option?.description || '服务状态未知'
+}
+
+const isUnavailableOcrEngine = (engine) => ['unavailable', 'error'].includes(getOcrStatus(engine))
+
+const availableOcrOptions = computed(() =>
+  ocrEngineOptions.filter((option) => !isUnavailableOcrEngine(option.value))
+)
+
+const unavailableOcrOptions = computed(() =>
+  ocrEngineOptions.filter((option) => isUnavailableOcrEngine(option.value))
+)
+
+const selectedOcrEngineLabel = computed(() => {
+  return (
+    ocrEngineOptions.find((option) => option.value === processingParams.value.ocr_engine)?.label ||
+    '选择 OCR 引擎'
+  )
+})
+
+const selectOcrEngine = (engine) => {
+  if (isUnavailableOcrEngine(engine)) return
+  processingParams.value.ocr_engine = engine
+  ocrPanelOpen.value = false
+}
+
+const toggleUnavailableOcrOptions = () => {
+  unavailableOcrExpanded.value = !unavailableOcrExpanded.value
 }
 
 // 验证OCR服务可用性
@@ -1018,10 +1076,9 @@ const validateOcrService = () => {
     return true
   }
 
-  const status = selectedOcrStatus.value
-  if (status === 'unavailable' || status === 'error') {
-    const ocrMessage = selectedOcrMessage.value
-    message.error(`OCR服务不可用: ${ocrMessage}`)
+  const engine = processingParams.value.ocr_engine
+  if (isUnavailableOcrEngine(engine)) {
+    message.error(`OCR服务不可用: ${getOcrDescription(engine)}`)
     return false
   }
 
@@ -1320,11 +1377,11 @@ const checkOcrHealth = async () => {
   }
 }
 
-const handleOcrDropdownVisibleChange = (open) => {
-  if (!open) {
-    return
+const handleOcrPanelOpenChange = (open) => {
+  ocrPanelOpen.value = open
+  if (open) {
+    checkOcrHealth()
   }
-  checkOcrHealth()
 }
 
 const getAuthHeaders = () => {
@@ -1696,6 +1753,118 @@ const chunkData = async () => {
 .folder-checkbox {
   margin-left: 12px;
   white-space: nowrap;
+}
+
+.ocr-engine-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.ocr-engine-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 280px;
+}
+
+.ocr-engine-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-100);
+  border-radius: 8px;
+  background: var(--gray-0);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ocr-engine-option:hover:not(:disabled) {
+  border-color: var(--main-color);
+  background: color-mix(in srgb, var(--main-color) 6%, var(--gray-0));
+}
+
+.ocr-engine-option.selected {
+  border-color: var(--main-color);
+  background: color-mix(in srgb, var(--main-color) 8%, var(--gray-0));
+}
+
+.ocr-engine-option.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.unavailable-ocr-options,
+.unavailable-ocr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.unavailable-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 2px;
+  border: none;
+  background: transparent;
+  color: var(--gray-500);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.unavailable-toggle:hover {
+  color: var(--gray-800);
+}
+
+.ocr-engine-option-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ocr-engine-name {
+  color: var(--gray-900);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ocr-engine-status {
+  flex: none;
+  font-size: 12px;
+}
+
+.ocr-engine-status.status-local,
+.ocr-engine-status.status-healthy {
+  color: var(--color-success-700);
+}
+
+.ocr-engine-status.status-unavailable,
+.ocr-engine-status.status-error {
+  color: var(--color-error-700);
+}
+
+.ocr-engine-status.status-unhealthy,
+.ocr-engine-status.status-timeout,
+.ocr-engine-status.status-unknown,
+.ocr-engine-status.status-checking {
+  color: var(--color-warning-700);
+}
+
+.ocr-engine-desc {
+  color: var(--gray-500);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+:global(.ocr-engine-popover .ant-popover-inner-content) {
+  padding: 10px;
 }
 
 .param-description {
