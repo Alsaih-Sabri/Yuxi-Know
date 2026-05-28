@@ -150,7 +150,7 @@ const toggleToolCallsExpanded = () => {
 <style lang="less" scoped>
 .tool-calls-container {
   width: 100%;
-  margin: 0;
+  margin: 10px 0;
   padding: 0;
 
   .tool-calls-summary {
@@ -160,7 +160,7 @@ const toggleToolCallsExpanded = () => {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    color: var(--gray-500);
+    color: var(--gray-700);
     text-align: left;
     cursor: pointer;
     outline: none;
@@ -171,18 +171,18 @@ const toggleToolCallsExpanded = () => {
     background: transparent;
 
     &:hover {
-      color: var(--gray-700);
+      color: var(--gray-800);
     }
 
     &.is-expanded {
-      color: var(--gray-700);
+      color: var(--gray-800);
       margin-bottom: 4px;
     }
 
     .summary-leading {
       display: inline-flex;
       align-items: center;
-      color: var(--gray-600);
+      color: var(--gray-700);
       flex-shrink: 0;
     }
 
@@ -196,17 +196,17 @@ const toggleToolCallsExpanded = () => {
     }
 
     .summary-title {
-      font-weight: 500;
+      font-weight: 400;
       white-space: nowrap;
     }
 
     .summary-separator {
-      color: var(--gray-300);
+      color: var(--gray-500);
       flex-shrink: 0;
     }
 
     .summary-meta {
-      color: var(--gray-500);
+      color: var(--gray-600);
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -217,7 +217,7 @@ const toggleToolCallsExpanded = () => {
       font-size: 11px;
       padding: 0px 4px;
       background: var(--gray-25);
-      color: var(--gray-500);
+      color: var(--gray-600);
       border-radius: 4px;
       white-space: nowrap;
       font-weight: normal;
@@ -226,7 +226,7 @@ const toggleToolCallsExpanded = () => {
     .summary-trailing {
       display: inline-flex;
       align-items: center;
-      color: var(--gray-300);
+      color: var(--gray-500);
       flex-shrink: 0;
     }
   }

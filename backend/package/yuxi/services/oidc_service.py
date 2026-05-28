@@ -855,7 +855,7 @@ async def oidc_callback_handler(code: str, state: str, db, request: Request | No
     response_data = {
         "access_token": jwt_token,
         "token_type": "bearer",
-        "uid": user.id,
+        "user_id": user.id,
         "username": user.username,
         "uid": user.uid,
         "phone_number": user.phone_number,

@@ -49,7 +49,11 @@ export class MessageProcessor {
   static convertServerHistoryToMessages(serverHistory) {
     // Filter out standalone 'tool' messages since tool results are already in AI messages' tool_calls
     // Backend new storage: tool results are embedded in AI messages' tool_calls array with tool_call_result field
-    const filteredHistory = serverHistory.filter((item) => item.type !== 'tool')
+    const filteredHistory = serverHistory.filter(
+      (item) =>
+        item.type !== 'tool' &&
+        !(item.type === 'human' && item.extra_metadata?.source === 'ask_user_question_resume')
+    )
 
     // 按照对话分组
     const conversations = []

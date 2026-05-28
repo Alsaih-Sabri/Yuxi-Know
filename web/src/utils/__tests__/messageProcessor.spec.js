@@ -92,6 +92,23 @@ const run = () => {
   const idxB = chunks.findIndex((c) => c.content === 'B')
   assert.equal(idxA < idxB, true)
 
+  const conversations = MessageProcessor.convertServerHistoryToMessages([
+    { type: 'human', content: '请选择语言' },
+    { type: 'ai', content: '请选择输出语言' },
+    {
+      type: 'human',
+      content: '{"language":"python"}',
+      extra_metadata: { source: 'ask_user_question_resume' }
+    },
+    { type: 'ai', content: '这是 Python 版本' }
+  ])
+
+  assert.equal(conversations.length, 1)
+  assert.equal(conversations[0].messages.length, 3)
+  assert.equal(conversations[0].messages.at(-1).content, '这是 Python 版本')
+  assert.equal(conversations[0].messages.at(-1).isLast, true)
+  assert.equal(conversations[0].status, 'finished')
+
   console.log('messageProcessor extractKnowledgeChunksFromConversation: all assertions passed')
 }
 

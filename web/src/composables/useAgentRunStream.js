@@ -48,7 +48,19 @@ const processRunSseResponse = async (response, onEvent) => {
   const decoder = new TextDecoder()
   let buffer = ''
   let eventType = 'message'
+  let eventId = null
   let dataLines = []
+
+  const dispatch = () => {
+    if (dataLines.length === 0) return
+    const dataText = dataLines.join('\n')
+    try {
+      const parsed = JSON.parse(dataText)
+      onEvent(eventType, parsed, eventId)
+    } catch (e) {
+      console.warn('Failed to parse run SSE data:', e, dataText)
+    }
+  }
 
   try {
     while (true) {
@@ -61,37 +73,27 @@ const processRunSseResponse = async (response, onEvent) => {
       for (const rawLine of lines) {
         const line = rawLine.replace(/\r$/, '')
         if (!line) {
-          if (dataLines.length > 0) {
-            const dataText = dataLines.join('\n')
-            try {
-              const parsed = JSON.parse(dataText)
-              onEvent(eventType, parsed)
-            } catch (e) {
-              console.warn('Failed to parse run SSE data:', e, dataText)
-            }
-          }
+          dispatch()
           eventType = 'message'
+          eventId = null
           dataLines = []
           continue
         }
 
+        if (line.startsWith(':')) {
+          continue
+        }
         if (line.startsWith('event:')) {
           eventType = line.slice(6).trim() || 'message'
         } else if (line.startsWith('data:')) {
-          dataLines.push(line.slice(5).trim())
+          dataLines.push(line.slice(5).trimStart())
+        } else if (line.startsWith('id:')) {
+          eventId = line.slice(3).trim()
         }
       }
     }
 
-    if (dataLines.length > 0) {
-      const dataText = dataLines.join('\n')
-      try {
-        const parsed = JSON.parse(dataText)
-        onEvent(eventType, parsed)
-      } catch (e) {
-        console.warn('Failed to parse trailing run SSE data:', e, dataText)
-      }
-    }
+    dispatch()
   } finally {
     try {
       reader.releaseLock()
@@ -103,10 +105,8 @@ const processRunSseResponse = async (response, onEvent) => {
 
 export function useAgentRunStream({
   getThreadState,
-  useRunsApi,
   currentAgentId,
   handleStreamChunk,
-  processApprovalInStream,
   fetchThreadMessages,
   fetchAgentState,
   resetOnGoingConv,
@@ -152,7 +152,7 @@ export function useAgentRunStream({
   }
 
   const startRunStream = async (threadId, runId, afterSeq = '0-0') => {
-    if (!threadId || !runId || !useRunsApi) return
+    if (!threadId || !runId) return
     const ts = getThreadState(threadId)
     if (!ts) return
 
@@ -173,20 +173,20 @@ export function useAgentRunStream({
         throw new Error(`SSE response not ok: ${response.status}`)
       }
 
-      await processRunSseResponse(response, (event, data) => {
+      await processRunSseResponse(response, (event, data, eventId) => {
         if (!data || ts.activeRunId !== runId) return
 
-        if (data.seq !== undefined && data.seq !== null) {
-          const incomingSeq = normalizeRunSeq(data.seq)
+        if (eventId) {
+          const incomingSeq = normalizeRunSeq(eventId)
           if (compareRunSeq(incomingSeq, ts.runLastSeq) <= 0) return
           ts.runLastSeq = incomingSeq
           saveActiveRunSnapshot(threadId, runId, incomingSeq)
         }
 
-        if (event === 'heartbeat') return
-
         const payload = data.payload || {}
-        const isRetryableError = event === 'error' && payload?.chunk?.retryable === true
+        const terminalStatus = event === 'end' ? payload.status : data.status
+        const isRetryableError =
+          event === 'error' && (payload?.retryable === true || payload?.chunk?.retryable === true)
         if (isRetryableError) {
           const parsedJobTry = Number.parseInt(payload?.chunk?.job_try, 10)
           const retryJobTry = Number.isNaN(parsedJobTry) ? null : parsedJobTry
@@ -205,25 +205,19 @@ export function useAgentRunStream({
 
         if (Array.isArray(payload.items)) {
           payload.items.forEach((chunk) => {
-            handleStreamChunk(chunk, threadId)
+            handleStreamChunk({ ...chunk, run_id: chunk.run_id || data.run_id || runId }, threadId)
           })
         } else if (payload.chunk) {
-          handleStreamChunk(payload.chunk, threadId)
+          handleStreamChunk(
+            { ...payload.chunk, run_id: payload.chunk.run_id || data.run_id || runId },
+            threadId
+          )
         }
 
-        const approvalStatuses = ['ask_user_question_required', 'human_approval_required']
-        const isApprovalEvent =
-          approvalStatuses.includes(event) || approvalStatuses.includes(payload?.chunk?.status)
-
-        if (isApprovalEvent) {
-          const approvalChunk = payload?.chunk || { status: event, thread_id: threadId }
-          processApprovalInStream(approvalChunk, threadId, unref(currentAgentId))
-        }
-
-        if (event === 'close') {
+        if (event === 'end') {
           streamSmoother?.flushThread(threadId)
           ts.isStreaming = false
-          if (RUN_TERMINAL_STATUSES.has(data.status)) {
+          if (RUN_TERMINAL_STATUSES.has(terminalStatus)) {
             ts.activeRunId = null
             ts.lastRetryableJobTry = null
             ts.replyLoadingVisible = false
@@ -231,26 +225,14 @@ export function useAgentRunStream({
             clearActiveRunSnapshot(threadId)
             fetchThreadMessages({ agentId: unref(currentAgentId), threadId, delay: 200 }).finally(
               () => {
+                resetOnGoingConv(threadId)
                 fetchAgentState(unref(currentAgentId), threadId)
               }
             )
-          } else if (ts.activeRunId === runId) {
-            setTimeout(() => {
-              if (ts.activeRunId === runId && !ts.runStreamAbortController) {
-                void startRunStream(threadId, runId, ts.runLastSeq)
-              }
-            }, 300)
           }
         }
 
-        const chunkStatus = payload?.chunk?.status
-        if (
-          event === 'finished' ||
-          event === 'error' ||
-          event === 'interrupted' ||
-          approvalStatuses.includes(event) ||
-          approvalStatuses.includes(chunkStatus)
-        ) {
+        if (event === 'error') {
           ts.isStreaming = false
           ts.activeRunId = null
           ts.lastRetryableJobTry = null
@@ -295,7 +277,7 @@ export function useAgentRunStream({
   }
 
   const resumeActiveRunForThread = async (threadId) => {
-    if (!useRunsApi || !threadId) return
+    if (!threadId) return
     const ts = getThreadState(threadId)
     if (!ts || ts.runStreamAbortController) return
 

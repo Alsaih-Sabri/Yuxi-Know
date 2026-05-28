@@ -1,7 +1,11 @@
 """测试 chat_service 中的 interrupt 相关函数"""
 
+import json
 import sys
 import os
+from types import SimpleNamespace
+
+import pytest
 
 sys.path.insert(0, os.getcwd())
 
@@ -9,6 +13,7 @@ from yuxi.services.chat_service import (
     _normalize_interrupt_questions,
     _build_ask_user_question_payload,
     _coerce_interrupt_payload,
+    stream_agent_resume,
 )
 from yuxi.utils.question_utils import normalize_options
 
@@ -171,6 +176,24 @@ class TestNormalizeInterruptQuestions:
 
         assert len(result) == 1
         assert result[0]["question"] == "有效问题"
+
+
+@pytest.mark.asyncio
+async def test_stream_agent_resume_init_does_not_render_resume_input():
+    stream = stream_agent_resume(
+        thread_id="thread-1",
+        resume_input={"language": "python"},
+        meta={"request_id": "req-1"},
+        current_user=SimpleNamespace(uid="user-1"),
+        db=object(),
+    )
+
+    first_chunk = json.loads((await stream.__anext__()).decode("utf-8"))
+    await stream.aclose()
+
+    assert first_chunk["status"] == "init"
+    assert "msg" not in first_chunk
+    assert "Resume with input" not in json.dumps(first_chunk, ensure_ascii=False)
 
 
 class TestCoerceInterruptPayload:

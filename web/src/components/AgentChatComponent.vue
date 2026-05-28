@@ -234,8 +234,6 @@ const { threads, currentThreadId, currentThread } = storeToRefs(chatThreadsStore
 const userInput = ref('')
 const sendCooldownActive = ref(false)
 let sendCooldownTimer = null
-const useRunsApi = import.meta.env.VITE_USE_RUNS_API === 'true'
-
 // 预设的打招呼文本
 const greetingMessages = [
   '👋 您好，有什么可以帮您？',
@@ -1085,13 +1083,12 @@ const handleAttachmentRemove = async (attachment) => {
 }
 
 // ==================== 审批功能管理 ====================
-const { approvalState, handleApproval, processApprovalInStream } = useApproval({
+const { approvalState, processApprovalInStream } = useApproval({
   getThreadState,
-  resetOnGoingConv,
   fetchThreadMessages
 })
 
-const { handleAgentResponse, handleStreamChunk } = useAgentStreamHandler({
+const { handleStreamChunk } = useAgentStreamHandler({
   getThreadState,
   processApprovalInStream,
   currentAgentId,
@@ -1100,55 +1097,14 @@ const { handleAgentResponse, handleStreamChunk } = useAgentStreamHandler({
 })
 const { startRunStream, resumeActiveRunForThread, stopRunStreamSubscription } = useAgentRunStream({
   getThreadState,
-  useRunsApi,
   currentAgentId,
   handleStreamChunk,
-  processApprovalInStream,
   fetchThreadMessages,
   fetchAgentState,
   resetOnGoingConv,
   onScrollToBottom: () => scrollController.scrollToBottom(),
   streamSmoother
 })
-
-// 发送消息并处理流式响应
-const sendMessage = async ({
-  agentId,
-  threadId,
-  text,
-  signal = undefined,
-  imageData = undefined,
-  requestId = '',
-  attachmentFileIds = []
-}) => {
-  if (!agentId || !threadId || !text) {
-    const error = new Error('Missing agent, thread, or message text')
-    handleChatError(error, 'send')
-    return Promise.reject(error)
-  }
-
-  const requestData = {
-    query: text,
-    agent_id: agentId,
-    thread_id: threadId,
-    meta: {
-      request_id: requestId,
-      attachment_file_ids: attachmentFileIds
-    }
-  }
-
-  // 如果有图片，添加到请求中
-  if (imageData && imageData.imageContent) {
-    requestData.image_content = imageData.imageContent
-  }
-
-  try {
-    return await agentApi.sendAgentMessage(requestData, signal ? { signal } : undefined)
-  } catch (error) {
-    handleChatError(error, 'send')
-    throw error
-  }
-}
 
 // ==================== CHAT ACTIONS ====================
 // 获取第一个非置顶的对话
@@ -1289,72 +1245,6 @@ const handleSendMessage = async ({ image } = {}) => {
     .map((attachment) => attachment.file_id)
     .filter(Boolean)
 
-  if (useRunsApi) {
-    if ((threadMessages.value[threadId] || []).length === 0) {
-      const autoTitle = text.replace(/\s+/g, ' ').trim().slice(0, 2000)
-      if (autoTitle) {
-        void (async () => {
-          try {
-            const generatedTitle = await agentApi.generateTitle(
-              autoTitle,
-              configStore.config?.fast_model
-            )
-            if (generatedTitle) {
-              const finalTitle = generatedTitle.slice(0, 30).replace(/\s+/g, ' ').trim()
-              if (finalTitle) {
-                void chatThreadsStore.updateThread(threadId, finalTitle).catch(() => {})
-              }
-            }
-          } catch (e) {
-            console.error('Title generation failed:', e)
-            // 失败时使用原始文本作为标题
-            void chatThreadsStore.updateThread(threadId, autoTitle.slice(0, 30)).catch(() => {})
-          }
-        })()
-      }
-    }
-
-    resetOnGoingConv(threadId)
-    const requestId = createClientRequestId()
-    const previousAttachments = markAttachmentsRequestId(threadId, pendingAttachments, requestId)
-    insertOptimisticHumanMessage(threadState, {
-      requestId,
-      text,
-      imageContent,
-      attachments: pendingAttachments.map((attachment) => ({
-        ...attachment,
-        request_id: requestId
-      }))
-    })
-    threadState.isStreaming = true
-    try {
-      const runResp = await agentApi.createAgentRun({
-        query: text,
-        agent_id: currentAgentId.value,
-        thread_id: threadId,
-        meta: {
-          request_id: requestId,
-          attachment_file_ids: pendingAttachmentFileIds
-        },
-        image_content: imageContent
-      })
-      const runId = runResp?.run_id
-      if (!runId) {
-        throw new Error('创建 run 失败：缺少 run_id')
-      }
-      await startRunStream(threadId, runId, 0)
-    } catch (error) {
-      threadState.isStreaming = false
-      threadState.replyLoadingVisible = false
-      threadState.pendingRequestId = null
-      rollbackAttachments(threadId, previousAttachments)
-      resetOnGoingConv(threadId)
-      handleChatError(error, 'send')
-    }
-    return
-  }
-
-  // 如果是新对话，用 fast-model 异步生成标题（不阻塞消息发送）
   if ((threadMessages.value[threadId] || []).length === 0) {
     const autoTitle = text.replace(/\s+/g, ' ').trim().slice(0, 2000)
     if (autoTitle) {
@@ -1372,14 +1262,12 @@ const handleSendMessage = async ({ image } = {}) => {
           }
         } catch (e) {
           console.error('Title generation failed:', e)
-          // 失败时使用原始文本作为标题
           void chatThreadsStore.updateThread(threadId, autoTitle.slice(0, 30)).catch(() => {})
         }
       })()
     }
   }
 
-  threadState.isStreaming = true
   resetOnGoingConv(threadId)
   const requestId = createClientRequestId()
   const previousAttachments = markAttachmentsRequestId(threadId, pendingAttachments, requestId)
@@ -1387,40 +1275,36 @@ const handleSendMessage = async ({ image } = {}) => {
     requestId,
     text,
     imageContent,
-    attachments: pendingAttachments.map((attachment) => ({ ...attachment, request_id: requestId }))
+    attachments: pendingAttachments.map((attachment) => ({
+      ...attachment,
+      request_id: requestId
+    }))
   })
-  threadState.streamAbortController = new AbortController()
+  threadState.isStreaming = true
 
   try {
-    const response = await sendMessage({
-      agentId: currentAgentId.value,
-      threadId: threadId,
-      text: text,
-      signal: threadState.streamAbortController?.signal,
-      imageData: image,
-      requestId,
-      attachmentFileIds: pendingAttachmentFileIds
+    const runResp = await agentApi.createAgentRun({
+      query: text,
+      agent_id: currentAgentId.value,
+      thread_id: threadId,
+      meta: {
+        request_id: requestId,
+        attachment_file_ids: pendingAttachmentFileIds
+      },
+      image_content: imageContent
     })
-
-    await handleAgentResponse(response, threadId)
-  } catch (error) {
-    if (error.name !== 'AbortError') {
-      console.error('Stream error:', error)
-      rollbackAttachments(threadId, previousAttachments)
-      handleChatError(error, 'send')
-    } else {
-      console.warn('[Interrupted] Catch')
+    const runId = runResp?.run_id
+    if (!runId) {
+      throw new Error('创建 run 失败：缺少 run_id')
     }
+    await startRunStream(threadId, runId, 0)
+  } catch (error) {
     threadState.isStreaming = false
-  } finally {
-    threadState.streamAbortController = null
-    // 异步加载历史记录，保持当前消息显示直到历史记录加载完成
-    fetchThreadMessages({ agentId: currentAgentId.value, threadId: threadId }).finally(() => {
-      // 历史记录加载完成后，安全地清空当前进行中的对话
-      resetOnGoingConv(threadId)
-      handleAgentStateRefresh(threadId)
-      scrollController.scrollToBottom()
-    })
+    threadState.replyLoadingVisible = false
+    threadState.pendingRequestId = null
+    rollbackAttachments(threadId, previousAttachments)
+    resetOnGoingConv(threadId)
+    handleChatError(error, 'send')
   }
 }
 
@@ -1432,32 +1316,14 @@ const handleSendOrStop = async (payload) => {
 
   const threadId = currentChatId.value
   const threadState = getThreadState(threadId)
-  if (isProcessing.value && threadState) {
-    if (useRunsApi && threadState.activeRunId) {
-      try {
-        await agentApi.cancelAgentRun(threadState.activeRunId)
-        message.info('已发送取消请求')
-      } catch (error) {
-        handleChatError(error, 'stop')
-      }
-      return
+  if (isProcessing.value && threadState?.activeRunId) {
+    try {
+      await agentApi.cancelAgentRun(threadState.activeRunId)
+      message.info('已发送取消请求')
+    } catch (error) {
+      handleChatError(error, 'stop')
     }
-
-    if (threadState.streamAbortController) {
-      // 中断生成
-      threadState.streamAbortController.abort()
-
-      // 中断后刷新消息历史，确保显示最新的状态
-      try {
-        await fetchThreadMessages({ agentId: currentAgentId.value, threadId: threadId, delay: 500 })
-        fetchAgentState(currentAgentId.value, threadId)
-        message.info('已中断对话生成')
-      } catch (error) {
-        console.error('刷新消息历史失败:', error)
-        message.info('已中断对话生成')
-      }
-      return
-    }
+    return
   }
   if (props.sendDisabled) return
   await handleSendMessage(payload)
@@ -1479,30 +1345,35 @@ const handleApprovalWithStream = async (answer) => {
     return
   }
 
+  if (!approvalState.parentRunId) {
+    message.error('无法找到需要恢复的运行任务')
+    approvalState.showModal = false
+    return
+  }
+
   try {
-    // 使用审批 composable 处理审批
-    const response = await handleApproval(answer)
-
-    if (!response) return // 如果 handleApproval 抛出错误，这里不会执行
-
-    // 处理流式响应
-    await handleAgentResponse(response, threadId)
-  } catch (error) {
-    if (error.name !== 'AbortError') {
-      console.error('Resume approval error:', error)
-    }
-  } finally {
-    if (threadState) {
-      threadState.isStreaming = false
-      threadState.streamAbortController = null
-    }
-
-    // 异步加载历史记录，保持当前消息显示直到历史记录加载完成
-    fetchThreadMessages({ agentId: currentAgentId.value, threadId: threadId }).finally(() => {
-      resetOnGoingConv(threadId)
-      fetchAgentState(currentAgentId.value, threadId)
-      scrollController.scrollToBottom()
+    approvalState.showModal = false
+    threadState.isStreaming = true
+    resetOnGoingConv(threadId)
+    const resumeRequestId = createClientRequestId()
+    const runResp = await agentApi.createAgentRun({
+      query: null,
+      agent_id: currentAgentId.value,
+      thread_id: threadId,
+      meta: { request_id: resumeRequestId },
+      resume: answer,
+      parent_run_id: approvalState.parentRunId,
+      resume_request_id: resumeRequestId
     })
+    const runId = runResp?.run_id
+    if (!runId) {
+      throw new Error('创建 resume run 失败：缺少 run_id')
+    }
+    await startRunStream(threadId, runId, '0-0')
+  } catch (error) {
+    threadState.isStreaming = false
+    threadState.replyLoadingVisible = false
+    handleChatError(error, 'resume')
   }
 }
 

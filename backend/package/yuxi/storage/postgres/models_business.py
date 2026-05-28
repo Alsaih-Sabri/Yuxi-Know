@@ -300,6 +300,9 @@ class Message(Base):
     token_count = Column(Integer, nullable=True, comment="Token count (optional)")
     extra_metadata = Column(JSON, nullable=True, comment="Additional metadata (complete message dump)")
     image_content = Column(Text, nullable=True, comment="Base64 encoded image content for multimodal messages")
+    run_id = Column(String(64), ForeignKey("agent_runs.id"), nullable=True, index=True, comment="Agent run ID")
+    request_id = Column(String(64), nullable=True, index=True, comment="Request ID for idempotency")
+    delivery_status = Column(String(32), nullable=False, default="complete", comment="Message status")
 
     # Relationships
     conversation = relationship("Conversation", back_populates="messages")
@@ -317,6 +320,9 @@ class Message(Base):
             "token_count": self.token_count,
             "metadata": self.extra_metadata or {},
             "image_content": self.image_content,
+            "run_id": self.run_id,
+            "request_id": self.request_id,
+            "status": self.delivery_status,
             "tool_calls": [tc.to_dict() for tc in self.tool_calls] if self.tool_calls else [],
         }
 
@@ -769,6 +775,16 @@ class AgentRun(Base):
         comment="Run status: pending/running/completed/failed/cancel_requested/cancelled/interrupted",
     )
     request_id = Column(String(64), unique=True, index=True, nullable=False, comment="Idempotency request ID")
+    conversation_id = Column(
+        Integer, ForeignKey("conversations.id"), nullable=True, index=True, comment="Conversation ID"
+    )
+    parent_run_id = Column(String(64), nullable=True, index=True, comment="Parent interrupted run ID")
+    run_type = Column(String(32), nullable=False, default="chat", comment="Run type: chat/resume")
+    resume_request_id = Column(String(64), nullable=True, index=True, comment="Resume idempotency request ID")
+    input_message_id = Column(Integer, nullable=True, comment="Input message ID")
+    output_message_id = Column(Integer, nullable=True, comment="Output message ID")
+    checkpoint_thread_id = Column(String(64), nullable=True, comment="LangGraph checkpoint thread ID")
+    last_event_id = Column(String(64), nullable=True, comment="Last Redis stream event ID")
     input_payload = Column(JSON, nullable=False, default=dict, comment="Original input payload")
     error_type = Column(String(64), nullable=True, comment="Error type")
     error_message = Column(Text, nullable=True, comment="Error message")
@@ -785,6 +801,14 @@ class AgentRun(Base):
             "uid": self.uid,
             "status": self.status,
             "request_id": self.request_id,
+            "conversation_id": self.conversation_id,
+            "parent_run_id": self.parent_run_id,
+            "run_type": self.run_type,
+            "resume_request_id": self.resume_request_id,
+            "input_message_id": self.input_message_id,
+            "output_message_id": self.output_message_id,
+            "checkpoint_thread_id": self.checkpoint_thread_id,
+            "last_event_id": self.last_event_id,
             "input_payload": self.input_payload or {},
             "error_type": self.error_type,
             "error_message": self.error_message,

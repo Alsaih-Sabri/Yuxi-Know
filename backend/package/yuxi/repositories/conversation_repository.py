@@ -98,6 +98,9 @@ class ConversationRepository:
         message_type: str = "text",
         extra_metadata: dict | None = None,
         image_content: str | None = None,
+        run_id: str | None = None,
+        request_id: str | None = None,
+        delivery_status: str = "complete",
     ) -> Message:
         message = Message(
             conversation_id=conversation_id,
@@ -106,6 +109,9 @@ class ConversationRepository:
             message_type=message_type,
             extra_metadata=extra_metadata or {},
             image_content=image_content,
+            run_id=run_id,
+            request_id=request_id,
+            delivery_status=delivery_status,
         )
 
         self.db.add(message)
@@ -129,6 +135,9 @@ class ConversationRepository:
         message_type: str = "text",
         extra_metadata: dict | None = None,
         image_content: str | None = None,
+        run_id: str | None = None,
+        request_id: str | None = None,
+        delivery_status: str = "complete",
     ) -> Message | None:
         conversation = await self.get_conversation_by_thread_id(thread_id)
         if not conversation:
@@ -142,6 +151,9 @@ class ConversationRepository:
             message_type=message_type,
             extra_metadata=extra_metadata,
             image_content=image_content,
+            run_id=run_id,
+            request_id=request_id,
+            delivery_status=delivery_status,
         )
 
     async def add_tool_call(

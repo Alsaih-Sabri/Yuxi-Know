@@ -711,6 +711,7 @@ async def stream_agent_chat(
     image_content: str | None,
     current_user,
     db,
+    save_user_message: bool = True,
 ) -> AsyncIterator[bytes]:
     start_time = asyncio.get_event_loop().time()
 
@@ -819,21 +820,22 @@ async def stream_agent_chat(
             init_msg["image_content"] = image_content
         yield make_chunk(status="init", meta=meta, msg=init_msg)
 
-        try:
-            await conv_repo.add_message_by_thread_id(
-                thread_id=thread_id,
-                role="user",
-                content=query,
-                message_type=message_type,
-                image_content=image_content,
-                extra_metadata={
-                    "raw_message": human_message.model_dump(),
-                    "request_id": meta.get("request_id"),
-                    "attachments": request_attachments,
-                },
-            )
-        except Exception as e:
-            logger.error(f"Error saving user message: {e}")
+        if save_user_message:
+            try:
+                await conv_repo.add_message_by_thread_id(
+                    thread_id=thread_id,
+                    role="user",
+                    content=query,
+                    message_type=message_type,
+                    image_content=image_content,
+                    extra_metadata={
+                        "raw_message": human_message.model_dump(),
+                        "request_id": meta.get("request_id"),
+                        "attachments": request_attachments,
+                    },
+                )
+            except Exception as e:
+                logger.error(f"Error saving user message: {e}")
 
         # 先构建 langgraph_config
         langgraph_config = {"configurable": {"thread_id": thread_id, "uid": uid}}
@@ -1001,8 +1003,7 @@ async def stream_agent_resume(
             + b"\n"
         )
 
-    init_msg = {"type": "system", "content": f"Resume with input: {resume_input}"}
-    yield make_resume_chunk(status="init", meta=meta, msg=init_msg)
+    yield make_resume_chunk(status="init", meta=meta)
 
     resume_command = Command(resume=resume_input)
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Any
+
+from fastapi import APIRouter, Depends, Header, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,11 +48,14 @@ class AgentUpdate(BaseModel):
 
 
 class AgentRunCreate(BaseModel):
-    query: str = Field(..., description="用户输入的问题")
+    query: str | None = Field(None, description="用户输入的问题")
     agent_id: str = Field(..., description="智能体 ID")
     thread_id: str = Field(..., description="会话线程 ID")
     meta: dict = Field(default_factory=dict, description="可选，请求追踪信息，例如 request_id")
     image_content: str | None = Field(None, description="可选，base64 图片内容")
+    resume: Any | None = Field(None, description="可选，恢复 interrupted run 的输入")
+    parent_run_id: str | None = Field(None, description="可选，被恢复的 run ID")
+    resume_request_id: str | None = Field(None, description="可选，resume 幂等键")
 
 
 class AgentChatRequest(BaseModel):
@@ -293,6 +298,9 @@ async def create_agent_run(
         image_content=payload.image_content,
         current_uid=str(current_user.uid),
         db=db,
+        resume=payload.resume,
+        parent_run_id=payload.parent_run_id,
+        resume_request_id=payload.resume_request_id,
     )
 
 
@@ -311,9 +319,15 @@ async def cancel_agent_run(
 
 
 @agent_router.get("/runs/{run_id}/events")
-async def stream_run_events(run_id: str, after_seq: str = "0-0", current_user: User = Depends(get_required_user)):
+async def stream_run_events(
+    run_id: str,
+    after_seq: str = "0-0",
+    last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
+    current_user: User = Depends(get_required_user),
+):
+    cursor = last_event_id or after_seq
     return StreamingResponse(
-        stream_agent_run_events(run_id=run_id, after_seq=after_seq, current_uid=str(current_user.uid)),
+        stream_agent_run_events(run_id=run_id, after_seq=cursor, current_uid=str(current_user.uid)),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )

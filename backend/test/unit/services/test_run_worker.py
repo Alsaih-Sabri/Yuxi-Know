@@ -90,8 +90,8 @@ async def test_process_agent_run_non_retryable_error_marks_failed(monkeypatch: p
     terminal_statuses: list[str] = []
     events: list[str] = []
 
-    async def fake_append_event(run_id: str, event_type: str, payload: dict):
-        del run_id, payload
+    async def fake_append_event(run_id: str, event_type: str, payload: dict, **kwargs):
+        del run_id, payload, kwargs
         events.append(event_type)
 
     async def fake_mark_terminal(run_id: str, status: str, error_type=None, error_message=None):
@@ -121,8 +121,8 @@ async def test_process_agent_run_retryable_error_retries_then_completes(monkeypa
     events: list[dict] = []
     attempts = {"count": 0}
 
-    async def fake_append_event(run_id: str, event_type: str, payload: dict):
-        del run_id
+    async def fake_append_event(run_id: str, event_type: str, payload: dict, **kwargs):
+        del run_id, kwargs
         events.append({"event_type": event_type, "payload": payload})
 
     async def fake_mark_terminal(run_id: str, status: str, error_type=None, error_message=None):
@@ -169,10 +169,20 @@ async def test_worker_startup_ensures_builtin_mcp_servers(monkeypatch: pytest.Mo
     async def fake_ensure_builtin_mcp_servers_in_db():
         calls.append("ensure_builtin_mcp_servers_in_db")
 
+    @asynccontextmanager
+    async def fake_session_ctx():
+        yield object()
+
+    async def fake_init_builtin_skills(session):
+        del session
+        calls.append("init_builtin_skills")
+
     monkeypatch.setattr(run_worker.pg_manager, "initialize", fake_initialize)
     monkeypatch.setattr(run_worker.pg_manager, "create_business_tables", fake_create_business_tables)
     monkeypatch.setattr(run_worker.pg_manager, "ensure_business_schema", fake_ensure_business_schema)
+    monkeypatch.setattr(run_worker.pg_manager, "get_async_session_context", fake_session_ctx)
     monkeypatch.setattr(run_worker, "ensure_builtin_mcp_servers_in_db", fake_ensure_builtin_mcp_servers_in_db)
+    monkeypatch.setattr(run_worker, "init_builtin_skills", fake_init_builtin_skills)
 
     await run_worker._worker_startup({})
 
@@ -181,4 +191,5 @@ async def test_worker_startup_ensures_builtin_mcp_servers(monkeypatch: pytest.Mo
         "create_business_tables",
         "ensure_business_schema",
         "ensure_builtin_mcp_servers_in_db",
+        "init_builtin_skills",
     ]

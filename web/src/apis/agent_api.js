@@ -1,10 +1,4 @@
-import {
-  apiGet,
-  apiPost,
-  apiDelete,
-  apiPut,
-  apiRequest
-} from './base'
+import { apiGet, apiPost, apiDelete, apiPut, apiRequest } from './base'
 import { useUserStore } from '@/stores/user'
 
 /**
@@ -18,30 +12,6 @@ import { useUserStore } from '@/stores/user'
 // =============================================================================
 
 export const agentApi = {
-  /**
-   * 发送聊天消息到指定智能体（流式响应）
-   * @param {Object} data - 聊天数据
-   * @returns {Promise} - 聊天响应流
-   */
-  sendAgentMessage: (data, options = {}) => {
-    const { signal, headers: extraHeaders, ...restOptions } = options || {}
-    const baseHeaders = {
-      'Content-Type': 'application/json',
-      ...useUserStore().getAuthHeaders()
-    }
-
-    return fetch('/api/agent/chat', {
-      method: 'POST',
-      body: JSON.stringify(data),
-      signal,
-      headers: {
-        ...baseHeaders,
-        ...(extraHeaders || {})
-      },
-      ...restOptions
-    })
-  },
-
   /**
    * 简单聊天调用（非流式）
    * @param {string} query - 查询内容
@@ -111,38 +81,11 @@ export const agentApi = {
    */
   getMessageFeedback: (messageId) => apiGet(`/api/chat/message/${messageId}/feedback`),
 
-
   createAgent: (payload) => apiPost('/api/agent', payload),
 
   updateAgent: (agentId, payload) => apiPut(`/api/agent/${agentId}`, payload),
 
   deleteAgent: (agentId) => apiDelete(`/api/agent/${agentId}`),
-
-  /**
-   * 恢复被人工审批中断的对话（流式响应）
-   * @param {string} threadId - 会话 ID
-   * @param {Object} data - 恢复数据 { answer: { question_id: answer }, approved }
-   * @param {Object} options - 可选参数（signal, headers等）
-   * @returns {Promise} - 恢复响应流
-   */
-  resumeAgentChat: (threadId, data, options = {}) => {
-    const { signal, headers: extraHeaders, ...restOptions } = options || {}
-    const baseHeaders = {
-      'Content-Type': 'application/json',
-      ...useUserStore().getAuthHeaders()
-    }
-
-    return fetch(`/api/chat/thread/${threadId}/resume`, {
-      method: 'POST',
-      body: JSON.stringify(data),
-      signal,
-      headers: {
-        ...baseHeaders,
-        ...(extraHeaders || {})
-      },
-      ...restOptions
-    })
-  },
 
   /**
    * 创建异步运行任务（Run）
@@ -155,7 +98,10 @@ export const agentApi = {
       agent_id: data.agent_id,
       thread_id: data.thread_id,
       meta: data.meta || {},
-      image_content: data.image_content || null
+      image_content: data.image_content || null,
+      resume: data.resume ?? null,
+      parent_run_id: data.parent_run_id || null,
+      resume_request_id: data.resume_request_id || null
     }),
 
   /**
@@ -188,16 +134,18 @@ export const agentApi = {
    */
   streamAgentRunEvents: (runId, afterSeq = '0-0', options = {}) => {
     const { signal } = options
-    return fetch(
-      `/api/agent/runs/${runId}/events?after_seq=${encodeURIComponent(String(afterSeq))}`,
-      {
-        method: 'GET',
-        headers: {
-          ...useUserStore().getAuthHeaders()
-        },
-        signal
-      }
-    )
+    const headers = {
+      ...useUserStore().getAuthHeaders()
+    }
+    const cursor = String(afterSeq || '0-0')
+    if (cursor && cursor !== '0-0') {
+      headers['Last-Event-ID'] = cursor
+    }
+    return fetch(`/api/agent/runs/${runId}/events`, {
+      method: 'GET',
+      headers,
+      signal
+    })
   }
 }
 

@@ -159,13 +159,22 @@ async def clear_cancel_signal(run_id: str) -> None:
         logger.warning(f"Failed to clear cancel signal for run {run_id}: {e}")
 
 
-async def append_run_stream_event(run_id: str, event_type: str, payload: dict) -> str:
+async def append_run_stream_event(run_id: str, event_type: str, payload: dict, *, thread_id: str | None = None) -> str:
     redis = await get_redis_client()
     key = _event_stream_key(run_id)
-    now_ms = int(datetime.now(tz=UTC).timestamp() * 1000)
+    now = datetime.now(tz=UTC)
+    now_ms = int(now.timestamp() * 1000)
+    envelope = {
+        "schema_version": 1,
+        "run_id": run_id,
+        "thread_id": thread_id,
+        "event": event_type,
+        "payload": payload or {},
+        "created_at": now.isoformat(),
+    }
     fields = {
         "event_type": event_type,
-        "payload": json.dumps(payload or {}, ensure_ascii=False),
+        "payload": json.dumps(envelope, ensure_ascii=False),
         "ts": str(now_ms),
     }
 
@@ -198,11 +207,22 @@ async def list_run_stream_events(
         except Exception:
             payload = {}
 
+        event_type = fields.get("event_type") or "message"
+        if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+            payload = {
+                "schema_version": 1,
+                "run_id": run_id,
+                "thread_id": None,
+                "event": event_type,
+                "payload": payload if isinstance(payload, dict) else {},
+                "created_at": None,
+            }
+
         ts_value = fields.get("ts")
         events.append(
             {
                 "seq": str(event_id),
-                "event_type": fields.get("event_type") or "message",
+                "event_type": event_type,
                 "payload": payload,
                 "ts": int(ts_value) if ts_value else None,
             }

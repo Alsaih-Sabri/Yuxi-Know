@@ -2,65 +2,6 @@ import { message } from 'ant-design-vue'
 import { handleChatError } from '@/utils/errorHandler'
 import { unref } from 'vue'
 
-/**
- * Process a streaming response from the server
- * @param {Response} response - The fetch response object
- * @param {Function} onChunk - Callback function for each parsed JSON chunk. Return true to stop processing.
- */
-const processStreamResponse = async (response, onChunk) => {
-  if (!response || !response.body) {
-    console.warn('Invalid response or missing body for stream processing')
-    return
-  }
-
-  const reader = response.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let stopProcessing = false
-
-  try {
-    while (!stopProcessing) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        const trimmedLine = line.trim()
-        if (trimmedLine) {
-          try {
-            const chunk = JSON.parse(trimmedLine)
-            if (onChunk && onChunk(chunk)) {
-              stopProcessing = true
-              break
-            }
-          } catch (e) {
-            console.warn('Failed to parse stream chunk JSON:', e, 'Line:', trimmedLine)
-          }
-        }
-      }
-    }
-
-    if (!stopProcessing && buffer.trim()) {
-      try {
-        const chunk = JSON.parse(buffer.trim())
-        if (onChunk) {
-          onChunk(chunk)
-        }
-      } catch (e) {
-        console.warn('Failed to parse final stream chunk JSON:', e)
-      }
-    }
-  } finally {
-    try {
-      reader.releaseLock()
-    } catch {
-      // Ignore errors on releasing lock
-    }
-  }
-}
 
 export function useAgentStreamHandler({
   getThreadState,
@@ -88,6 +29,8 @@ export function useAgentStreamHandler({
           const resolvedRequestId = request_id || threadState.pendingRequestId
           if (resolvedRequestId) {
             threadState.pendingRequestId = resolvedRequestId
+          }
+          if (resolvedRequestId && msg && msg.type !== 'system') {
             threadState.onGoingConv.msgChunks[resolvedRequestId] = [
               {
                 ...msg,
@@ -126,11 +69,6 @@ export function useAgentStreamHandler({
           threadState.replyLoadingVisible = false
           threadState.pendingRequestId = null
 
-          // Abort the stream controller to stop processing further events
-          if (threadState.streamAbortController) {
-            threadState.streamAbortController.abort()
-            threadState.streamAbortController = null
-          }
         }
         return true
 
@@ -229,37 +167,7 @@ export function useAgentStreamHandler({
     return false
   }
 
-  /**
-   * Process the full agent stream response
-   * @param {Response} response - The fetch response
-   * @param {String} threadId - The thread ID
-   * @param {Function} [onChunk] - Optional callback for each chunk (e.g. for logging)
-   */
-  const handleAgentResponse = async (response, threadId, onChunk = null) => {
-    console.log(`${debugPrefix}[stream_start]`, {
-      threadId,
-      currentAgentId: unref(currentAgentId),
-      supportsFiles: unref(supportsFiles)
-    })
-    await processStreamResponse(response, (chunk) => {
-      if (chunk?.status && chunk.status !== 'loading') {
-        console.log(`${debugPrefix}[chunk_status]`, {
-          threadId,
-          status: chunk.status,
-          requestId: chunk.request_id
-        })
-      }
-      if (onChunk) onChunk(chunk)
-      return handleStreamChunk(chunk, threadId)
-    })
-    console.log(`${debugPrefix}[stream_end]`, {
-      threadId,
-      currentAgentId: unref(currentAgentId)
-    })
-  }
-
   return {
-    handleStreamChunk,
-    handleAgentResponse
+    handleStreamChunk
   }
 }

@@ -103,7 +103,9 @@ async def test_run_stream_event_roundtrip(monkeypatch: pytest.MonkeyPatch):
 
     events = await run_queue_service.list_run_stream_events(run_id, after_seq="0-0", limit=100)
     assert [item["event_type"] for item in events] == ["loading", "finished"]
-    assert events[0]["payload"] == {"items": [1]}
+    assert events[0]["payload"]["schema_version"] == 1
+    assert events[0]["payload"]["run_id"] == run_id
+    assert events[0]["payload"]["payload"] == {"items": [1]}
 
     next_events = await run_queue_service.list_run_stream_events(run_id, after_seq=seq1, limit=100)
     assert len(next_events) == 1

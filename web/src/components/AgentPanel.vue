@@ -792,14 +792,14 @@ watch(
   align-items: center;
   border: 1px solid var(--gray-150);
   border-radius: 8px;
-  background: var(--gray-0);
+  background: var(--gray-25);
   color: var(--gray-700);
   overflow: hidden;
   flex-shrink: 0;
 
   &.active {
-    border-color: var(--main-200);
-    background: var(--main-20);
+    border-color: var(--main-600);
+    background: var(--gray-0);
     color: var(--main-800);
   }
 }
