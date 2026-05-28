@@ -6,6 +6,8 @@ from fastapi import UploadFile
 
 from yuxi.storage.minio import aupload_file_to_minio
 
+MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024
+
 
 async def write_upload_to_buffer(
     upload: UploadFile,

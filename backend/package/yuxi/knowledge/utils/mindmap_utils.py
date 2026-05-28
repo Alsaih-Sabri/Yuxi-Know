@@ -4,6 +4,8 @@ import json
 import textwrap
 from typing import Any
 
+from fastapi import HTTPException
+
 from yuxi import config, knowledge_base
 from yuxi.models import select_model
 from yuxi.repositories.knowledge_base_repository import KnowledgeBaseRepository
@@ -61,18 +63,6 @@ MINDMAP_SYSTEM_PROMPT = """你是一个专业的知识整理助手。
 - 分类名称要简洁明了
 - 使用emoji增强视觉效果
 """
-
-
-class MindmapNotFoundError(ValueError):
-    pass
-
-
-class MindmapValidationError(ValueError):
-    pass
-
-
-class MindmapGenerationError(ValueError):
-    pass
 
 
 def build_database_file_list(files: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
@@ -136,7 +126,7 @@ def parse_mindmap_content(content: str) -> dict[str, Any]:
 async def get_mindmap_database_files(kb_id: str) -> dict[str, Any]:
     db_info = await knowledge_base.get_database_info(kb_id)
     if not db_info:
-        raise MindmapNotFoundError(f"知识库 {kb_id} 不存在")
+        raise HTTPException(status_code=404, detail=f"知识库 {kb_id} 不存在")
 
     file_list = build_database_file_list(db_info.get("files", {}))
     return {
@@ -154,13 +144,13 @@ async def generate_database_mindmap(
 ) -> dict[str, Any]:
     db_info = await knowledge_base.get_database_info(kb_id)
     if not db_info:
-        raise MindmapNotFoundError(f"知识库 {kb_id} 不存在")
+        raise HTTPException(status_code=404, detail=f"知识库 {kb_id} 不存在")
 
     db_name = db_info.get("name", "知识库")
     all_files = db_info.get("files", {})
     selected_file_ids = list(file_ids or all_files.keys())
     if not selected_file_ids:
-        raise MindmapValidationError("知识库中没有文件")
+        raise HTTPException(status_code=400, detail="知识库中没有文件")
 
     original_count = len(selected_file_ids)
     if len(selected_file_ids) > 20:
@@ -169,7 +159,7 @@ async def generate_database_mindmap(
 
     files_info = collect_mindmap_files(all_files, selected_file_ids)
     if not files_info:
-        raise MindmapValidationError("选择的文件不存在")
+        raise HTTPException(status_code=400, detail="选择的文件不存在")
 
     logger.info(f"开始生成思维导图，知识库: {db_name}, 文件数量: {len(files_info)}")
 
@@ -185,7 +175,7 @@ async def generate_database_mindmap(
         mindmap_data = parse_mindmap_content(content)
     except ValueError as e:
         logger.error(f"AI返回的JSON解析失败: {e}, 原始内容: {content}")
-        raise MindmapGenerationError(f"AI返回格式错误: {str(e)}") from e
+        raise HTTPException(status_code=500, detail=f"AI返回格式错误: {str(e)}") from e
 
     logger.info("思维导图生成成功")
 
@@ -234,7 +224,7 @@ async def get_mindmap_databases_overview(uid: str) -> dict[str, Any]:
 async def get_database_mindmap_data(kb_id: str) -> dict[str, Any]:
     kb = await KnowledgeBaseRepository().get_by_kb_id(kb_id)
     if kb is None:
-        raise MindmapNotFoundError(f"知识库 {kb_id} 不存在")
+        raise HTTPException(status_code=404, detail=f"知识库 {kb_id} 不存在")
 
     return {
         "message": "success",

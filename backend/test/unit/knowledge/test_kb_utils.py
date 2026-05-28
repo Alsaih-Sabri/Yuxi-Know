@@ -1,3 +1,5 @@
+import pytest
+
 from yuxi.knowledge.utils.kb_utils import prepare_item_metadata
 
 
@@ -31,3 +33,8 @@ async def test_prepare_item_metadata_preserves_preprocessed_file_size():
 
     assert metadata["size"] == 5678
     assert "_preprocessed_map" not in (metadata.get("processing_params") or {})
+
+
+async def test_prepare_item_metadata_rejects_direct_url_content_type():
+    with pytest.raises(ValueError, match="Unsupported content_type"):
+        await prepare_item_metadata("https://example.com", "url", "db")

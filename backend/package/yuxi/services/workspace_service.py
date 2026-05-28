@@ -12,14 +12,14 @@ import aiofiles
 from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from yuxi.agents.backends.sandbox.paths import _global_user_data_dir, ensure_workspace_default_files
-from yuxi.services.upload_utils import write_upload_to_buffer
+from yuxi.services.upload_utils import MAX_UPLOAD_SIZE_BYTES, write_upload_to_buffer
 from yuxi.services.viewer_filesystem_service import _detect_preview_type
 from yuxi.storage.postgres.models_business import User
 from yuxi.utils.datetime_utils import utc_isoformat_from_timestamp
 from yuxi.utils.paths import VIRTUAL_PATH_WORKSPACE, WORKSPACE_DIR_NAME
 
 EDITABLE_WORKSPACE_SUFFIXES = {".md", ".markdown", ".mdx", ".txt"}
-MAX_WORKSPACE_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024
+MAX_WORKSPACE_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_BYTES
 
 
 def _workspace_root(user: User) -> Path:

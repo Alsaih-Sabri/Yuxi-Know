@@ -1,13 +1,11 @@
 import asyncio
-import json
 import os
 import textwrap
 import traceback
 import time
 from urllib.parse import quote, unquote
 
-import aiofiles
-from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 from fastapi.responses import FileResponse
 from starlette.responses import StreamingResponse
@@ -18,18 +16,20 @@ from yuxi import config, knowledge_base
 from yuxi.knowledge.factory import KnowledgeBaseFactory
 from yuxi.knowledge.graphs.milvus_graph_service import GRAPH_TASK_TYPE, MilvusGraphService
 from yuxi.plugins.parser import Parser, SUPPORTED_FILE_EXTENSIONS, is_supported_file_extension
-from yuxi.knowledge.utils import calculate_content_hash
-from yuxi.knowledge.utils.kb_utils import is_minio_url, parse_minio_url
+from yuxi.knowledge.utils import calculate_content_hash, is_minio_url, parse_minio_url
 from yuxi.knowledge.utils.mindmap_utils import (
-    MindmapGenerationError,
-    MindmapNotFoundError,
-    MindmapValidationError,
     generate_database_mindmap,
     get_database_mindmap_data,
     get_mindmap_database_files,
     get_mindmap_databases_overview,
 )
+from yuxi.knowledge.utils.sample_question_utils import (
+    generate_database_sample_questions,
+    get_database_sample_questions,
+)
+from yuxi.knowledge.utils.url_fetcher import fetch_url_content
 from yuxi.services.model_cache import model_cache
+from yuxi.services.upload_utils import MAX_UPLOAD_SIZE_BYTES, read_upload_with_limit, write_upload_to_path
 from yuxi.services.workspace_service import MAX_WORKSPACE_UPLOAD_SIZE_BYTES, resolve_workspace_file_path
 from yuxi.storage.postgres.models_business import User
 from yuxi.storage.minio.client import MinIOClient, StorageError, aupload_file_to_minio, get_minio_client
@@ -147,9 +147,9 @@ async def create_database(
     description: str = Body(...),
     embedding_model_spec: str | None = Body(None),
     kb_type: str = Body("milvus"),
-    additional_params: dict = Body({}),
+    additional_params: dict | None = Body(None),
     llm_model_spec: str | None = Body(None),
-    share_config: dict = Body(None),
+    share_config: dict | None = Body(None),
     current_user: User = Depends(get_admin_user),
 ):
     """创建知识库"""
@@ -238,24 +238,16 @@ async def get_accessible_databases(current_user: User = Depends(get_required_use
         return {"message": f"获取可访问知识库列表失败: {str(e)}", "databases": []}
 
 
-def _raise_mindmap_http_exception(error: Exception, operation: str) -> None:
-    if isinstance(error, MindmapNotFoundError):
-        raise HTTPException(status_code=404, detail=str(error))
-    if isinstance(error, MindmapValidationError):
-        raise HTTPException(status_code=400, detail=str(error))
-    if isinstance(error, MindmapGenerationError):
-        raise HTTPException(status_code=500, detail=str(error))
-    logger.error(f"{operation}失败: {error}, {traceback.format_exc()}")
-    raise HTTPException(status_code=500, detail=f"{operation}失败: {str(error)}")
-
-
 @knowledge.get("/mindmap/databases")
 async def get_mindmap_databases(current_user: User = Depends(get_admin_user)):
     """获取所有知识库的概览信息，用于思维导图界面选择。"""
     try:
         return await get_mindmap_databases_overview(current_user.uid)
+    except HTTPException:
+        raise
     except Exception as e:
-        _raise_mindmap_http_exception(e, "获取知识库列表")
+        logger.error(f"获取知识库列表失败: {e}, {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取知识库列表失败: {str(e)}")
 
 
 @knowledge.get("/databases/{kb_id}/mindmap/files")
@@ -263,8 +255,11 @@ async def get_database_mindmap_files(kb_id: str, current_user: User = Depends(ge
     """获取指定知识库的所有文件列表。"""
     try:
         return await get_mindmap_database_files(kb_id)
+    except HTTPException:
+        raise
     except Exception as e:
-        _raise_mindmap_http_exception(e, "获取文件列表")
+        logger.error(f"获取文件列表失败: {e}, {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取文件列表失败: {str(e)}")
 
 
 @knowledge.post("/databases/{kb_id}/mindmap/generate")
@@ -277,8 +272,11 @@ async def generate_mindmap(
     """使用 AI 分析知识库文件，生成思维导图结构。"""
     try:
         return await generate_database_mindmap(kb_id, file_ids, user_prompt)
+    except HTTPException:
+        raise
     except Exception as e:
-        _raise_mindmap_http_exception(e, "生成思维导图")
+        logger.error(f"生成思维导图失败: {e}, {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"生成思维导图失败: {str(e)}")
 
 
 @knowledge.get("/databases/{kb_id}/mindmap")
@@ -286,8 +284,11 @@ async def get_database_mindmap(kb_id: str, current_user: User = Depends(get_admi
     """获取知识库关联的思维导图。"""
     try:
         return await get_database_mindmap_data(kb_id)
+    except HTTPException:
+        raise
     except Exception as e:
-        _raise_mindmap_http_exception(e, "获取知识库思维导图")
+        logger.error(f"获取知识库思维导图失败: {e}, {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"获取知识库思维导图失败: {str(e)}")
 
 
 @knowledge.get("/databases/{kb_id}")
@@ -342,6 +343,8 @@ async def update_database_info(
             operator_department_id=current_user.department_id,
         )
         return {"message": "更新成功", "database": database}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"更新数据库失败 {e}, {traceback.format_exc()}")
         raise HTTPException(status_code=400, detail=f"更新数据库失败: {e}")
@@ -401,9 +404,10 @@ async def configure_graph_build(
 @knowledge.post("/databases/{kb_id}/graph-build/index")
 async def index_graph_build(
     kb_id: str,
-    data: dict = Body(default={}),
+    data: dict | None = Body(default=None),
     current_user: User = Depends(get_admin_user),
 ):
+    data = data or {}
     try:
         if await _has_running_graph_build_task(kb_id):
             raise HTTPException(status_code=409, detail="该知识库已有正在运行的图谱构建任务")
@@ -449,9 +453,10 @@ async def index_graph_build(
 @knowledge.post("/databases/{kb_id}/graph-build/reset")
 async def reset_graph_build(
     kb_id: str,
-    data: dict = Body(default={}),
+    data: dict | None = Body(default=None),
     current_user: User = Depends(get_admin_user),
 ):
+    data = data or {}
     try:
         if await _has_running_graph_build_task(kb_id):
             raise HTTPException(status_code=409, detail="该知识库存在正在运行的图谱构建任务，无法重置")
@@ -485,9 +490,11 @@ async def export_database(
         if not os.path.exists(file_path):
             raise HTTPException(status_code=404, detail="Exported file not found.")
 
-        media_type = media_types.get(format, "application/octet-stream")
+        media_type = media_types.get(f".{format}", "application/octet-stream")
 
         return FileResponse(path=file_path, filename=os.path.basename(file_path), media_type=media_type)
+    except HTTPException:
+        raise
     except NotImplementedError as e:
         logger.warning(f"A disabled feature was accessed: {e}")
         raise HTTPException(status_code=501, detail=str(e))
@@ -521,148 +528,142 @@ async def add_documents(
     if isinstance(chunk_parser_config, dict):
         indexing_params["chunk_parser_config"] = chunk_parser_config
 
-    # URL 解析与入库（需白名单验证）
     if content_type == "url":
         raise HTTPException(status_code=400, detail="URL 处理方式已变更，请使用 fetch-url 接口先获取内容")
+    if content_type != "file":
+        raise HTTPException(status_code=400, detail=f"Unsupported content_type: {content_type}")
 
-    if content_type == "file":
-        for item in items:
-            if not is_minio_url(item):
-                raise HTTPException(status_code=400, detail="File source must be a MinIO URL")
+    for item in items:
+        if not is_minio_url(item):
+            raise HTTPException(status_code=400, detail="File source must be a MinIO URL")
 
     async def run_ingest(context: TaskContext):
         await context.set_message("任务初始化")
         await context.set_progress(5.0, "准备处理文档")
 
         total = len(items)
-        processed_items = []
-
-        # 存储第一阶段成功添加的文件记录 {item: (file_id, file_meta)}
-        added_files = {}
+        processed_items: list[dict | None] = [None] * total
+        added_files: list[dict] = []
 
         try:
-            # ========== 第一阶段：批量添加文件记录 ==========
             await context.set_message("第一阶段：添加文件记录")
             for idx, item in enumerate(items, 1):
                 await context.raise_if_cancelled()
 
-                # 第一阶段进度：5% ~ 30%
                 progress = 5.0 + (idx / total) * 25.0
-                await context.set_progress(progress, f"[1/2] 添加记录 {idx}/{total}")
+                await context.set_progress(progress, f"[1/3] 添加记录 {idx}/{total}")
 
                 try:
-                    # 1. Add file record (UPLOADED)
                     file_meta = await knowledge_base.add_file_record(
                         kb_id, item, params=params, operator_id=current_user.uid
                     )
-                    file_id = file_meta["file_id"]
-                    added_files[item] = (file_id, file_meta)
+                    added_files.append(
+                        {
+                            "index": idx - 1,
+                            "item": item,
+                            "file_id": file_meta["file_id"],
+                            "file_meta": file_meta,
+                        }
+                    )
                 except Exception as add_error:
                     logger.error(f"添加文件记录失败 {item}: {add_error}")
                     error_type = "timeout" if isinstance(add_error, TimeoutError) else "add_failed"
                     error_msg = "添加超时" if isinstance(add_error, TimeoutError) else "添加记录失败"
-                    processed_items.append(
-                        {
-                            "item": item,
-                            "status": "failed",
-                            "error": f"{error_msg}: {str(add_error)}",
-                            "error_type": error_type,
-                        }
-                    )
+                    processed_items[idx - 1] = {
+                        "item": item,
+                        "status": "failed",
+                        "error": f"{error_msg}: {str(add_error)}",
+                        "error_type": error_type,
+                    }
 
-            # ========== 第二阶段：批量解析文件 ==========
             await context.set_message("第二阶段：解析文件")
-            parse_success_count = 0
-            # 计算解析阶段的进度范围
-            parse_progress_range = 30.0 if not auto_index else 25.0
-
-            for idx, (item, (file_id, add_file_meta)) in enumerate(added_files.items(), 1):
+            parse_end = 60.0 if auto_index else 95.0
+            parse_total = len(added_files)
+            for idx, record in enumerate(added_files, 1):
                 await context.raise_if_cancelled()
 
-                # 第二阶段进度：25%~55% 或 30%~60%
-                progress = parse_progress_range + (idx / len(added_files)) * 30.0
-                await context.set_progress(progress, f"[2/2] 解析文件 {idx}/{len(added_files)}")
+                progress = 30.0 + (idx / parse_total) * (parse_end - 30.0)
+                await context.set_progress(progress, f"[2/3] 解析文件 {idx}/{parse_total}")
 
+                item = record["item"]
+                file_id = record["file_id"]
                 try:
-                    # 2. Parse file (PARSING -> PARSED)
                     file_meta = await knowledge_base.parse_file(kb_id, file_id, operator_id=current_user.uid)
-                    added_files[item] = (file_id, file_meta)
-                    processed_items.append(file_meta)
-                    parse_success_count += 1
+                    record["file_meta"] = file_meta
+                    if not auto_index or file_meta.get("status") != "parsed":
+                        processed_items[record["index"]] = file_meta
                 except Exception as parse_error:
                     logger.error(f"解析文件失败 {item} (file_id={file_id}): {parse_error}")
                     error_type = "timeout" if isinstance(parse_error, TimeoutError) else "parse_failed"
                     error_msg = "解析超时" if isinstance(parse_error, TimeoutError) else "解析失败"
-                    processed_items.append(
-                        {
-                            "item": item,
-                            "status": "failed",
-                            "error": f"{error_msg}: {str(parse_error)}",
-                            "error_type": error_type,
-                        }
-                    )
+                    processed_items[record["index"]] = {
+                        "item": item,
+                        "status": "failed",
+                        "error": f"{error_msg}: {str(parse_error)}",
+                        "error_type": error_type,
+                    }
 
-            # ========== 第三阶段：自动入库 ==========
             if auto_index:
                 await context.set_message("第三阶段：自动入库")
-                parsed_files = [(item, data) for item, data in added_files.items() if data[1].get("status") == "parsed"]
+                parsed_files = [record for record in added_files if record["file_meta"].get("status") == "parsed"]
                 total_parsed = len(parsed_files)
 
-                for idx, (item, (file_id, file_meta)) in enumerate(parsed_files, 1):
+                for idx, record in enumerate(parsed_files, 1):
                     await context.raise_if_cancelled()
 
-                    # 第三阶段进度：55%~95% 或 60%~95%
-                    progress = 55.0 + (idx / total_parsed) * 40.0
+                    progress = 60.0 + (idx / total_parsed) * 35.0
                     await context.set_progress(progress, f"[3/3] 入库文件 {idx}/{total_parsed}")
 
+                    item = record["item"]
+                    file_id = record["file_id"]
                     try:
-                        # 1. 更新入库参数
                         await knowledge_base.update_file_params(
                             kb_id, file_id, indexing_params, operator_id=current_user.uid
                         )
-                        # 2. 执行入库（传入 indexing_params 确保使用的参数与用户设置一致）
                         result = await knowledge_base.index_file(
                             kb_id, file_id, operator_id=current_user.uid, params=indexing_params
                         )
-                        processed_items.append(result)
+                        processed_items[record["index"]] = result
                     except Exception as index_error:
                         logger.error(f"自动入库失败 {item} (file_id={file_id}): {index_error}")
-                        processed_items.append(
-                            {
-                                "item": item,
-                                "status": "failed",
-                                "error": f"入库失败: {str(index_error)}",
-                                "error_type": "index_failed",
-                            }
-                        )
+                        processed_items[record["index"]] = {
+                            "item": item,
+                            "status": "failed",
+                            "error": f"入库失败: {str(index_error)}",
+                            "error_type": "index_failed",
+                        }
 
         except asyncio.CancelledError:
             await context.set_progress(100.0, "任务已取消")
             raise
         except Exception as task_error:
-            # 处理整体任务的其他异常（如内存不足、网络错误等）
             logger.exception(f"Task processing failed: {task_error}")
             await context.set_progress(100.0, f"任务处理失败: {str(task_error)}")
-            # 注意：不需要手动标记未处理的文件为失败，因为：
-            # 1. 内层异常处理已记录所有处理过的文件（成功/失败）
-            # 2. 未处理的文件没有进入 processed_items，前端会正确显示
-            # 3. 用户可以重新提交未处理的文件
             raise
 
-        item_type = "URL" if content_type == "url" else "文件"
-        # Check for failed status (including ERROR_PARSING)
-        failed_count = len([_p for _p in processed_items if "error" in _p or _p.get("status") == "failed"])
+        final_items = [
+            item
+            if item is not None
+            else {
+                "item": items[index],
+                "status": "failed",
+                "error": "文件未处理",
+                "error_type": "not_processed",
+            }
+            for index, item in enumerate(processed_items)
+        ]
+        failed_count = len([item for item in final_items if "error" in item or item.get("status") == "failed"])
 
         summary = {
             "kb_id": kb_id,
-            "item_type": item_type,
-            "submitted": len(processed_items),
+            "item_type": "文件",
+            "submitted": total,
             "failed": failed_count,
         }
-        message = f"{item_type}处理完成，失败 {failed_count} 个" if failed_count else f"{item_type}处理完成"
-        await context.set_result(summary | {"items": processed_items})
+        message = f"文件处理完成，失败 {failed_count} 个" if failed_count else "文件处理完成"
+        await context.set_result(summary | {"items": final_items})
         await context.set_progress(100.0, message)
-        return summary | {"items": processed_items}
+        return summary | {"items": final_items}
 
     try:
         database = await knowledge_base.get_database_info(kb_id)
@@ -740,15 +741,15 @@ async def parse_documents(kb_id: str, file_ids: list[str] = Body(...), current_u
 async def index_documents(
     kb_id: str,
     file_ids: list[str] = Body(...),
-    params: dict = Body({}),
+    params: dict | None = Body(None),
     current_user: User = Depends(get_admin_user),
 ):
     """手动触发文档入库（Indexing），支持更新参数"""
+    params = params or {}
     logger.debug(f"Index documents for kb_id {kb_id}: {file_ids} {params=}")
     await _ensure_database_supports_documents(kb_id, "文档入库")
 
-    # extract operator_id safely before background task
-    operator_id = current_user.id
+    operator_id = current_user.uid
 
     async def run_index(context: TaskContext):
         await context.set_message("任务初始化")
@@ -928,7 +929,7 @@ async def delete_document(kb_id: str, doc_id: str, current_user: User = Depends(
 
 
 @knowledge.get("/databases/{kb_id}/documents/{doc_id}/download")
-async def download_document(kb_id: str, doc_id: str, request: Request, current_user: User = Depends(get_admin_user)):
+async def download_document(kb_id: str, doc_id: str, current_user: User = Depends(get_admin_user)):
     """下载原始文件"""
     logger.debug(f"Download document {doc_id} from {kb_id}")
     await _ensure_database_supports_documents(kb_id, "文档下载")
@@ -1080,6 +1081,8 @@ async def update_knowledge_base_query_params(
 
         return {"message": "success", "data": params}
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"更新知识库查询参数失败: {e}")
         raise HTTPException(status_code=500, detail=f"更新查询参数失败: {str(e)}")
@@ -1121,148 +1124,16 @@ def _merge_saved_options(params: dict, saved_options: dict) -> dict:
 # =============================================================================
 
 
-SAMPLE_QUESTIONS_SYSTEM_PROMPT = """你是一个专业的知识库问答测试专家。
-
-你的任务是根据知识库中的文件列表，生成有价值的测试问题。
-
-要求：
-1. 问题要具体、有针对性，基于文件名称和类型推测可能的内容
-2. 问题要涵盖不同方面和难度
-3. 问题要简洁明了，适合用于检索测试
-4. 问题要多样化，包括事实查询、概念解释、操作指导等
-5. 问题长度控制在10-30字之间
-6. 直接返回JSON数组格式，不要其他说明
-
-返回格式：
-```json
-{
-  "questions": [
-    "问题1？",
-    "问题2？",
-    "问题3？"
-  ]
-}
-```
-"""
-
-
 @knowledge.post("/databases/{kb_id}/sample-questions")
 async def generate_sample_questions(
     kb_id: str,
     request_body: dict = Body(...),
     current_user: User = Depends(get_admin_user),
 ):
-    """
-    AI生成针对知识库的测试问题
-
-    Args:
-        kb_id: 知识库ID
-        request_body: 请求体，包含 count 字段
-
-    Returns:
-        生成的问题列表
-    """
+    """AI生成针对知识库的测试问题。"""
     try:
-        db_info = await knowledge_base.get_database_info(kb_id)
-        if not db_info:
-            raise HTTPException(status_code=404, detail=f"知识库 {kb_id} 不存在")
-        kb_type = (db_info.get("kb_type") or "").lower()
-        if not KnowledgeBaseFactory.get_kb_class(kb_type).supports_documents:
-            raise HTTPException(status_code=400, detail=f"{db_info.get('name') or kb_type} 不支持基于文件生成测试问题")
-
-        from yuxi.models import select_model
-
-        # 从请求体中提取参数
         count = request_body.get("count", 10)
-
-        db_name = db_info.get("name", "")
-        all_files = db_info.get("files", {})
-
-        if not all_files:
-            raise HTTPException(status_code=400, detail="知识库中没有文件")
-
-        # 收集文件信息
-        files_info = []
-        for file_id, file_info in all_files.items():
-            files_info.append(
-                {
-                    "filename": file_info.get("filename", ""),
-                    "type": file_info.get("type", ""),
-                }
-            )
-
-        # 构建AI提示词
-        system_prompt = SAMPLE_QUESTIONS_SYSTEM_PROMPT
-
-        # 构建用户消息
-        files_text = "\n".join(
-            [
-                f"- {f['filename']} ({f['type']})"
-                for f in files_info[:20]  # 最多列举20个文件
-            ]
-        )
-
-        file_count_text = f"（共{len(files_info)}个文件）" if len(files_info) > 20 else ""
-
-        user_message = textwrap.dedent(f"""请为知识库"{db_name}"生成{count}个测试问题。
-
-            知识库文件列表{file_count_text}：
-            {files_text}
-
-            请根据这些文件的名称和类型，生成{count}个有价值的测试问题。""")
-
-        # 调用AI生成
-        logger.info(f"开始生成知识库问题，知识库: {db_name}, 文件数量: {len(files_info)}, 问题数量: {count}")
-
-        # 选择模型并调用
-        model = select_model(model_spec=config.default_model)
-        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_message}]
-        response = await model.call(messages, stream=False)
-
-        # 解析AI返回的JSON
-        try:
-            # 提取JSON内容
-            content = response.content if hasattr(response, "content") else str(response)
-
-            # 尝试从markdown代码块中提取JSON
-            if "```json" in content:
-                json_start = content.find("```json") + 7
-                json_end = content.find("```", json_start)
-                content = content[json_start:json_end].strip()
-            elif "```" in content:
-                json_start = content.find("```") + 3
-                json_end = content.find("```", json_start)
-                content = content[json_start:json_end].strip()
-
-            questions_data = json.loads(content)
-            questions = questions_data.get("questions", [])
-
-            if not questions or not isinstance(questions, list):
-                raise ValueError("AI返回的问题格式不正确")
-
-            logger.info(f"成功生成{len(questions)}个问题")
-
-            # 保存问题到知识库元数据
-            try:
-                from yuxi.repositories.knowledge_base_repository import KnowledgeBaseRepository
-
-                await KnowledgeBaseRepository().update(kb_id, {"sample_questions": questions})
-                logger.info(f"成功保存 {len(questions)} 个问题到知识库 {kb_id}")
-            except Exception as save_error:
-                logger.error(f"保存问题失败: {save_error}")
-
-            return {
-                "message": "success",
-                "questions": questions,
-                "count": len(questions),
-                "kb_id": kb_id,
-                "db_name": db_name,
-            }
-
-        except json.JSONDecodeError as e:
-            logger.error(f"AI返回的JSON解析失败: {e}, 原始内容: {content}")
-            raise HTTPException(status_code=500, detail=f"AI返回格式错误: {str(e)}")
-
+        return await generate_database_sample_questions(kb_id, count=count)
     except HTTPException:
         raise
     except Exception as e:
@@ -1272,33 +1143,9 @@ async def generate_sample_questions(
 
 @knowledge.get("/databases/{kb_id}/sample-questions")
 async def get_sample_questions(kb_id: str, current_user: User = Depends(get_admin_user)):
-    """
-    获取知识库的测试问题
-
-    Args:
-        kb_id: 知识库ID
-
-    Returns:
-        问题列表
-    """
+    """获取知识库的测试问题。"""
     try:
-        from yuxi.repositories.knowledge_base_repository import KnowledgeBaseRepository
-
-        kb_repo = KnowledgeBaseRepository()
-        kb = await kb_repo.get_by_kb_id(kb_id)
-
-        if kb is None:
-            raise HTTPException(status_code=404, detail=f"知识库 {kb_id} 不存在")
-
-        questions = kb.sample_questions or []
-
-        return {
-            "message": "success",
-            "questions": questions,
-            "count": len(questions),
-            "kb_id": kb_id,
-        }
-
+        return await get_database_sample_questions(kb_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -1322,6 +1169,8 @@ async def create_folder(
     try:
         await _ensure_database_supports_documents(kb_id, "文件夹创建")
         return await knowledge_base.create_folder(kb_id, folder_name, parent_id)
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"创建文件夹失败 {e}, {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -1339,6 +1188,8 @@ async def move_document(
     try:
         await _ensure_database_supports_documents(kb_id, "文件移动")
         return await knowledge_base.move_file(kb_id, doc_id, new_parent_id)
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -1357,10 +1208,6 @@ async def fetch_url(
     """
     logger.debug(f"Fetching URL: {url} for kb_id: {kb_id}")
     try:
-        from yuxi.knowledge.utils.url_fetcher import fetch_url_content
-        from yuxi.storage.minio import get_minio_client
-        from yuxi.knowledge.utils import calculate_content_hash
-
         # 1. 下载内容 (包含白名单校验、大小限制、类型检查)
         content_bytes, final_url = await fetch_url_content(url)
 
@@ -1511,7 +1358,14 @@ async def upload_file(
     # 直接使用原始文件名（小写）
     filename = f"{basename}{ext}".lower()
 
-    file_bytes = await file.read()
+    try:
+        file_bytes = await read_upload_with_limit(
+            file,
+            max_size_bytes=MAX_UPLOAD_SIZE_BYTES,
+            too_large_message="文件过大，当前仅支持 100 MB 以内的文件",
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     content_hash = await calculate_content_hash(file_bytes)
 
@@ -1523,8 +1377,6 @@ async def upload_file(
         )
 
     # 直接上传到MinIO，添加时间戳区分版本
-    import time
-
     timestamp = int(time.time() * 1000)
     minio_filename = f"{basename}_{timestamp}{ext}"
 
@@ -1574,16 +1426,20 @@ async def mark_it_down(file: UploadFile = File(...), current_user: User = Depend
     temp_path = None
 
     try:
-        content = await file.read()
-
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
             temp_path = temp_file.name
 
-        async with aiofiles.open(temp_path, "wb") as temp_buffer:
-            await temp_buffer.write(content)
+        await write_upload_to_path(
+            file,
+            temp_path,
+            max_size_bytes=MAX_UPLOAD_SIZE_BYTES,
+            too_large_message="文件过大，当前仅支持 100 MB 以内的文件",
+        )
 
         markdown_content = await Parser.aparse(temp_path)
         return {"markdown_content": markdown_content, "message": "success"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"文件解析失败 {e}, {traceback.format_exc()}")
         return {"message": f"文件解析失败 {e}", "markdown_content": ""}
@@ -1631,7 +1487,7 @@ async def get_knowledge_base_statistics(current_user: User = Depends(get_admin_u
 async def generate_description(
     name: str = Body(..., description="知识库名称"),
     current_description: str = Body("", description="当前描述（可选，用于优化）"),
-    file_list: list[str] = Body([], description="文件列表"),
+    file_list: list[str] | None = Body(None, description="文件列表"),
     current_user: User = Depends(get_admin_user),
 ):
     """使用 LLM 生成或优化知识库描述
@@ -1640,6 +1496,7 @@ async def generate_description(
     """
     from yuxi.models import select_model
 
+    file_list = file_list or []
     logger.debug(f"Generating description for knowledge base: {name}, files: {len(file_list)}")
 
     # 构建文件列表文本

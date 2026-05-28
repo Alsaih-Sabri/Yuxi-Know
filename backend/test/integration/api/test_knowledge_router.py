@@ -709,7 +709,7 @@ async def test_sample_questions_endpoints(test_client, admin_headers, knowledge_
     get_response = await test_client.get(f"/api/knowledge/databases/{slug}/sample-questions", headers=admin_headers)
     assert get_response.status_code == 200, get_response.text
     get_payload = get_response.json()
-    assert get_payload["slug"] == slug
+    assert get_payload["kb_id"] == slug
     assert "questions" in get_payload
     assert get_payload["count"] == 0  # 空知识库没有问题
 

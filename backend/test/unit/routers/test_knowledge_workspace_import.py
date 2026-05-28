@@ -45,7 +45,7 @@ async def test_import_workspace_files_uploads_workspace_file_to_minio(tmp_path, 
     monkeypatch.setattr(knowledge_router, "aupload_file_to_minio", fake_upload)
 
     result = await knowledge_router.import_workspace_files(
-        knowledge_router.WorkspaceImportRequest(slug="db_1", paths=["/note.md"]),
+        knowledge_router.WorkspaceImportRequest(kb_id="db_1", paths=["/note.md"]),
         current_user=SimpleNamespace(id="user_1"),
     )
 
@@ -77,7 +77,7 @@ async def test_import_workspace_files_rejects_directory(tmp_path, monkeypatch):
 
     with pytest.raises(HTTPException) as exc_info:
         await knowledge_router.import_workspace_files(
-            knowledge_router.WorkspaceImportRequest(slug="db_1", paths=["/folder"]),
+            knowledge_router.WorkspaceImportRequest(kb_id="db_1", paths=["/folder"]),
             current_user=SimpleNamespace(id="user_1"),
         )
 

@@ -51,11 +51,11 @@ async def calculate_content_hash(data: bytes | bytearray) -> str:
 
 async def prepare_item_metadata(item: str, content_type: str, kb_id: str, params: dict | None = None) -> dict:
     """
-    准备文件或URL的元数据，文件来源必须是 MinIO URL。
+    准备 MinIO 文件元数据；URL 导入需先通过 fetch-url 预处理为 MinIO 文件。
 
     Args:
-        item: MinIO URL 或 URL
-        content_type: 内容类型 ("file" 或 "url")
+        item: MinIO URL
+        content_type: 内容类型，目前仅支持 "file"
         kb_id: 数据库ID
         params: 处理参数，可选
     """
@@ -133,16 +133,6 @@ async def prepare_item_metadata(item: str, content_type: str, kb_id: str, params
         file_size = file_sizes.get(item)
         file_id = f"file_{hashstr(str(item_path) + str(time.time()), 6)}"
 
-    elif content_type == "url":
-        # URL 处理
-        filename = item  # 使用完整 URL 作为文件名
-        filename_display = item
-        file_type = "url"
-        item_path = item
-        content_hash = None  # URL 没有 content_hash
-        file_size = None
-        file_id = f"url_{hashstr(item + str(time.time()), 6)}"
-
     else:
         raise ValueError(f"Unsupported content_type: {content_type}")
 
@@ -189,7 +179,6 @@ def merge_processing_params(metadata_params: dict | None, request_params: dict |
 
     logger.debug(f"Merged processing params: {metadata_params=}, {request_params=}, {merged_params=}")
     return merged_params
-
 
 
 def is_minio_url(file_path: str) -> bool:
