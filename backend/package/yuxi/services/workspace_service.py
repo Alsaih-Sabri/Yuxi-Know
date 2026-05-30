@@ -13,6 +13,7 @@ from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from yuxi.agents.backends.sandbox.paths import _global_user_data_dir, ensure_workspace_default_files
 from yuxi.services.file_preview import detect_preview_type
+from yuxi.services.mention_search_service import invalidate_workspace_mention_cache
 from yuxi.utils.upload_utils import MAX_UPLOAD_SIZE_BYTES, write_upload_to_buffer
 from yuxi.storage.postgres.models_business import User
 from yuxi.utils.datetime_utils import utc_isoformat_from_timestamp
@@ -227,6 +228,7 @@ async def delete_workspace_path(*, path: str, current_user: User) -> dict:
     except PermissionError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    await invalidate_workspace_mention_cache(str(current_user.uid))
     return {"success": True, "path": _normalize_workspace_path(path).as_posix()}
 
 
@@ -243,6 +245,7 @@ async def create_workspace_directory(*, parent_path: str, name: str, current_use
     except PermissionError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    await invalidate_workspace_mention_cache(str(current_user.uid))
     return {"success": True, "entry": _entry_for_path(root, target)}
 
 
@@ -275,6 +278,7 @@ async def upload_workspace_file(*, parent_path: str, file: UploadFile, current_u
             with contextlib.suppress(OSError):
                 await asyncio.to_thread(target.unlink)
 
+    await invalidate_workspace_mention_cache(str(current_user.uid))
     return {"success": True, "entry": _entry_for_path(root, target)}
 
 

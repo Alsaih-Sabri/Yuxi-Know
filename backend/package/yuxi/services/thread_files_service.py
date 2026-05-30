@@ -17,7 +17,7 @@ from yuxi.agents.backends.sandbox import (
 )
 from yuxi.repositories.conversation_repository import ConversationRepository
 from yuxi.services.conversation_service import require_user_conversation
-from yuxi.services.mention_search_service import invalidate_mention_cache
+from yuxi.services.mention_search_service import invalidate_mention_cache, invalidate_workspace_mention_cache
 from yuxi.utils.datetime_utils import utc_isoformat_from_timestamp
 
 
@@ -230,6 +230,7 @@ async def save_thread_artifact_to_workspace_view(
         shutil.copyfileobj(src, dst)
 
     await invalidate_mention_cache(thread_id)
+    await invalidate_workspace_mention_cache(uid)
 
     saved_virtual_path = virtual_path_for_thread_file(thread_id, target_path, uid=uid)
     return {
