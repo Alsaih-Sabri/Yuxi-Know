@@ -401,6 +401,10 @@ const formatResultData = (data) => {
       padding-left: 8px;
       border-left: 1px solid var(--gray-100);
 
+      &:hover {
+        border-left-color: var(--gray-400);
+      }
+
       .tool-params {
         padding: 4px 0 8px;
         background-color: transparent;

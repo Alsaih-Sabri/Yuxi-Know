@@ -25,7 +25,7 @@ import { useUserStore } from '@/stores/user'
 import PageShoulder from '@/components/shared/PageShoulder.vue'
 import InfoCard from '@/components/shared/InfoCard.vue'
 import ExtensionCardGrid from '@/components/extensions/ExtensionCardGrid.vue'
-import defaultAgentIcon from '@/assets/defaults/agent.png'
+import { generatePixelAvatar } from '@/utils/pixelAvatar'
 import { MAX_IMAGE_UPLOAD_SIZE_BYTES, MAX_IMAGE_UPLOAD_SIZE_MB } from '@/utils/upload_limits'
 
 const userStore = useUserStore()
@@ -35,7 +35,16 @@ const saving = ref(false)
 const searchQuery = ref('')
 
 const DEFAULT_AGENT_BACKEND_ID = 'ChatbotAgent'
+const SUB_AGENT_BACKEND_ID = 'SubAgentBackend'
 const agentBackendOptions = ref([])
+const managedAgents = ref([])
+
+const normalizeAgent = (agent) => {
+  const agentId = agent?.agent_id || agent?.slug || agent?.id
+  return agentId
+    ? { ...agent, id: agentId, agent_id: agentId, slug: agent?.slug || agentId }
+    : agent
+}
 
 const showAgentModal = ref(false)
 const editingAgentId = ref(null)
@@ -72,7 +81,7 @@ const isRuntimeAgentModalTab = (key) => runtimeAgentModalTabs.includes(key)
 
 const filteredAgents = computed(() => {
   const keyword = searchQuery.value.trim().toLowerCase()
-  const list = agentStore.agents || []
+  const list = managedAgents.value || []
   const filtered = keyword
     ? list.filter(
         (agent) =>
@@ -94,12 +103,14 @@ const filteredAgents = computed(() => {
 })
 
 const agentStats = computed(() => ({
-  total: agentStore.agents.length,
-  builtin: agentStore.agents.filter(isBuiltinAgent).length,
-  manageable: agentStore.agents.filter((agent) => agent.can_manage).length,
-  global: agentStore.agents.filter((agent) => agent.share_config?.access_level === 'global').length
+  total: managedAgents.value.length,
+  builtin: managedAgents.value.filter(isBuiltinAgent).length,
+  manageable: managedAgents.value.filter((agent) => agent.can_manage).length,
+  global: managedAgents.value.filter((agent) => agent.share_config?.access_level === 'global')
+    .length
 }))
 const getDefaultBackendId = () => DEFAULT_AGENT_BACKEND_ID
+const isSubAgentBackend = (backendId) => backendId === SUB_AGENT_BACKEND_ID
 
 const getInitialShareConfig = () => ({
   access_level: userStore.isAdmin ? 'global' : 'user',
@@ -129,8 +140,16 @@ const getAgentShareAllowedLevels = () => {
 
 const canManageAgent = (agent) => !!agent?.can_manage
 const agentModalTitle = computed(() => (editingAgentId.value ? '编辑智能体' : '新增智能体'))
-const getAgentIconSrc = (agent) => agent?.icon || defaultAgentIcon
-const agentPreviewIcon = computed(() => agentForm.icon?.trim() || defaultAgentIcon)
+const getAgentIconSrc = (agent) => agent.icon || generatePixelAvatar(agent.id)
+const getAgentTags = (agent) => [
+  ...(agent?.is_subagent ? [{ name: '子智能体', color: 'purple' }] : []),
+  ...(agent?.backend_id ? [{ name: agent.backend_id, color: 'blue' }] : [])
+]
+const agentPreviewIcon = computed(() => {
+  if (agentForm.icon?.trim()) return agentForm.icon.trim()
+  if (editingAgentId.value) return generatePixelAvatar(editingAgentId.value)
+  return ''
+})
 const selectedBackendOption = computed(() =>
   agentBackendOptions.value.find((backend) => backend.value === agentForm.backend_id)
 )
@@ -158,7 +177,8 @@ const loadAgentBackends = async () => {
 const loadAgents = async () => {
   agentLoading.value = true
   try {
-    await agentStore.fetchAgents()
+    const response = await agentApi.getAgents({ includeSubagents: true })
+    managedAgents.value = (response.agents || []).map(normalizeAgent)
   } catch (error) {
     message.error(error.message || '加载智能体失败')
   } finally {
@@ -200,13 +220,20 @@ const openEditAgentModal = async (agent) => {
   agentShareConfig.value = isBuiltinAgent(detail)
     ? { access_level: 'global', department_ids: [], user_uids: [] }
     : detail.share_config || getInitialShareConfig()
-  await agentStore.selectAgent(detail.id)
+  await agentStore.selectAgent(detail.id, { allowSubagent: true })
   showAgentModal.value = true
 }
 
-const closeAgentModal = () => {
+const restoreChatAgentSelectionIfNeeded = async () => {
+  if (!agentStore.selectedAgent?.is_subagent) return
+  const fallbackAgentId = (agentStore.agents || []).find((agent) => !agent.is_subagent)?.id
+  if (fallbackAgentId) await agentStore.selectAgent(fallbackAgentId)
+}
+
+const closeAgentModal = async () => {
   if (saving.value || agentIconUploading.value) return
   showAgentModal.value = false
+  await restoreChatAgentSelectionIfNeeded()
 }
 
 const beforeAgentIconUpload = (file) => {
@@ -242,7 +269,8 @@ const buildAgentPayload = () => {
     name: agentForm.name.trim(),
     description: agentForm.description.trim() || null,
     icon: agentForm.icon.trim() || null,
-    share_config: normalizeShareConfigForPayload()
+    share_config: normalizeShareConfigForPayload(),
+    is_subagent: isSubAgentBackend(agentForm.backend_id)
   }
 
   if (!editingAgentId.value) {
@@ -251,6 +279,10 @@ const buildAgentPayload = () => {
   }
 
   return payload
+}
+
+const refreshAgentLists = async () => {
+  await Promise.all([loadAgents(), agentStore.fetchAgents()])
 }
 
 const saveAgent = async () => {
@@ -285,12 +317,17 @@ const saveAgent = async () => {
       }
       await agentStore.updateAgentProfile(editingAgentId.value, payload)
       agentStore.originalAgentConfig = { ...agentStore.agentConfig }
+      await refreshAgentLists()
       message.success('智能体已保存')
     } else {
-      await agentStore.createAgent(payload)
+      const response = await agentApi.createAgent(payload)
+      const created = normalizeAgent(response.agent)
+      await refreshAgentLists()
+      if (created?.id && !created.is_subagent) await agentStore.selectAgent(created.id)
       message.success('智能体已创建')
     }
     showAgentModal.value = false
+    await restoreChatAgentSelectionIfNeeded()
   } catch (error) {
     message.error(error.message || '保存智能体失败')
   } finally {
@@ -311,7 +348,8 @@ const deleteAgent = async (agent) => {
     cancelText: '取消',
     async onOk() {
       try {
-        await agentStore.deleteAgent(agent.id)
+        await agentApi.deleteAgent(agent.id)
+        await refreshAgentLists()
         message.success('智能体已删除')
       } catch (error) {
         message.error(error.message || '删除智能体失败')
@@ -353,7 +391,7 @@ defineExpose({
         :subtitle="agent.slug || agent.id"
         :description="agent.description || '暂无描述'"
         :default-icon="Bot"
-        :tags="agent.backend_id ? [{ name: agent.backend_id, color: 'blue' }] : []"
+        :tags="getAgentTags(agent)"
         class="config-card agent-card"
         @click="canManageAgent(agent) && openEditAgentModal(agent)"
       >
@@ -452,7 +490,12 @@ defineExpose({
                     accept="image/*"
                   >
                     <div class="agent-icon-upload" :class="{ uploading: agentIconUploading }">
-                      <img :src="agentPreviewIcon" :alt="`${agentForm.name || '智能体'}图标`" />
+                      <img
+                        v-if="agentPreviewIcon"
+                        :src="agentPreviewIcon"
+                        :alt="`${agentForm.name || '智能体'}图标`"
+                      />
+                      <Bot v-else :size="32" />
                       <div class="agent-icon-mask">
                         <RefreshCw v-if="agentIconUploading" :size="14" class="spinning" />
                         <Upload v-else :size="14" />
@@ -562,7 +605,7 @@ defineExpose({
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .agent-card-menu-trigger {
@@ -803,7 +846,7 @@ defineExpose({
     display: block;
     width: 100%;
     height: 100%;
-    object-fit: contain;
+    object-fit: cover;
   }
 
   &:hover .agent-icon-mask,

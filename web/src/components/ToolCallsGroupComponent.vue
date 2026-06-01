@@ -97,6 +97,9 @@ watch(
 )
 
 const getToolCallLabel = (toolCall) => {
+  const displayLabel = String(toolCall?.display_label || '').trim()
+  if (displayLabel) return displayLabel
+
   const rawName = getToolCallId(toolCall)
   const name = typeof rawName === 'string' ? rawName.replaceAll('_', ' ') : 'tool'
   return name.charAt(0).toUpperCase() + name.slice(1)

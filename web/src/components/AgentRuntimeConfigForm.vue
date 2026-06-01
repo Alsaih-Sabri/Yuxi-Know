@@ -485,7 +485,7 @@ const navigateToConfigPage = (kind) => {
         router.push({ path: '/extensions', query: { tab: 'skills' } })
         break
       case 'subagents':
-        router.push({ path: '/extensions', query: { tab: 'subagents' } })
+        router.push({ path: '/model-manage', query: { tab: 'agents' } })
         break
     }
   }, 100)

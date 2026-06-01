@@ -166,8 +166,8 @@ import { isBuiltinAgent, useAgentStore } from '@/stores/agent'
 import { useChatUIStore } from '@/stores/chatUI'
 import { ChatExporter } from '@/utils/chatExporter'
 import { handleChatError } from '@/utils/errorHandler'
+import { generatePixelAvatar } from '@/utils/pixelAvatar'
 import { onClickOutside } from '@vueuse/core'
-import defaultAgentIcon from '@/assets/defaults/agent.png'
 
 import { storeToRefs } from 'pinia'
 
@@ -243,12 +243,14 @@ const handleThreadChange = (threadId) => {
 }
 
 const agentQuickSwitchOptions = computed(() =>
-  (agents.value || []).map((agent) => ({
-    label: agent.name || agent.id,
-    value: agent.id,
-    icon: agent.icon || defaultAgentIcon,
-    isBuiltin: isBuiltinAgent(agent)
-  }))
+  (agents.value || [])
+    .filter((agent) => !agent.is_subagent)
+    .map((agent) => ({
+      label: agent.name || agent.id,
+      value: agent.id,
+      icon: agent.icon || generatePixelAvatar(agent.id),
+      isBuiltin: isBuiltinAgent(agent)
+    }))
 )
 
 const currentAgentOption = computed(() =>
@@ -260,14 +262,13 @@ const currentAgentLabel = computed(() => {
   return currentAgentOption.value?.label || '智能体'
 })
 
-const currentAgentIcon = computed(() => currentAgentOption.value?.icon || defaultAgentIcon)
+const currentAgentIcon = computed(() => currentAgentOption.value?.icon)
 
 const inputModelKey = computed(() => {
   if (configurableItems.value?.model?.kind === 'llm') return 'model'
   return (
-    Object.entries(configurableItems.value || {}).find(
-      ([key, item]) => key !== 'subagents_model' && item?.kind === 'llm'
-    )?.[0] || ''
+    Object.entries(configurableItems.value || {}).find(([, item]) => item?.kind === 'llm')?.[0] ||
+    ''
   )
 })
 
@@ -453,7 +454,7 @@ const handleFeedback = () => {
   height: 18px;
   border-radius: 3px;
   flex-shrink: 0;
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .config-dropdown-trigger :deep(svg) {
@@ -645,7 +646,7 @@ const handleFeedback = () => {
 .config-dropdown-overlay .config-dropdown-item-icon-image {
   width: 24px;
   height: 24px;
-  object-fit: contain;
+  object-fit: cover;
   border-radius: 4px;
 }
 

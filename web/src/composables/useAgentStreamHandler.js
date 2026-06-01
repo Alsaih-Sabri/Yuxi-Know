@@ -2,6 +2,63 @@ import { message } from 'ant-design-vue'
 import { handleChatError } from '@/utils/errorHandler'
 import { unref } from 'vue'
 
+const serializeToolArgs = (args) => {
+  if (typeof args === 'string') return args
+  if (args === undefined || args === null) return ''
+  return JSON.stringify(args)
+}
+
+const streamEventToMessageChunk = (streamEvent) => {
+  if (!streamEvent || typeof streamEvent !== 'object') return null
+  const messageId = streamEvent.message_id
+  if (!messageId) return null
+
+  if (streamEvent.type === 'message_delta') {
+    const chunk = {
+      id: messageId,
+      type: 'AIMessageChunk',
+      content: streamEvent.content || ''
+    }
+    if (streamEvent.reasoning_content) {
+      chunk.reasoning_content = streamEvent.reasoning_content
+    }
+    if (streamEvent.additional_reasoning_content) {
+      chunk.additional_kwargs = { reasoning_content: streamEvent.additional_reasoning_content }
+    }
+    return chunk
+  }
+
+  if (streamEvent.type === 'tool_call' || streamEvent.type === 'tool_call_delta') {
+    return {
+      id: messageId,
+      type: 'AIMessageChunk',
+      content: '',
+      tool_call_chunks: [
+        {
+          index: streamEvent.index || 0,
+          id: streamEvent.tool_call_id,
+          name: streamEvent.name,
+          args:
+            streamEvent.type === 'tool_call_delta'
+              ? streamEvent.args_delta || ''
+              : serializeToolArgs(streamEvent.args)
+        }
+      ]
+    }
+  }
+
+  return null
+}
+
+const loadingMessageChunk = (chunk) => {
+  const semanticChunk = streamEventToMessageChunk(chunk?.stream_event)
+  if (semanticChunk) return semanticChunk
+
+  const msg = chunk?.msg
+  if (msg?.event) return null
+  return msg || null
+}
+
 export function useAgentStreamHandler({
   getThreadState,
   processApprovalInStream,
@@ -47,14 +104,17 @@ export function useAgentStreamHandler({
         return false
 
       case 'loading':
-        if (msg.id) {
-          if (streamSmoother) {
-            streamSmoother.pushChunk(msg, threadId)
-          } else {
-            if (!threadState.onGoingConv.msgChunks[msg.id]) {
-              threadState.onGoingConv.msgChunks[msg.id] = []
+        {
+          const messageChunk = loadingMessageChunk(chunk)
+          if (messageChunk?.id) {
+            if (streamSmoother) {
+              streamSmoother.pushChunk(messageChunk, threadId)
+            } else {
+              if (!threadState.onGoingConv.msgChunks[messageChunk.id]) {
+                threadState.onGoingConv.msgChunks[messageChunk.id] = []
+              }
+              threadState.onGoingConv.msgChunks[messageChunk.id].push(messageChunk)
             }
-            threadState.onGoingConv.msgChunks[msg.id].push(msg)
           }
         }
         return false

@@ -2,7 +2,13 @@
   <BaseToolCall :tool-call="toolCall">
     <template #header>
       <div class="sep-header">
-        <span class="note">{{ subagentType }}</span>
+        <span class="note">{{ subagentDisplayName }}</span>
+        <span v-if="subagentSlug && subagentSlug !== subagentDisplayName" class="subagent-slug">
+          {{ subagentSlug }}
+        </span>
+        <span v-if="runStatusLabel" class="run-status" :class="runStatusClass">
+          {{ runStatusLabel }}
+        </span>
         <span class="separator" v-if="shortDescription">|</span>
         <span class="description" v-if="shortDescription">{{ shortDescription }}</span>
       </div>
@@ -43,9 +49,30 @@ const parsedArgs = computed(() => {
   }
 })
 
-const subagentType = computed(() => parsedArgs.value.subagent_type || 'Unknown Agent')
-const description = computed(() => parsedArgs.value.description || '')
-
+const subagentRun = computed(() => props.toolCall.subagent_run || null)
+const subagentSlug = computed(
+  () => parsedArgs.value.subagent_type || subagentRun.value?.subagent_type || ''
+)
+const subagentDisplayName = computed(
+  () =>
+    subagentRun.value?.subagent_name ||
+    parsedArgs.value.subagent_name ||
+    subagentSlug.value ||
+    'Unknown Agent'
+)
+const description = computed(
+  () => parsedArgs.value.description || subagentRun.value?.description || ''
+)
+const runStatus = computed(() => subagentRun.value?.status || '')
+const runStatusLabel = computed(() => {
+  if (runStatus.value === 'completed') return '已完成'
+  if (runStatus.value === 'failed') return '失败'
+  return ''
+})
+const runStatusClass = computed(() => ({
+  'is-completed': runStatus.value === 'completed',
+  'is-failed': runStatus.value === 'failed'
+}))
 const shortDescription = computed(() => {
   const desc = description.value
   if (!desc) return ''
@@ -63,15 +90,42 @@ const shortDescription = computed(() => {
   overflow: hidden;
 }
 
+.subagent-slug {
+  color: var(--gray-500);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-status {
+  flex-shrink: 0;
+  border-radius: 4px;
+  padding: 0 4px;
+  font-size: 11px;
+  background: var(--gray-25);
+  color: var(--gray-600);
+
+  &.is-completed {
+    color: var(--color-success-700);
+    background: var(--color-success-50);
+  }
+
+  &.is-failed {
+    color: var(--color-error-700);
+    background: var(--color-error-50);
+  }
+}
+
 .task-description {
   border-radius: 8px;
   font-size: 13px;
   color: var(--gray-800);
+  padding: 6px 8px;
+  background: var(--gray-50);
 }
 
 .task-result {
-  padding: 12px;
-  background: var(--gray-0);
   border-radius: 8px;
 
   .md-preview-wrapper {

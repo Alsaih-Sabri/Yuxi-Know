@@ -42,6 +42,26 @@ const compareRunSeq = (incoming, current) => {
   return 0
 }
 
+const getThreadIdFromObject = (value) => {
+  if (!value || typeof value !== 'object') return ''
+  if (typeof value.thread_id === 'string' && value.thread_id.trim()) return value.thread_id.trim()
+  const nestedSources = [value.meta, value.metadata, value.configurable, value.stream_event]
+  for (const source of nestedSources) {
+    const nestedThreadId = getThreadIdFromObject(source)
+    if (nestedThreadId) return nestedThreadId
+  }
+  return ''
+}
+
+const resolveChunkThreadId = ({ envelope, payload, chunk, fallbackThreadId }) => {
+  return (
+    getThreadIdFromObject(chunk) ||
+    getThreadIdFromObject(payload) ||
+    getThreadIdFromObject(envelope) ||
+    fallbackThreadId
+  )
+}
+
 const processRunSseResponse = async (response, onEvent) => {
   if (!response || !response.body) return
   const reader = response.body.getReader()
@@ -164,6 +184,7 @@ export function useAgentRunStream({
     ts.lastRetryableJobTry = null
     ts.isStreaming = true
     saveActiveRunSnapshot(threadId, runId, ts.runLastSeq)
+    const touchedThreadIds = new Set([threadId])
 
     try {
       const response = await agentApi.streamAgentRunEvents(runId, ts.runLastSeq, {
@@ -205,17 +226,34 @@ export function useAgentRunStream({
 
         if (Array.isArray(payload.items)) {
           payload.items.forEach((chunk) => {
-            handleStreamChunk({ ...chunk, run_id: chunk.run_id || data.run_id || runId }, threadId)
+            const routeThreadId = resolveChunkThreadId({
+              envelope: data,
+              payload,
+              chunk,
+              fallbackThreadId: threadId
+            })
+            touchedThreadIds.add(routeThreadId)
+            handleStreamChunk(
+              { ...chunk, run_id: chunk.run_id || data.run_id || runId, thread_id: routeThreadId },
+              routeThreadId
+            )
           })
         } else if (payload.chunk) {
+          const routeThreadId = resolveChunkThreadId({
+            envelope: data,
+            payload,
+            chunk: payload.chunk,
+            fallbackThreadId: threadId
+          })
+          touchedThreadIds.add(routeThreadId)
           handleStreamChunk(
-            { ...payload.chunk, run_id: payload.chunk.run_id || data.run_id || runId },
-            threadId
+            { ...payload.chunk, run_id: payload.chunk.run_id || data.run_id || runId, thread_id: routeThreadId },
+            routeThreadId
           )
         }
 
         if (event === 'end') {
-          streamSmoother?.flushThread(threadId)
+          touchedThreadIds.forEach((id) => streamSmoother?.flushThread(id))
           ts.isStreaming = false
           if (RUN_TERMINAL_STATUSES.has(terminalStatus)) {
             ts.activeRunId = null
@@ -233,6 +271,7 @@ export function useAgentRunStream({
         }
 
         if (event === 'error') {
+          touchedThreadIds.forEach((id) => streamSmoother?.flushThread(id))
           ts.isStreaming = false
           ts.activeRunId = null
           ts.lastRetryableJobTry = null

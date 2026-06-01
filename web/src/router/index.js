@@ -126,16 +126,6 @@ const router = createRouter({
               }
             },
             {
-              path: 'subagent/:slug',
-              name: 'ExtensionSubagentDetail',
-              component: () => import('../components/extensions/SubagentDetailView.vue'),
-              meta: {
-                keepAlive: false,
-                requiresAuth: true,
-                requiresAdmin: true
-              }
-            },
-            {
               path: 'skill/:slug',
               name: 'ExtensionSkillDetail',
               component: () => import('../components/extensions/SkillDetailView.vue'),

@@ -25,8 +25,9 @@ function sortAgents(agents) {
 }
 
 function getPreferredAgentId(agents, persistedId) {
-  if (persistedId && agents.some((agent) => agent.id === persistedId)) return persistedId
-  return agents.find(isBuiltinAgent)?.id || agents[0]?.id || null
+  const chatAgents = agents.filter((agent) => !agent.is_subagent)
+  if (persistedId && chatAgents.some((agent) => agent.id === persistedId)) return persistedId
+  return chatAgents.find(isBuiltinAgent)?.id || chatAgents[0]?.id || null
 }
 
 function extractContext(agent) {
@@ -116,11 +117,11 @@ export const useAgentStore = defineStore(
       }
     }
 
-    async function fetchAgents() {
+    async function fetchAgents({ includeSubagents = false } = {}) {
       isLoadingAgents.value = true
       error.value = null
       try {
-        const response = await agentApi.getAgents()
+        const response = await agentApi.getAgents({ includeSubagents })
         agents.value = sortAgents((response.agents || []).map(normalizeAgent))
       } catch (err) {
         console.error('Failed to fetch agents:', err)
@@ -178,11 +179,16 @@ export const useAgentStore = defineStore(
       }
     }
 
-    async function selectAgent(agentId) {
-      if (!agentId || !agents.value.find((a) => a.id === agentId)) return
+    async function selectAgent(agentId, { allowSubagent = false } = {}) {
+      if (!agentId) return
+      let knownAgent = agentDetails.value[agentId] || agents.value.find((a) => a.id === agentId)
+      if (!knownAgent) {
+        knownAgent = await fetchAgentDetail(agentId)
+      }
+      if (knownAgent?.is_subagent && !allowSubagent) return
       isLoadingConfig.value = true
       try {
-        const detail = await fetchAgentDetail(agentId)
+        const detail = agentDetails.value[agentId] || (await fetchAgentDetail(agentId))
         const loadedConfig = applyConfigDefaults(
           extractContext(detail),
           detail?.configurable_items || {}
@@ -224,7 +230,7 @@ export const useAgentStore = defineStore(
           created,
           ...agents.value.filter((item) => item.id !== created.id)
         ])
-        await selectAgent(created.id)
+        if (!created.is_subagent) await selectAgent(created.id)
       }
       return created
     }
