@@ -38,6 +38,16 @@ def test_parse_skill_markdown_requires_frontmatter():
         svc._parse_skill_markdown("# missing")
 
 
+def test_image_gen_builtin_skill_spec():
+    specs = {spec["slug"]: spec for spec in svc.list_builtin_skill_specs()}
+
+    assert "image-gen" in specs
+    image_gen = specs["image-gen"]
+    assert image_gen["name"] == "image-gen"
+    assert image_gen["tool_dependencies"] == ["present_artifacts"]
+    assert (image_gen["source_dir"] / "SKILL.md").exists()
+
+
 def test_is_valid_skill_slug():
     # Test valid slugs
     assert svc.is_valid_skill_slug("demo-skill") is True

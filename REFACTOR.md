@@ -48,4 +48,6 @@
 - [x] parser 从plugins 移动到 knowledge 里面，guard 移动到services 里面
 - [x] neo4j 相关的服务，可以移动到 storage 里面
 - [ ] 点开对话的时候要能够自动定位到尾部，而不是最开始。
-- [ ] 将 Qwen-Image 修改为 Skill，暴露一个工具，叫做上传图片到 MINIO，这样生成图片的时候就可以调用别的接口生成图片，并可以上传到 MINIO 上面。也就是将原本生成图片的逻辑移动到 Skill 里面来实现，这样就可以支持多种生成图片的模型了。接入多种的接口
+- [x] 将 Qwen-Image 修改为 Skill
+- [ ] 现在输入区域对于不同 mention 的渲染的 ICON 和 human-message 里面的渲染的 ICON; 居然不一样？这个是什么原因，综合并统一一下，使用最优方案。
+- [ ] 现在的消息突然居然

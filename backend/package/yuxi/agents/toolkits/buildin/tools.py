@@ -1,9 +1,7 @@
 import os
-import uuid
 from pathlib import Path
 from typing import Annotated
 
-import requests
 from langchain.tools import InjectedToolCallId
 from langchain_core.messages import ToolMessage
 from langgraph.prebuilt.tool_node import ToolRuntime
@@ -11,22 +9,12 @@ from langgraph.types import Command, interrupt
 from pydantic import BaseModel, Field
 
 from yuxi.agents.toolkits.registry import ToolExtraMetadata, _all_tool_instances, _extra_registry, tool
-from yuxi.storage.minio import aupload_file_to_minio
 from yuxi.utils import logger
 from yuxi.utils.paths import VIRTUAL_PATH_OUTPUTS
 from yuxi.utils.question_utils import normalize_questions
 
 # Lazy initialization for TavilySearch (only when API key is available)
 _tavily_search_instance = None
-
-QWEN_IMAGE_CONFIG_GUIDE = """
-使用前需要先配置硅基流动的图片生成访问凭证。
-
-请在后端运行环境中配置环境变量：
-- `SILICONFLOW_API_KEY`：用于调用 SiliconFlow 的图片生成接口
-
-配置完成后即可使用该工具生成图片。
-""".strip()
 
 
 def _create_tavily_search():
@@ -216,52 +204,3 @@ def ask_user_question(
         "questions": normalized_questions,
         "answer": answer,
     }
-
-
-@tool(
-    category="buildin",
-    tags=["图片", "生成"],
-    display_name="Qwen-Image",
-    config_guide=QWEN_IMAGE_CONFIG_GUIDE,
-)
-async def text_to_img_qwen_image(
-    prompt: Annotated[str, "用于生成图片的文本描述"],
-    negative_prompt: Annotated[str, "负面提示词，用于指定不想出现在图片中的元素"] = "",
-    num_inference_steps: Annotated[int, "推理步数，范围1-100"] = 20,
-    guidance_scale: Annotated[float, "引导强度，控制图片与提示词的匹配程度"] = 7.5,
-    uid: Annotated[str, "UID，用于图片归档路径"] = "unknown",
-) -> str:
-    """使用 Qwen-Image 模型生成图片，返回图片的URL，需要注意的是，生成结果不会默认展示，需要将返回的URL进行展示处理。"""
-    url = "https://api.siliconflow.cn/v1/images/generations"
-
-    payload = {
-        "model": "Qwen/Qwen-Image",
-        "prompt": prompt,
-        "negative_prompt": negative_prompt,
-        "num_inference_steps": num_inference_steps,
-        "guidance_scale": guidance_scale,
-    }
-    headers = {"Authorization": f"Bearer {os.getenv('SILICONFLOW_API_KEY')}", "Content-Type": "application/json"}
-
-    try:
-        response = requests.post(url, json=payload, headers=headers)
-        response_json = response.json()
-    except Exception as e:
-        logger.error(f"Failed to generate image with: {e}")
-        raise ValueError(f"Image generation failed: {e}")
-
-    try:
-        image_url = response_json["images"][0]["url"]
-    except (KeyError, IndexError, TypeError) as e:
-        logger.error(f"Failed to parse image URL from response: {e}, {response_json=}")
-        raise ValueError(f"Image URL extraction failed: {e}")
-
-    # Upload to MinIO
-    response = requests.get(image_url)
-    file_data = response.content
-
-    safe_uid = str(uid or "unknown").replace("/", "_").replace("\\", "_")
-    file_name = f"user/{safe_uid}/generated-images/{uuid.uuid4()}.jpg"
-    image_url = await aupload_file_to_minio(bucket_name="public", file_name=file_name, data=file_data)
-    logger.info(f"Image uploaded. URL: {image_url}")
-    return image_url
