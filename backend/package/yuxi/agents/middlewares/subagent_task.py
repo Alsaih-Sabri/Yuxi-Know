@@ -85,7 +85,7 @@ def _preview_text(text: str, limit: int = 500) -> str:
 
 
 def _tool_result_with_thread_id(child_thread_id: str, content: str) -> str:
-    return f"子智能体线程 ID: {child_thread_id}\n\n{content}"
+    return f"> 子智能体线程 ID: {child_thread_id}\n\n---\n\n{content}"
 
 
 def _new_child_thread_id(

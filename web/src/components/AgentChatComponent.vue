@@ -288,13 +288,15 @@
               <section class="state-section">
                 <div class="state-section-header">
                   <span class="state-section-title">子智能体</span>
-                  <span class="state-section-meta">{{ currentSubagentRuns.length }}</span>
+                  <span class="state-section-meta">{{ displaySubagentRuns.length }}</span>
                 </div>
-                <div v-if="currentSubagentRuns.length" class="state-list">
+                <div v-if="displaySubagentRuns.length" class="state-list">
                   <div
-                    v-for="(run, index) in currentSubagentRuns"
+                    v-for="(run, index) in displaySubagentRuns"
                     :key="run.id || `${run.subagent_type || 'subagent'}-${index}`"
                     class="state-list-item"
+                    :class="{ 'is-clickable': run.child_thread_id }"
+                    @click="run.child_thread_id && openSubagentThread(run)"
                   >
                     <img
                       v-if="getSubagentIconSrc(run)"
@@ -333,6 +335,12 @@
         </div>
       </div>
     </div>
+
+    <SubagentThreadModal
+      v-model:open="subagentThreadModal.open"
+      :child-thread-id="subagentThreadModal.childThreadId"
+      :subagent-name="subagentThreadModal.subagentName"
+    />
   </div>
 </template>
 
@@ -344,6 +352,7 @@ import {
   watch,
   nextTick,
   computed,
+  provide,
   onUnmounted,
   onActivated,
   onDeactivated
@@ -383,7 +392,10 @@ import { useAgentMentionConfig } from '@/composables/useAgentMentionConfig'
 import AgentArtifactsCard from '@/components/AgentArtifactsCard.vue'
 import AgentPanel from '@/components/AgentPanel.vue'
 import AttachmentTmpUploadModal from '@/components/AttachmentTmpUploadModal.vue'
-import { enrichTaskToolCalls } from '@/components/ToolCallingResult/toolRegistry'
+import SubagentThreadModal from '@/components/SubagentThreadModal.vue'
+import { enrichTaskToolCalls, parseToolCallArgs } from '@/components/ToolCallingResult/toolRegistry'
+import { getConversationDisplayItems } from '@/utils/messageGrouping'
+import { makeChildThreadId } from '@/utils/subagentThread'
 
 // ==================== PROPS & EMITS ====================
 const props = defineProps({
@@ -422,8 +434,17 @@ const randomGreeting = greetingMessages[Math.floor(Math.random() * greetingMessa
 const chatState = reactive({
   currentThreadId: null,
   // 以threadId为键的线程状态
-  threadStates: {}
+  threadStates: {},
+  // 流式期间记录 父 task 工具调用 id → 子智能体 child_thread_id（首次运行时前端无法推算该 id）
+  subagentThreadByToolCall: {}
 })
+const recordSubagentThread = (toolCallId, childThreadId) => {
+  if (!toolCallId || !childThreadId) return
+  if (chatState.subagentThreadByToolCall[toolCallId] === childThreadId) return
+  chatState.subagentThreadByToolCall[toolCallId] = childThreadId
+}
+const getSubagentThreadIdByToolCall = (toolCallId) =>
+  (toolCallId && chatState.subagentThreadByToolCall[String(toolCallId)]) || ''
 const setCurrentThreadId = (threadId) => {
   chatState.currentThreadId = threadId || null
   chatThreadsStore.setCurrentThreadId(threadId || null)
@@ -728,6 +749,18 @@ const currentSubagentOptionBySlug = computed(() => {
   })
   return optionBySlug
 })
+
+const subagentThreadModal = reactive({
+  open: false,
+  childThreadId: '',
+  subagentName: ''
+})
+const openSubagentThread = (run) => {
+  if (!run?.child_thread_id) return
+  subagentThreadModal.childThreadId = String(run.child_thread_id)
+  subagentThreadModal.subagentName = getSubagentRunName(run)
+  subagentThreadModal.open = true
+}
 const currentStateFiles = computed(() => {
   const files = []
   const seenPaths = new Set()
@@ -770,7 +803,7 @@ const stateSummaryLabel = computed(() => {
     totalTodoCount.value +
     currentStateFiles.value.length +
     currentArtifactFiles.value.length +
-    currentSubagentRuns.value.length
+    displaySubagentRuns.value.length
   return total ? `${total} 项` : '暂无内容'
 })
 
@@ -828,6 +861,122 @@ const getThreadOngoingMessages = (threadId) => {
 
 const onGoingConvMessages = computed(() => getThreadOngoingMessages(currentChatId.value))
 
+// 供深层 TaskTool 读取子线程实时轨迹 / 首次运行时定位 child_thread_id
+provide('getThreadOngoingMessages', getThreadOngoingMessages)
+provide('getSubagentThreadIdByToolCall', getSubagentThreadIdByToolCall)
+
+// 解析父级 ongoing 里的全部 task 工具调用（按消息顺序），统一供面板与状态判定使用。
+// 注意：ongoing 期间 task 的工具结果不流式（只有 message_delta/tool_call 事件），因此这里的
+// hasResult 在流式阶段恒为 false，状态判定不能依赖它。
+const ongoingTaskCalls = computed(() => {
+  const calls = []
+  onGoingConvMessages.value.forEach((message, messageIndex) => {
+    if (message?.type !== 'ai' || !Array.isArray(message.tool_calls)) return
+    message.tool_calls.forEach((toolCall) => {
+      const name = toolCall?.name || toolCall?.function?.name
+      if (name !== 'task') return
+      const id = toolCall?.id ? String(toolCall.id) : ''
+      if (!id) return
+      const args = parseToolCallArgs(toolCall)
+      calls.push({
+        id,
+        messageIndex,
+        hasResult: Boolean(toolCall.tool_call_result || toolCall.result),
+        subagentType: args.subagent_type || '',
+        description: args.description || '',
+        childThreadId: args.thread_id ? String(args.thread_id) : getSubagentThreadIdByToolCall(id)
+      })
+    })
+  })
+  return calls
+})
+
+// 当前活跃（真正在执行）的 task 调用 = 最后一条「含未完成 task 调用」的 AI 消息中的那些调用。
+// steer 顺序进行 → 只有最后一条消息的调用在执行；并行 → 同一条消息的多个调用都在执行。
+// 用消息顺序判定，不依赖异步推算的 child_thread_id，避免首次运行哈希未就绪导致的状态错乱。
+const activeSubagentToolCallIds = computed(() => {
+  const pending = ongoingTaskCalls.value.filter((call) => !call.hasResult)
+  if (!pending.length) return new Set()
+  const lastMessageIndex = pending[pending.length - 1].messageIndex
+  return new Set(
+    pending.filter((call) => call.messageIndex === lastMessageIndex).map((call) => call.id)
+  )
+})
+provide('activeSubagentToolCallIds', activeSubagentToolCallIds)
+
+// agent_state.subagent_runs 仅在 task 返回（完成态）时写入；面板的运行中条目只取「活跃」调用，
+// 避免已完成的 steer 历史调用在面板里重复成额外条目。
+const runningSubagentRunsFromStream = computed(() => {
+  const activeIds = activeSubagentToolCallIds.value
+  return ongoingTaskCalls.value
+    .filter((call) => activeIds.has(call.id))
+    .map((call) => {
+      const option = call.subagentType ? currentSubagentOptionBySlug.value.get(call.subagentType) : null
+      return {
+        id: call.id,
+        subagent_type: call.subagentType,
+        subagent_name: option?.name || call.subagentType || '子智能体',
+        description: call.description,
+        child_thread_id: call.childThreadId || '',
+        status: 'running'
+      }
+    })
+})
+
+// 与后端 merge_subagent_runs 一致：按 child_thread_id / id 合并，运行中条目覆盖同一线程的完成态，
+// 保证每个子线程恒为一行并反映当前状态（含续跑/steer）。
+const displaySubagentRuns = computed(() => {
+  const merged = currentSubagentRuns.value.map((run) => ({ ...run }))
+  const childIndex = new Map()
+  const idIndex = new Map()
+  merged.forEach((run, index) => {
+    if (run.child_thread_id) childIndex.set(String(run.child_thread_id), index)
+    if (run.id) idIndex.set(String(run.id), index)
+  })
+  runningSubagentRunsFromStream.value.forEach((run) => {
+    let position
+    if (run.child_thread_id && childIndex.has(run.child_thread_id)) {
+      position = childIndex.get(run.child_thread_id)
+    } else if (idIndex.has(run.id)) {
+      position = idIndex.get(run.id)
+    }
+    if (position === undefined) {
+      position = merged.length
+      merged.push(run)
+    } else {
+      merged[position] = { ...merged[position], ...run }
+    }
+    if (run.child_thread_id) childIndex.set(run.child_thread_id, position)
+    idIndex.set(run.id, position)
+  })
+  return merged
+})
+
+// 首次运行的子智能体：前端按后端同样的哈希推算 child_thread_id，缓存到映射里供面板/轨迹定位。
+watch(
+  onGoingConvMessages,
+  (messages) => {
+    const parentThreadId = currentChatId.value
+    if (!parentThreadId) return
+    messages.forEach((message) => {
+      if (message?.type !== 'ai' || !Array.isArray(message.tool_calls)) return
+      message.tool_calls.forEach((toolCall) => {
+        const name = toolCall?.name || toolCall?.function?.name
+        if (name !== 'task') return
+        if (toolCall.tool_call_result || toolCall.result) return
+        const id = toolCall?.id ? String(toolCall.id) : ''
+        if (!id || chatState.subagentThreadByToolCall[id]) return
+        const args = parseToolCallArgs(toolCall)
+        if (args.thread_id || !args.subagent_type) return
+        makeChildThreadId(parentThreadId, String(args.subagent_type), id).then((childThreadId) => {
+          recordSubagentThread(id, childThreadId)
+        })
+      })
+    })
+  },
+  { deep: true }
+)
+
 const historyConversations = computed(() => {
   return MessageProcessor.convertServerHistoryToMessages(currentThreadMessages.value)
 })
@@ -855,7 +1004,7 @@ const conversationRows = computed(() => {
     type: 'conversation',
     key: conv.status === 'streaming' ? 'ongoing-conversation' : `history-${index}`,
     conv,
-    displayItems: getConversationDisplayItems(conv)
+    displayItems: getDisplayItems(conv)
   }))
 
   if (currentThreadConfigNotice.value) {
@@ -1808,19 +1957,6 @@ const handleResizingChange = (isResizingState, clientX = 0) => {
 }
 
 // ==================== HELPER FUNCTIONS ====================
-const hasVisibleAssistantBody = (message) => {
-  if (!message || message.type !== 'ai') return true
-
-  const { content, reasoningContent } = MessageProcessor.parseAssistantMessageBody(message)
-  return Boolean(
-    content ||
-    reasoningContent ||
-    message.error_type ||
-    message.extra_metadata?.error_type ||
-    message.isStoppedByUser
-  )
-}
-
 const getMessageToolCalls = (message) => {
   return enrichTaskToolCalls(message?.tool_calls, {
     subagentRunById: currentSubagentRunById.value,
@@ -1829,58 +1965,8 @@ const getMessageToolCalls = (message) => {
   })
 }
 
-// 将 AI 消息拆成“正文块”和“工具块”，再跨消息合并相邻工具块。
-const getConversationDisplayItems = (conv) => {
-  if (!Array.isArray(conv?.messages) || conv.messages.length === 0) return []
-
-  const items = []
-  let pendingToolGroup = null
-
-  const flushToolGroup = () => {
-    if (pendingToolGroup && pendingToolGroup.toolCalls.length > 0) {
-      items.push(pendingToolGroup)
-    }
-    pendingToolGroup = null
-  }
-
-  conv.messages.forEach((message, index) => {
-    if (message.type !== 'ai') {
-      flushToolGroup()
-      items.push({
-        type: 'message',
-        key: message.id || `message-${index}`,
-        message,
-        sourceIndex: index
-      })
-      return
-    }
-
-    if (hasVisibleAssistantBody(message)) {
-      flushToolGroup()
-      items.push({
-        type: 'message',
-        key: message.id || `message-${index}`,
-        message,
-        sourceIndex: index
-      })
-    }
-
-    const toolCalls = getMessageToolCalls(message)
-    if (toolCalls.length === 0) return
-
-    if (!pendingToolGroup) {
-      pendingToolGroup = {
-        type: 'tool-group',
-        key: `tool-group-${message.id || index}`,
-        toolCalls: []
-      }
-    }
-    pendingToolGroup.toolCalls.push(...toolCalls)
-  })
-
-  flushToolGroup()
-  return items
-}
+const getDisplayItems = (conv) =>
+  getConversationDisplayItems(conv, { enrichToolCalls: getMessageToolCalls })
 
 const isDisplayMessageProcessing = (conv, displayItem) => {
   return (
@@ -2807,9 +2893,14 @@ watch(currentChatId, (threadId, oldThreadId) => {
   cursor: pointer;
 }
 
-.state-list-item--button:hover {
+.state-list-item--button:hover,
+.state-list-item.is-clickable:hover {
   border-color: var(--main-200);
   background: var(--gray-0);
+}
+
+.state-list-item.is-clickable {
+  cursor: pointer;
 }
 
 .state-list-item-icon {

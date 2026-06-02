@@ -6,11 +6,11 @@
     <!-- Header Slot -->
     <div class="tool-header" @click="toggleExpand">
       <!-- Fixed Status Icon -->
-      <span v-if="toolCall.status === 'success' || toolCall.tool_call_result">
+      <span v-if="effectiveStatus === 'completed'">
         <component v-if="toolIcon" :is="toolIcon" size="16" class="tool-loader tool-success" />
         <CheckCircle v-else size="16" class="tool-loader tool-success" />
       </span>
-      <span v-else-if="toolCall.status === 'error'">
+      <span v-else-if="effectiveStatus === 'error'">
         <XCircle size="16" class="tool-loader tool-error" />
       </span>
       <span v-else>
@@ -71,7 +71,7 @@
       </div>
 
       <!-- Result Slot -->
-      <div class="tool-result" style="opacity: 0.8" v-if="hasResult">
+      <div class="tool-result" style="opacity: 0.8" v-if="hasResult || forceShowResult">
         <slot name="result" :tool-call="toolCall" :result-content="resultContent">
           <div class="tool-result-content" :data-tool-call-id="toolCall.id">
             <!-- Default rendering -->
@@ -112,6 +112,16 @@ const props = defineProps({
   appearance: {
     type: String,
     default: 'card'
+  },
+  // 外部可覆盖状态以驱动图标：'running' | 'completed' | 'failed'（用于结果不随流式返回的工具，如 task）
+  status: {
+    type: String,
+    default: ''
+  },
+  // 即使没有 tool_call_result 也展示结果区（配合外部提供的结果内容，如 task 的 result_preview）
+  forceShowResult: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -124,6 +134,14 @@ const isTimeline = computed(() => props.appearance === 'timeline')
 const toggleExpand = () => {
   isExpanded.value = !isExpanded.value
 }
+
+// 图标状态：优先用外部传入的 status，否则按 tool_call_result/status 推断
+const effectiveStatus = computed(() => {
+  if (props.status) return props.status
+  if (props.toolCall.status === 'success' || props.toolCall.tool_call_result) return 'completed'
+  if (props.toolCall.status === 'error') return 'failed'
+  return 'running'
+})
 
 // Tool Name Logic
 const toolId = computed(() => getToolCallId(props.toolCall))

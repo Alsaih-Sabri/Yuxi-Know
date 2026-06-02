@@ -67,7 +67,8 @@ export const agentApi = {
    * @param {string} threadId - 会话ID
    * @returns {Promise} - AgentState
    */
-  getAgentState: (threadId) => apiGet(`/api/chat/thread/${threadId}/state`),
+  getAgentState: (threadId, { includeMessages = false } = {}) =>
+    apiGet(`/api/chat/thread/${threadId}/state${includeMessages ? '?include_messages=true' : ''}`),
 
   /**
    * Submit feedback for a message

@@ -39,10 +39,22 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, inject } from 'vue'
 import { ChevronDown, ChevronRight, Wrench } from 'lucide-vue-next'
 import { ToolCallRenderer } from '@/components/ToolCallingResult'
 import { getToolCallId, normalizeToolCalls } from '@/components/ToolCallingResult/toolRegistry'
+
+const activeSubagentToolCallIds = inject('activeSubagentToolCallIds', null)
+
+// task 工具结果不随流式返回，不能用 tool_call_result 判断运行中：只有「活跃」的 task 才算运行中。
+const toolRunState = (toolCall) => {
+  if (toolCall.status === 'error') return 'error'
+  if (toolCall.tool_call_result || toolCall.status === 'success') return 'completed'
+  if (getToolCallId(toolCall) === 'task') {
+    return activeSubagentToolCallIds?.value?.has(String(toolCall.id)) ? 'running' : 'completed'
+  }
+  return 'running'
+}
 
 const props = defineProps({
   toolCalls: {
@@ -110,16 +122,10 @@ const toolCallsNamesMeta = computed(() => {
 })
 
 const statusSummary = computed(() => {
-  const successCount = normalizedToolCalls.value.filter(
-    (toolCall) => toolCall.status === 'success' || toolCall.tool_call_result
-  ).length
-  const runningCount = normalizedToolCalls.value.filter(
-    (toolCall) =>
-      toolCall.status !== 'success' && toolCall.status !== 'error' && !toolCall.tool_call_result
-  ).length
-  const errorCount = normalizedToolCalls.value.filter(
-    (toolCall) => toolCall.status === 'error'
-  ).length
+  const states = normalizedToolCalls.value.map(toolRunState)
+  const successCount = states.filter((state) => state === 'completed').length
+  const runningCount = states.filter((state) => state === 'running').length
+  const errorCount = states.filter((state) => state === 'error').length
 
   const parts = []
   if (successCount > 0 && successCount === normalizedToolCalls.value.length) {
@@ -140,7 +146,6 @@ const toggleToolCallsExpanded = () => {
 <style lang="less" scoped>
 .tool-calls-container {
   width: 100%;
-  margin: 10px 0;
   padding: 0;
 
   .tool-calls-summary {
@@ -222,9 +227,8 @@ const toggleToolCallsExpanded = () => {
   }
 
   .tool-calls-panel {
-    padding: 4px 0 4px 12px;
-    border-left: 1px solid var(--gray-100);
-    margin-left: 8px;
+    border-top: 1px solid var(--gray-100);
+    padding-top: 4px;
     margin-top: 4px;
     margin-bottom: 8px;
   }
