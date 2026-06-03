@@ -21,10 +21,14 @@
 - [ ] rename database table name, such as skills -> agent_skills, subagents -> agent_subagents, mcp, tool_call, 等等
 - [x] department 的 id 也不能使用那个索引的 id 来使用了，应该是一个独立的 dept_id，需要确认
 - [x] allow user config envs
-- [ ] add model retry times to agent context config
-- [ ] 添加用户级别的 Skills 的安装
-- [ ] Skill 卡片优化
-- [ ] 子智能体的消息渲染与可视化
+- [x] add model retry times to agent context config
+- [x] 添加用户级别的 Skills 的安装
+- [x] Skill 卡片优化
+- [ ] 拓展 Skill 安装方法
+- [ ] MCP 部分，未添加情况下无法获取工具
+- [ ] 添加 MCP 移除 JSON 模式
+- [ ] 工作区允许上传多个文件
+- [x] 子智能体的消息渲染与可视化
 - [x] 子智能体的优化，参考 PR 的方案。
 - [x] 附件上传能够支持转换为 PDF，待办：查看 OCR 模型的状态，样式优化，保存的文件名不对
 - [x] 参考 PR，实现内置 Dashscope 的 Embedding 和 rerank 的方法
@@ -38,14 +42,14 @@
 - [x] default enable all build in tools / kbs / skills / mcps / subagents
 - [x] 链接 Notion 和 feishu 目前来看，都是支持的
 - [x] 知识库的权限调整，修改为三个等级，全局共享、部门共享、指定人可访问
-- [x] 当前的评估基准是最重要的是评估数据集和评估结果都是放在一个文件里面的，这个是绝对不可以的，应该是放在数据库里面，比如评估数据集是一个表，每一个评估的题目是一个表，评估的结果是一个表，每一个评估的 item 也是一个表，但是数据表太多要注意命名规范。现在第一步就是完成原本的评估的功能的重新梳理
+- [x] 优化评估结构
 - [ ] 考虑如何将知识库更好的挂载到沙盒，是不是可以使用一个别的后端，但是使用别的后端是否还能读取到数据？应该不能
 - [x] 智能体体系改进。改进子智能体，我觉得子智能体并不是一个子级的智能体，应该是
 - [ ] RAG 中的文件的 metadata 包含那些内容？然后 Find 和 Read 的时候要支持展示
 - [x] 检查前端的这些 store 的使用，是否有需要调整优化收敛的地方
+- [ ] install skill 这个工具需要在主智能体启用，子智能体无法使用
 - [x] parser 从plugins 移动到 knowledge 里面，guard 移动到services 里面
 - [x] neo4j 相关的服务，可以移动到 storage 里面
 - [ ] 点开对话的时候要能够自动定位到尾部，而不是最开始。
 - [x] 将 Qwen-Image 修改为 Skill
-- [ ] 现在输入区域对于不同 mention 的渲染的 ICON 和 human-message 里面的渲染的 ICON; 居然不一样？这个是什么原因，综合并统一一下，使用最优方案。
-- [ ] 现在的消息突然居然
+- [x] 现在输入区域对于不同 mention 的渲染的 ICON 和 human-message 里面的渲染的 ICON;
