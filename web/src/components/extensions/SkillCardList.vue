@@ -76,49 +76,54 @@
     </div>
 
     <template v-else>
-      <ExtensionCardGrid :min-width="360">
-        <div
-          v-for="skill in filteredInstalledSkills"
-          :key="skill.slug"
-          class="card-wrapper"
-          :class="{
-            selected: selectedCardSlugs.includes(skill.slug),
-            'batch-mode': isBatchDeleteMode
-          }"
-        >
-          <a-checkbox
-            v-if="isBatchDeleteMode && canManageSkill(skill) && skill.sourceType !== 'builtin'"
-            :checked="selectedCardSlugs.includes(skill.slug)"
-            @change="handleToggleCardSelect(skill.slug)"
-            class="card-select-checkbox"
-          />
-          <InfoCard
-            variant="mini"
-            :title="formatExtensionCardTitle(skill.name)"
-            :description="skill.description || '暂无描述'"
-            :default-icon="BookMarkedIcon"
-            @click="handleCardClick(skill)"
-            :class="{ 'card-clickable-select': isBatchDeleteMode }"
-          >
-            <template #action>
-              <button
-                type="button"
-                class="skill-enabled-action"
-                :class="{ enabled: skill.enabled !== false }"
-                :disabled="!canManageSkill(skill) || isSkillToggling(skill.slug)"
-                :aria-label="skill.enabled === false ? '启用 Skill' : '禁用 Skill'"
-                @click.stop="handleToggleSkillEnabled(skill)"
+      <template v-for="group in skillGroups" :key="group.key">
+        <template v-if="group.skills.length">
+          <div class="extension-section-header">{{ group.title }}</div>
+          <ExtensionCardGrid :min-width="360">
+            <div
+              v-for="skill in group.skills"
+              :key="skill.slug"
+              class="card-wrapper"
+              :class="{
+                selected: selectedCardSlugs.includes(skill.slug),
+                'batch-mode': isBatchDeleteMode
+              }"
+            >
+              <a-checkbox
+                v-if="isBatchDeleteMode && canManageSkill(skill) && skill.sourceType !== 'builtin'"
+                :checked="selectedCardSlugs.includes(skill.slug)"
+                @change="handleToggleCardSelect(skill.slug)"
+                class="card-select-checkbox"
+              />
+              <InfoCard
+                variant="mini"
+                :title="formatExtensionCardTitle(skill.name)"
+                :description="skill.description || '暂无描述'"
+                :default-icon="BookMarkedIcon"
+                @click="handleCardClick(skill)"
+                :class="{ 'card-clickable-select': isBatchDeleteMode }"
               >
-                <Plus v-if="skill.enabled === false" :size="15" class="action-icon" />
-                <template v-else>
-                  <Check :size="15" class="action-icon action-icon-check" />
-                  <Minus :size="15" class="action-icon action-icon-minus" />
+                <template #action>
+                  <button
+                    type="button"
+                    class="skill-enabled-action"
+                    :class="{ enabled: skill.enabled !== false }"
+                    :disabled="!canManageSkill(skill) || isSkillToggling(skill.slug)"
+                    :aria-label="skill.enabled === false ? '启用 Skill' : '禁用 Skill'"
+                    @click.stop="handleToggleSkillEnabled(skill)"
+                  >
+                    <Plus v-if="skill.enabled === false" :size="15" class="action-icon" />
+                    <template v-else>
+                      <Check :size="15" class="action-icon action-icon-check" />
+                      <Minus :size="15" class="action-icon action-icon-minus" />
+                    </template>
+                  </button>
                 </template>
-              </button>
-            </template>
-          </InfoCard>
-        </div>
-      </ExtensionCardGrid>
+              </InfoCard>
+            </div>
+          </ExtensionCardGrid>
+        </template>
+      </template>
     </template>
 
     <a-modal
@@ -610,6 +615,18 @@ const installedSkillCards = computed(() =>
 )
 
 const filteredInstalledSkills = computed(() => installedSkillCards.value.filter(matchesSearch))
+const skillGroups = computed(() => [
+  {
+    key: 'builtin',
+    title: '内置',
+    skills: filteredInstalledSkills.value.filter((skill) => skill.sourceType === 'builtin')
+  },
+  {
+    key: 'uploaded',
+    title: '上传的',
+    skills: filteredInstalledSkills.value.filter((skill) => skill.sourceType !== 'builtin')
+  }
+])
 const filteredDeletableSkills = computed(() =>
   filteredInstalledSkills.value.filter(
     (skill) => canManageSkill(skill) && skill.sourceType !== 'builtin'
