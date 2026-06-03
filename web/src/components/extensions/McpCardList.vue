@@ -6,7 +6,7 @@
           <Plus :size="14" />
           <span>添加 MCP</span>
         </a-button>
-        <a-tooltip title="刷新 MCP">
+        <a-tooltip title="刷新 MCP" placement="bottom">
           <a-button class="lucide-icon-btn" :disabled="loading" @click="fetchServers">
             <RefreshCw :size="14" />
           </a-button>
@@ -30,7 +30,7 @@
         <InfoCard
           v-for="server in filteredEnabledServers"
           :key="server.name"
-          :title="server.name"
+          :title="formatExtensionCardTitle(server.name)"
           :subtitle="server.transport"
           :description="server.description || '暂无描述'"
           :tags="mcpTags(server)"
@@ -48,7 +48,7 @@
         <InfoCard
           v-for="server in filteredDisabledServers"
           :key="server.name"
-          :title="server.name"
+          :title="formatExtensionCardTitle(server.name)"
           :subtitle="server.transport"
           :description="server.description || '暂无描述'"
           :tags="mcpTags(server)"
@@ -81,6 +81,7 @@ import ExtensionCardGrid from './ExtensionCardGrid.vue'
 import InfoCard from '@/components/shared/InfoCard.vue'
 import PageShoulder from '@/components/shared/PageShoulder.vue'
 import McpFormModal from './McpFormModal.vue'
+import { formatExtensionCardTitle } from '@/utils/extensionDisplayName'
 
 const router = useRouter()
 
@@ -124,7 +125,7 @@ const mcpTags = (server) => {
 }
 
 const navigateToDetail = (server) => {
-  router.push({ path: `/extensions/mcp/${encodeURIComponent(server.name)}` })
+  router.push({ path: `/extensions/mcp/${encodeURIComponent(server.slug)}` })
 }
 
 const handleMcpAdd = () => {
@@ -138,7 +139,7 @@ const handleFormSubmitted = async () => {
 
 const handleSetServerEnabled = async (server, enabled) => {
   try {
-    const result = await mcpApi.updateMcpServerStatus(server.name, enabled)
+    const result = await mcpApi.updateMcpServerStatus(server.slug, enabled)
     if (result.success) {
       message.success(result.message || `MCP 已${enabled ? '添加' : '移除'}`)
       await fetchServers()

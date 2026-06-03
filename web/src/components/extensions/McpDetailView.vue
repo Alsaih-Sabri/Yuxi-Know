@@ -105,11 +105,13 @@
                         <small>定义 MCP 的名称、描述与展示方式。</small>
                       </div>
                       <div class="form-grid form-grid-three">
+                        <a-form-item label="MCP 标识" required class="form-item">
+                          <a-input v-model:value="editForm.slug" disabled />
+                        </a-form-item>
                         <a-form-item label="MCP 名称" required class="form-item">
                           <a-input
                             v-model:value="editForm.name"
-                            placeholder="请输入 MCP 名称（唯一标识）"
-                            disabled
+                            placeholder="请输入 MCP 展示名称"
                           />
                         </a-form-item>
                         <a-form-item label="传输类型" required class="form-item">
@@ -469,7 +471,7 @@ import McpEnvEditor from '@/components/McpEnvEditor.vue'
 
 const route = useRoute()
 const router = useRouter()
-const name = computed(() => decodeURIComponent(route.params.name))
+const slug = computed(() => decodeURIComponent(route.params.slug ?? route.params.name))
 
 const loading = ref(false)
 const server = ref(null)
@@ -488,6 +490,7 @@ const formMode = ref('form')
 const jsonContent = ref('')
 
 const editForm = reactive({
+  slug: '',
   name: '',
   description: '',
   transport: 'streamable_http',
@@ -537,6 +540,7 @@ const getTransportColor = (transport) => {
 
 const resetEditForm = (data) => {
   Object.assign(editForm, {
+    slug: data?.slug || '',
     name: data?.name || '',
     description: data?.description || '',
     transport: data?.transport || 'streamable_http',
@@ -649,7 +653,7 @@ const handleSaveEdit = async () => {
 
   try {
     editLoading.value = true
-    const result = await mcpApi.updateMcpServer(server.value.name, data)
+    const result = await mcpApi.updateMcpServer(server.value.slug, data)
     if (result.success) {
       message.success('MCP 更新成功')
       isEditing.value = false
@@ -667,7 +671,7 @@ const handleSaveEdit = async () => {
 const fetchServer = async () => {
   try {
     loading.value = true
-    const result = await mcpApi.getMcpServer(name.value)
+    const result = await mcpApi.getMcpServer(slug.value)
     if (result.success) {
       server.value = result.data
     } else {
@@ -685,7 +689,7 @@ const fetchTools = async () => {
   try {
     toolsLoading.value = true
     toolsError.value = null
-    const result = await mcpApi.getMcpServerTools(server.value.name)
+    const result = await mcpApi.getMcpServerTools(server.value.slug)
     if (result.success) {
       tools.value = result.data || []
     } else {
@@ -704,7 +708,7 @@ const handleToggleTool = async (tool) => {
   if (!server.value) return
   try {
     toggleToolLoading.value = tool.name
-    const result = await mcpApi.toggleMcpServerTool(server.value.name, tool.name)
+    const result = await mcpApi.toggleMcpServerTool(server.value.slug, tool.name)
     if (result.success) {
       message.success(result.message)
       const targetTool = tools.value.find((t) => t.name === tool.name)
@@ -732,7 +736,7 @@ const handleTestServer = async () => {
   if (!server.value) return
   try {
     testLoading.value = server.value.name
-    const result = await mcpApi.testMcpServer(server.value.name)
+    const result = await mcpApi.testMcpServer(server.value.slug)
     if (result.success) {
       message.success(result.message)
     } else {
@@ -760,7 +764,7 @@ const handleDangerAction = async () => {
 
 const handleSetServerEnabled = async (srv, enabled) => {
   try {
-    const result = await mcpApi.updateMcpServerStatus(srv.name, enabled)
+    const result = await mcpApi.updateMcpServerStatus(srv.slug, enabled)
     if (result.success) {
       message.success(result.message || `MCP 已${enabled ? '添加' : '移除'}`)
       await fetchServer()
@@ -781,7 +785,7 @@ const confirmDeleteServer = (srv) => {
     cancelText: '取消',
     async onOk() {
       try {
-        const result = await mcpApi.deleteMcpServer(srv.name)
+        const result = await mcpApi.deleteMcpServer(srv.slug)
         if (result.success) {
           message.success('MCP 删除成功')
           router.push({ path: '/extensions', query: { tab: 'mcp' } })

@@ -20,6 +20,26 @@ export const getWorkspaceFileContent = (path) => {
   return apiGet(`/api/workspace/file?${query}`)
 }
 
+export const getWorkspaceKnowledgeTree = (
+  kbId,
+  parentId = null,
+  recursive = false,
+  filesOnly = false
+) => {
+  const query = buildQuery({ kb_id: kbId, parent_id: parentId, recursive, files_only: filesOnly })
+  return apiGet(`/api/workspace/knowledge/tree?${query}`)
+}
+
+export const getWorkspaceKnowledgeFileContent = (kbId, fileId, variant = 'parsed') => {
+  const query = buildQuery({ kb_id: kbId, file_id: fileId, variant })
+  return apiGet(`/api/workspace/knowledge/file?${query}`)
+}
+
+export const downloadWorkspaceKnowledgeFile = (kbId, fileId, variant = 'original') => {
+  const query = buildQuery({ kb_id: kbId, file_id: fileId, variant })
+  return apiGet(`/api/workspace/knowledge/download?${query}`, {}, true, 'blob')
+}
+
 export const saveWorkspaceFileContent = (path, content) => {
   return apiPut('/api/workspace/file', { path, content })
 }

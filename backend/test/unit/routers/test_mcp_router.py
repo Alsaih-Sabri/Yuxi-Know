@@ -22,7 +22,7 @@ def _build_app(*, allow_admin: bool = True) -> FastAPI:
             raise HTTPException(status_code=403, detail="需要管理员权限")
         return User(
             username="admin",
-            user_id="admin",
+            uid="admin",
             password_hash="x",
             role="admin",
         )
@@ -30,7 +30,7 @@ def _build_app(*, allow_admin: bool = True) -> FastAPI:
     async def fake_required_user():
         return User(
             username="admin" if allow_admin else "user",
-            user_id="admin" if allow_admin else "user",
+            uid="admin" if allow_admin else "user",
             password_hash="x",
             role="admin" if allow_admin else "user",
         )

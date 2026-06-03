@@ -41,9 +41,10 @@ from yuxi.agents.toolkits import buildin, mysql  # 触发 @tool 装饰器执行
 |------|------|
 | `calculator` | 计算器，支持加减乘除 |
 | `ask_user_question` | 向用户发起交互式提问 |
-| `query_knowledge_graph` | 查询知识图谱三元组 |
-| `text_to_img_qwen_image` | 使用 Qwen-Image 生成图片 |
+| `present_artifacts` | 展示 Agent 沙盒 outputs 目录下的产物文件 |
 | `tavily_search` | Tavily 网页搜索（需配置 `TAVILY_API_KEY`） |
+
+Qwen-Image 生成能力已迁移为内置 Skill `image-gen`。模型调用与图片下载在 Agent 沙盒中完成，生成后的图片保存到 `/home/gem/user-data/outputs/`，再通过 `present_artifacts` 展示。
 
 ### MySQL 工具 (mysql)
 
