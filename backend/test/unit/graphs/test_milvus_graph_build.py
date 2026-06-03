@@ -217,25 +217,22 @@ def test_milvus_graph_service_writes_chunk_entity_and_relation():
     assert entity_call.kwargs["attributes"] == '[{"text": "工程师", "label": "Occupation"}]'
 
 
-def test_milvus_graph_service_query_nodes_empty_kb_id():
+@pytest.mark.asyncio
+async def test_milvus_graph_service_query_nodes_empty_kb_id():
     service = MilvusGraphService()
-    import asyncio
-
-    result = asyncio.get_event_loop().run_until_complete(service.query_nodes(kb_id=None, keyword="test"))
+    result = await service.query_nodes(kb_id=None, keyword="test")
     assert result == {"nodes": [], "edges": []}
 
 
-def test_milvus_graph_service_get_labels_empty_kb_id():
+@pytest.mark.asyncio
+async def test_milvus_graph_service_get_labels_empty_kb_id():
     service = MilvusGraphService()
-    import asyncio
-
-    result = asyncio.get_event_loop().run_until_complete(service.get_labels(kb_id=None))
+    result = await service.get_labels(kb_id=None)
     assert result == []
 
 
-def test_milvus_graph_service_get_stats_empty_kb_id():
+@pytest.mark.asyncio
+async def test_milvus_graph_service_get_stats_empty_kb_id():
     service = MilvusGraphService()
-    import asyncio
-
-    result = asyncio.get_event_loop().run_until_complete(service.get_stats(kb_id=None))
+    result = await service.get_stats(kb_id=None)
     assert result == {"total_nodes": 0, "total_edges": 0, "entity_types": []}

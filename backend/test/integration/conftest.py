@@ -222,9 +222,15 @@ async def standard_user(test_client: httpx.AsyncClient, admin_headers: dict[str,
     username = f"pytest_user_{uuid.uuid4().hex[:8]}"
     password = f"Pw!{uuid.uuid4().hex[:8]}"
 
+    # 用户隔离重构后所有登录用户必须绑定部门，创建时显式指定一个已存在部门
+    dept_response = await test_client.get("/api/departments", headers=admin_headers)
+    if dept_response.status_code != 200 or not dept_response.json():
+        pytest.fail(f"No department available to bind standard user: {dept_response.text}")
+    department_id = dept_response.json()[0]["id"]
+
     response = await test_client.post(
         "/api/auth/users",
-        json={"username": username, "password": password, "role": "user"},
+        json={"username": username, "password": password, "role": "user", "department_id": department_id},
         headers=admin_headers,
     )
     if response.status_code != 200:
@@ -275,7 +281,7 @@ async def knowledge_database(
     unique_id = uuid.uuid4().hex
     timestamp = int(time.time() * 1000000)
     db_name = f"pytest_kb_{timestamp}_{unique_id}"
-    slug = None
+    kb_id = None
 
     try:
         create_response = await test_client.post(
@@ -292,7 +298,7 @@ async def knowledge_database(
 
         if create_response.status_code == 200:
             db_payload = create_response.json()
-            slug = db_payload["slug"]
+            kb_id = db_payload["kb_id"]
         elif create_response.status_code == 409:
             error_detail = create_response.json().get("detail", "")
             pytest.fail(f"Knowledge database name conflict: {error_detail}. Please clean up old test databases first.")
@@ -301,13 +307,13 @@ async def knowledge_database(
                 f"Failed to create knowledge database (status={create_response.status_code}): {create_response.text}"
             )
 
-        yield db_payload if slug else {"slug": slug, "name": db_name}
+        yield db_payload
 
     finally:
-        if slug:
+        if kb_id:
             try:
-                delete_response = await test_client.delete(f"/api/knowledge/databases/{slug}", headers=admin_headers)
+                delete_response = await test_client.delete(f"/api/knowledge/databases/{kb_id}", headers=admin_headers)
                 if delete_response.status_code != 200:
-                    print(f"Warning: Failed to cleanup knowledge database {slug}: {delete_response.text}")
+                    print(f"Warning: Failed to cleanup knowledge database {kb_id}: {delete_response.text}")
             except Exception as exc:
-                print(f"Warning: Exception during cleanup of {slug}: {exc}")
+                print(f"Warning: Exception during cleanup of {kb_id}: {exc}")

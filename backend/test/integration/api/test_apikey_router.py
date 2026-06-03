@@ -9,26 +9,8 @@ import pytest
 pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
 API_KEYS_PATH = "/api/user/apikey/"
-
-
-async def _get_default_agent_config_id(test_client, headers):
-    agent_response = await test_client.get("/api/chat/default_agent", headers=headers)
-    assert agent_response.status_code == 200
-    agent_id = agent_response.json().get("default_agent_id")
-    if not agent_id:
-        pytest.skip("No default agent configured")
-
-    configs_response = await test_client.get(f"/api/chat/agent/{agent_id}/configs", headers=headers)
-    assert configs_response.status_code == 200, configs_response.text
-    configs = configs_response.json().get("configs", [])
-    if not configs:
-        pytest.skip("No configs found for default agent")
-
-    config_id = configs[0].get("id")
-    if not config_id:
-        pytest.skip("Agent config payload missing id field.")
-
-    return agent_id, config_id
+# 受登录保护的轻量端点，用于验证 Bearer 鉴权（API Key / JWT）是否生效，无需执行智能体
+PROTECTED_PATH = "/api/agent"
 
 
 async def test_list_api_keys_requires_auth(test_client):
@@ -129,26 +111,20 @@ async def test_regenerate_api_key(test_client, admin_headers):
     assert data["api_key"]["key_prefix"] != original_secret[:12]
 
 
-async def test_api_key_auth_chat_endpoint(test_client, admin_headers):
-    """Test that API Key can be used to authenticate to chat endpoint via Bearer token."""
+async def test_api_key_auth_protected_endpoint(test_client, admin_headers):
+    """Test that API Key can be used to authenticate to a protected endpoint via Bearer token."""
     # Create an API key
-    create_response = await test_client.post(API_KEYS_PATH, json={"name": "Chat Auth Test"}, headers=admin_headers)
+    create_response = await test_client.post(API_KEYS_PATH, json={"name": "Auth Test"}, headers=admin_headers)
     assert create_response.status_code == 200
     api_key_secret = create_response.json()["secret"]
     created = create_response.json()["api_key"]
 
     try:
-        _, agent_config_id = await _get_default_agent_config_id(test_client, admin_headers)
-
-        # Call chat endpoint with API Key using Bearer format (streaming response)
-        async with test_client.stream(
-            "POST",
-            "/api/chat/agent",
-            json={"query": "Hello", "agent_config_id": agent_config_id},
+        response = await test_client.get(
+            PROTECTED_PATH,
             headers={"Authorization": f"Bearer {api_key_secret}"},
-        ) as response:
-            assert response.status_code == 200, response.text
-            assert response.headers.get("content-type") == "application/json"
+        )
+        assert response.status_code == 200, response.text
     finally:
         # Cleanup: delete the test API key
         await test_client.delete(f"{API_KEYS_PATH}{created['id']}", headers=admin_headers)
@@ -156,10 +132,9 @@ async def test_api_key_auth_chat_endpoint(test_client, admin_headers):
 
 async def test_api_key_auth_requires_valid_key(test_client):
     """Test that invalid API Key is rejected."""
-    # Call chat endpoint with invalid API Key
-    response = await test_client.post(
-        "/api/chat/agent",
-        json={"query": "Hello", "agent_config_id": 1},
+    # Call protected endpoint with invalid API Key
+    response = await test_client.get(
+        PROTECTED_PATH,
         headers={"Authorization": "Bearer yxkey_invalid_key_that_does_not_exist"},
     )
     assert response.status_code == 401, response.text
@@ -175,9 +150,8 @@ async def test_api_key_auth_requires_bearer_prefix(test_client, admin_headers):
 
     try:
         # Call without Bearer prefix should fail
-        response = await test_client.post(
-            "/api/chat/agent",
-            json={"query": "Hello", "agent_config_id": 1},
+        response = await test_client.get(
+            PROTECTED_PATH,
             headers={"Authorization": api_key_secret},  # Missing "Bearer " prefix
         )
         assert response.status_code == 401, response.text
@@ -188,17 +162,9 @@ async def test_api_key_auth_requires_bearer_prefix(test_client, admin_headers):
 
 async def test_jwt_still_works_after_apikey_auth(test_client, admin_headers):
     """Test that JWT Bearer tokens still work after API Key changes."""
-    _, agent_config_id = await _get_default_agent_config_id(test_client, admin_headers)
-
-    # Call chat with JWT Bearer token (admin_headers) - streaming response
-    async with test_client.stream(
-        "POST",
-        "/api/chat/agent",
-        json={"query": "Hello", "agent_config_id": agent_config_id},
-        headers=admin_headers,
-    ) as response:
-        assert response.status_code == 200, response.text
-        assert response.headers.get("content-type") == "application/json"
+    # Call protected endpoint with JWT Bearer token (admin_headers)
+    response = await test_client.get(PROTECTED_PATH, headers=admin_headers)
+    assert response.status_code == 200, response.text
 
 
 async def test_api_key_auto_binds_to_current_user(test_client, admin_headers):
@@ -214,14 +180,11 @@ async def test_api_key_auto_binds_to_current_user(test_client, admin_headers):
 
         # Verify the key can be used for auth
         api_key_secret = create_response.json()["secret"]
-        _, agent_config_id = await _get_default_agent_config_id(test_client, admin_headers)
-        async with test_client.stream(
-            "POST",
-            "/api/chat/agent",
-            json={"query": "Hello", "agent_config_id": agent_config_id},
+        response = await test_client.get(
+            PROTECTED_PATH,
             headers={"Authorization": f"Bearer {api_key_secret}"},
-        ) as response:
-            assert response.status_code == 200, response.text
+        )
+        assert response.status_code == 200, response.text
     finally:
         # Cleanup: delete the test API key
         await test_client.delete(f"{API_KEYS_PATH}{created['id']}", headers=admin_headers)

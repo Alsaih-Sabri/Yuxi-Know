@@ -210,7 +210,7 @@ async def test_task_tool_invokes_subagent_with_child_scope(monkeypatch) -> None:
 
     child_thread_id = make_child_thread_id("parent-thread", "worker.agent", "tool-1")
     assert isinstance(result, Command)
-    assert result.update["messages"][0].content == f"子智能体线程 ID: {child_thread_id}\n\nchild done"
+    assert result.update["messages"][0].content == f"> 子智能体线程 ID: {child_thread_id}\n\n---\n\nchild done"
     assert result.update["messages"][0].tool_call_id == "tool-1"
     assert result.update["artifacts"] == ["/home/gem/user-data/outputs/report.md"]
     assert result.update["subagent_runs"] == [
@@ -311,7 +311,7 @@ async def test_task_tool_records_failed_subagent_run(monkeypatch) -> None:
     child_thread_id = make_child_thread_id("parent-thread", "worker", "tool-1")
     assert (
         result.update["messages"][0].content
-        == f"子智能体线程 ID: {child_thread_id}\n\n子智能体 worker 调用失败：child boom"
+        == f"> 子智能体线程 ID: {child_thread_id}\n\n---\n\n子智能体 worker 调用失败：child boom"
     )
     assert result.update["subagent_runs"] == [
         {
@@ -396,7 +396,7 @@ async def test_task_tool_continues_existing_subagent_thread(monkeypatch) -> None
     )
 
     assert isinstance(result, Command)
-    assert result.update["messages"][0].content == f"子智能体线程 ID: {child_thread_id}\n\ncontinued done"
+    assert result.update["messages"][0].content == f"> 子智能体线程 ID: {child_thread_id}\n\n---\n\ncontinued done"
     assert result.update["subagent_runs"] == [
         {
             "id": "tool-2",

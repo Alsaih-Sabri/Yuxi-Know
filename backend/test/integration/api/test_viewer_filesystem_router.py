@@ -25,15 +25,15 @@ def _get_provider():
 
 
 async def _create_thread_for_user(test_client, headers: dict[str, str]) -> str:
-    agents_resp = await test_client.get("/api/chat/agent", headers=headers)
+    agents_resp = await test_client.get("/api/agent", headers=headers)
     assert agents_resp.status_code == 200, agents_resp.text
     agents = agents_resp.json().get("agents", [])
     if not agents:
         pytest.skip("No agents available for viewer filesystem integration tests.")
 
-    agent_id = agents[0].get("id")
+    agent_id = agents[0].get("agent_id") or agents[0].get("slug")
     if not agent_id:
-        pytest.skip("Agent payload missing id field.")
+        pytest.skip("Agent payload missing agent_id field.")
 
     create_resp = await test_client.post(
         "/api/chat/thread",

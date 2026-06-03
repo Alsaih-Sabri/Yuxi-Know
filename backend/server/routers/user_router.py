@@ -297,7 +297,7 @@ async def update_agent_env(
         )
         .returning(AgentEnv)
     )
-    result = await db.execute(stmt)
-    agent_env = result.scalar_one()
+    await db.execute(stmt)
     await db.commit()
-    return AgentEnvResponse(env=agent_env.env or {}, updated_at=format_utc_datetime(agent_env.updated_at))
+    # 直接返回刚写入的 env/now，避免身份映射中的旧实例属性导致返回陈旧值
+    return AgentEnvResponse(env=env, updated_at=format_utc_datetime(now))
