@@ -673,6 +673,12 @@ const fetchServer = async () => {
     loading.value = true
     const result = await mcpApi.getMcpServer(slug.value)
     if (result.success) {
+      if (result.data?.enabled === false) {
+        server.value = null
+        message.info('请先添加 MCP 后再查看详情')
+        router.replace({ path: '/extensions', query: { tab: 'mcp' } })
+        return
+      }
       server.value = result.data
     } else {
       message.error(result.message || '获取 MCP 详情失败')
