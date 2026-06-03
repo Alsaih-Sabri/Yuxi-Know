@@ -45,10 +45,10 @@ export const createViewerDirectory = (threadId, parentPath, name) => {
   })
 }
 
-export const uploadViewerFile = (threadId, parentPath, file) => {
+export const uploadViewerFiles = (threadId, parentPath, files) => {
   const formData = new FormData()
   formData.set('thread_id', threadId)
   formData.set('parent_path', parentPath)
-  formData.set('file', file)
+  files.forEach((file) => formData.append('files', file))
   return apiPost('/api/viewer/filesystem/upload', formData)
 }

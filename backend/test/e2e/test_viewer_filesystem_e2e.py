@@ -128,7 +128,7 @@ async def _upload(
     response = await client.post(
         "/api/viewer/filesystem/upload",
         data={"thread_id": thread_id, "parent_path": parent_path, "agent_id": agent_id},
-        files={"file": (file_name, content, "text/plain")},
+        files={"files": (file_name, content, "text/plain")},
         headers=headers,
     )
     assert response.status_code == 200, response.text

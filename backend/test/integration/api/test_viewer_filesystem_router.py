@@ -542,13 +542,13 @@ async def test_viewer_upload_file_writes_to_workspace_subdirectory(test_client, 
     response = await test_client.post(
         "/api/viewer/filesystem/upload",
         data={"thread_id": thread_id, "parent_path": "/home/gem/user-data/workspace/upload-target"},
-        files={"file": ("uploaded.txt", b"uploaded from viewer\n", "text/plain")},
+        files={"files": ("uploaded.txt", b"uploaded from viewer\n", "text/plain")},
         headers=headers,
     )
     assert response.status_code == 200, response.text
     payload = response.json()
     assert payload["success"] is True
-    assert payload["entry"]["path"] == "/home/gem/user-data/workspace/upload-target/uploaded.txt"
+    assert payload["entries"][0]["path"] == "/home/gem/user-data/workspace/upload-target/uploaded.txt"
 
     file_response = await test_client.get(
         "/api/viewer/filesystem/file",
@@ -592,7 +592,7 @@ async def test_viewer_upload_file_rejects_conflict_without_overwrite(test_client
     response = await test_client.post(
         "/api/viewer/filesystem/upload",
         data={"thread_id": thread_id, "parent_path": "/home/gem/user-data/workspace"},
-        files={"file": ("existing.txt", b"replace me\n", "text/plain")},
+        files={"files": ("existing.txt", b"replace me\n", "text/plain")},
         headers=headers,
     )
     assert response.status_code == 400, response.text
@@ -623,7 +623,7 @@ async def test_viewer_write_rejects_non_workspace_paths(test_client, standard_us
     upload_response = await test_client.post(
         "/api/viewer/filesystem/upload",
         data={"thread_id": thread_id, "parent_path": parent_path},
-        files={"file": ("blocked.txt", b"blocked", "text/plain")},
+        files={"files": ("blocked.txt", b"blocked", "text/plain")},
         headers=headers,
     )
     assert upload_response.status_code == 400, upload_response.text

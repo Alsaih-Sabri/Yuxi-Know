@@ -155,22 +155,26 @@ async def test_write_workspace_file_content_blocks_path_traversal(tmp_path: Path
 
 
 @pytest.mark.asyncio
-async def test_upload_workspace_file_writes_file(tmp_path: Path, monkeypatch) -> None:
+async def test_upload_workspace_files_writes_files(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(workspace_paths.conf, "save_dir", str(tmp_path))
     user = _user()
     root = svc._workspace_root(user)
-    upload = UploadFile(filename="demo.txt", file=BytesIO(b"hello"))
+    uploads = [
+        UploadFile(filename="demo.txt", file=BytesIO(b"hello")),
+        UploadFile(filename="notes.md", file=BytesIO(b"# notes")),
+    ]
 
-    result = await svc.upload_workspace_file(parent_path="/", file=upload, current_user=user)
+    result = await svc.upload_workspace_files(parent_path="/", files=uploads, current_user=user)
 
     assert result["success"] is True
-    assert result["entry"]["path"] == "/demo.txt"
-    assert result["entry"]["size"] == 5
+    assert [entry["path"] for entry in result["entries"]] == ["/demo.txt", "/notes.md"]
+    assert result["entries"][0]["size"] == 5
     assert (root / "demo.txt").read_bytes() == b"hello"
+    assert (root / "notes.md").read_bytes() == b"# notes"
 
 
 @pytest.mark.asyncio
-async def test_upload_workspace_file_rejects_oversized_file_and_cleans_partial_file(
+async def test_upload_workspace_files_rejects_oversized_file_and_cleans_partial_files(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -178,11 +182,31 @@ async def test_upload_workspace_file_rejects_oversized_file_and_cleans_partial_f
     monkeypatch.setattr(svc, "MAX_WORKSPACE_UPLOAD_SIZE_BYTES", 5)
     user = _user()
     root = svc._workspace_root(user)
-    upload = UploadFile(filename="large.txt", file=BytesIO(b"123456"))
+    uploads = [
+        UploadFile(filename="small.txt", file=BytesIO(b"12345")),
+        UploadFile(filename="large.txt", file=BytesIO(b"123456")),
+    ]
 
     with pytest.raises(HTTPException) as exc_info:
-        await svc.upload_workspace_file(parent_path="/", file=upload, current_user=user)
+        await svc.upload_workspace_files(parent_path="/", files=uploads, current_user=user)
 
     assert exc_info.value.status_code == 400
     assert "100 MB" in exc_info.value.detail
+    assert not (root / "small.txt").exists()
     assert not (root / "large.txt").exists()
+
+
+@pytest.mark.asyncio
+async def test_upload_workspace_files_rejects_more_than_limit(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(workspace_paths.conf, "save_dir", str(tmp_path))
+    user = _user()
+    uploads = [
+        UploadFile(filename=f"demo-{index}.txt", file=BytesIO(b"hello"))
+        for index in range(svc.MAX_WORKSPACE_UPLOAD_FILES + 1)
+    ]
+
+    with pytest.raises(HTTPException) as exc_info:
+        await svc.upload_workspace_files(parent_path="/", files=uploads, current_user=user)
+
+    assert exc_info.value.status_code == 400
+    assert f"一次最多上传 {svc.MAX_WORKSPACE_UPLOAD_FILES} 个文件" in exc_info.value.detail

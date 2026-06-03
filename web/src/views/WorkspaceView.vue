@@ -20,6 +20,7 @@
       ref="uploadInputRef"
       class="upload-input"
       type="file"
+      multiple
       @change="handleUploadInputChange"
     />
 
@@ -172,7 +173,7 @@ import {
   getWorkspaceKnowledgeTree,
   getWorkspaceTree,
   saveWorkspaceFileContent,
-  uploadWorkspaceFile
+  uploadWorkspaceFiles
 } from '@/apis/workspace_api'
 
 const userStore = useUserStore()
@@ -206,6 +207,7 @@ const sidebarCollapsed = ref(false)
 const previewWidthPercent = ref(50)
 const previewRequestId = ref(0)
 const INLINE_PREVIEW_MIN_WIDTH = 960
+const MAX_WORKSPACE_UPLOAD_FILES = 50
 
 const useInlinePreview = computed(() => workspaceMainWidth.value >= INLINE_PREVIEW_MIN_WIDTH)
 const isKnowledgeSource = computed(() => activeSourceKey.value.startsWith('database:'))
@@ -635,14 +637,19 @@ const openUploadFilePicker = () => {
 }
 
 const handleUploadInputChange = async (event) => {
-  const file = event.target?.files?.[0]
-  if (!file || uploadingFile.value) return
+  const files = Array.from(event.target?.files || [])
+  if (!files.length || uploadingFile.value) return
+  if (files.length > MAX_WORKSPACE_UPLOAD_FILES) {
+    message.warning(`一次最多上传 ${MAX_WORKSPACE_UPLOAD_FILES} 个文件`)
+    event.target.value = ''
+    return
+  }
 
   uploadingFile.value = true
   try {
-    await uploadWorkspaceFile(currentPath.value, file)
+    await uploadWorkspaceFiles(currentPath.value, files)
     await loadWorkspaceEntries(currentPath.value)
-    message.success('文件上传成功')
+    message.success(`${files.length} 个文件上传成功`)
   } catch (error) {
     console.warn('上传文件失败:', error)
     message.error(error?.message || '上传文件失败')

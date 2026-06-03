@@ -21,6 +21,7 @@ from yuxi.utils.upload_utils import MAX_UPLOAD_SIZE_BYTES, write_upload_to_buffe
 
 EDITABLE_WORKSPACE_SUFFIXES = {".md", ".markdown", ".mdx", ".txt"}
 MAX_WORKSPACE_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_BYTES
+MAX_WORKSPACE_UPLOAD_FILES = 50
 
 
 def _workspace_root(user: User) -> Path:
@@ -249,11 +250,7 @@ async def create_workspace_directory(*, parent_path: str, name: str, current_use
     return {"success": True, "entry": _entry_for_path(root, target)}
 
 
-async def upload_workspace_file(*, parent_path: str, file: UploadFile, current_user: User) -> dict:
-    root = _workspace_root(current_user)
-    file_name = _validate_child_name(Path(file.filename or "").name, field_name="文件名")
-    parent = _resolve_parent_directory(current_user, parent_path)
-    target = _resolve_new_child(root, parent, file_name)
+async def _write_workspace_upload(file: UploadFile, target: Path) -> None:
     created_file = False
     upload_completed = False
 
@@ -278,8 +275,38 @@ async def upload_workspace_file(*, parent_path: str, file: UploadFile, current_u
             with contextlib.suppress(OSError):
                 await asyncio.to_thread(target.unlink)
 
+
+async def upload_workspace_files(*, parent_path: str, files: list[UploadFile], current_user: User) -> dict:
+    if not files:
+        raise HTTPException(status_code=400, detail="请选择至少一个文件")
+    if len(files) > MAX_WORKSPACE_UPLOAD_FILES:
+        raise HTTPException(status_code=400, detail=f"一次最多上传 {MAX_WORKSPACE_UPLOAD_FILES} 个文件")
+
+    root = _workspace_root(current_user)
+    parent = _resolve_parent_directory(current_user, parent_path)
+    seen_names = set()
+    upload_targets: list[tuple[UploadFile, Path]] = []
+
+    for file in files:
+        file_name = _validate_child_name(Path(file.filename or "").name, field_name="文件名")
+        if file_name in seen_names:
+            raise HTTPException(status_code=400, detail=f"选择的文件中存在重复文件名: {file_name}")
+        seen_names.add(file_name)
+        upload_targets.append((file, _resolve_new_child(root, parent, file_name)))
+
+    completed_targets: list[Path] = []
+    try:
+        for file, target in upload_targets:
+            await _write_workspace_upload(file, target)
+            completed_targets.append(target)
+    except HTTPException:
+        for target in completed_targets:
+            with contextlib.suppress(OSError):
+                await asyncio.to_thread(target.unlink)
+        raise
+
     await invalidate_workspace_mention_cache(str(current_user.uid))
-    return {"success": True, "entry": _entry_for_path(root, target)}
+    return {"success": True, "entries": [_entry_for_path(root, target) for _file, target in upload_targets]}
 
 
 async def download_workspace_file(*, path: str, current_user: User) -> StreamingResponse | FileResponse:

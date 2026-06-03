@@ -15,7 +15,7 @@ from yuxi.services.workspace_service import (
     download_workspace_file,
     list_workspace_tree,
     read_workspace_file_content,
-    upload_workspace_file,
+    upload_workspace_files,
     write_workspace_file_content,
 )
 from yuxi.storage.postgres.models_business import User
@@ -164,12 +164,12 @@ async def create_workspace_directory_route(
 
 
 @workspace.post("/upload", response_model=dict)
-async def upload_workspace_file_route(
+async def upload_workspace_files_route(
     parent_path: str = Form(..., description="父目录路径"),
-    file: UploadFile = File(..., description="上传文件"),
+    files: list[UploadFile] = File(..., description="上传文件列表"),
     current_user: User = Depends(get_required_user),
 ):
-    return await upload_workspace_file(parent_path=parent_path, file=file, current_user=current_user)
+    return await upload_workspace_files(parent_path=parent_path, files=files, current_user=current_user)
 
 
 @workspace.get("/download")

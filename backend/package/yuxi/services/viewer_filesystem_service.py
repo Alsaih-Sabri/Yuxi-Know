@@ -38,7 +38,7 @@ from yuxi.services.workspace_service import (
     read_workspace_file_content as read_workspace_file_content_response,
 )
 from yuxi.services.workspace_service import (
-    upload_workspace_file as upload_workspace_file_entry,
+    upload_workspace_files as upload_workspace_files_entry,
 )
 from yuxi.storage.postgres.models_business import User
 from yuxi.utils.datetime_utils import utc_isoformat_from_timestamp
@@ -195,6 +195,10 @@ def _viewer_response_from_workspace_response(response: dict) -> dict:
     result = {**response}
     if "entry" in result and isinstance(result["entry"], dict):
         result["entry"] = _viewer_entry_from_workspace_entry(result["entry"])
+    if "entries" in result and isinstance(result["entries"], list):
+        result["entries"] = [
+            _viewer_entry_from_workspace_entry(entry) for entry in result["entries"] if isinstance(entry, dict)
+        ]
     return result
 
 
@@ -534,11 +538,11 @@ async def create_viewer_directory(
     return _viewer_response_from_workspace_response(response)
 
 
-async def upload_viewer_file(
+async def upload_viewer_files(
     *,
     thread_id: str,
     parent_path: str,
-    file: UploadFile,
+    files: list[UploadFile],
     current_user: User,
     db: AsyncSession,
 ) -> dict:
@@ -555,9 +559,9 @@ async def upload_viewer_file(
     if not _is_workspace_path(normalized_parent):
         raise HTTPException(status_code=400, detail="当前路径不支持写入")
 
-    response = await upload_workspace_file_entry(
+    response = await upload_workspace_files_entry(
         parent_path=_workspace_relative_path(normalized_parent),
-        file=file,
+        files=files,
         current_user=current_user,
     )
     return _viewer_response_from_workspace_response(response)

@@ -70,7 +70,7 @@ async def test_viewer_upload_blocks_workspace_symlink_escape(test_client, standa
     response = await test_client.post(
         "/api/viewer/filesystem/upload",
         data={"thread_id": thread_id, "parent_path": parent_path},
-        files={"file": ("escape.txt", b"outside", "text/plain")},
+        files={"files": ("escape.txt", b"outside", "text/plain")},
         headers=headers,
     )
 

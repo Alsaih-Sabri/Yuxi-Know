@@ -17,7 +17,7 @@ from yuxi.services.viewer_filesystem_service import (
     download_viewer_file,
     list_viewer_filesystem_tree,
     read_viewer_file_content,
-    upload_viewer_file,
+    upload_viewer_files,
 )
 from yuxi.storage.postgres.models_business import User
 
@@ -91,17 +91,17 @@ async def create_viewer_directory_route(
 
 
 @filesystem_router.post("/upload", response_model=dict)
-async def upload_viewer_file_route(
+async def upload_viewer_files_route(
     thread_id: str = Form(..., description="线程 ID"),
     parent_path: str = Form(..., description="父目录路径"),
-    file: UploadFile = File(..., description="上传文件"),
+    files: list[UploadFile] = File(..., description="上传文件列表"),
     current_user: User = Depends(get_required_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await upload_viewer_file(
+    return await upload_viewer_files(
         thread_id=thread_id,
         parent_path=parent_path,
-        file=file,
+        files=files,
         current_user=current_user,
         db=db,
     )
