@@ -133,3 +133,34 @@ def test_get_mcp_servers_normal_user_is_stripped(monkeypatch):
     assert data_user["name"] == "test-mcp"
     assert data_user["description"] == "test mcp description"
     assert data_user["enabled"] is True
+
+
+def test_create_mcp_server_rejects_extra_config_fields():
+    client = TestClient(_build_app())
+    resp = client.post(
+        "/api/system/mcp-servers",
+        json={
+            "slug": "demo-mcp",
+            "name": "Demo MCP",
+            "transport": "streamable_http",
+            "url": "https://example.com/mcp",
+            "enabled": True,
+        },
+    )
+
+    assert resp.status_code == 422, resp.text
+
+
+def test_update_mcp_server_rejects_extra_config_fields():
+    client = TestClient(_build_app())
+    resp = client.put(
+        "/api/system/mcp-servers/demo-mcp",
+        json={
+            "name": "Demo MCP",
+            "transport": "streamable_http",
+            "url": "https://example.com/mcp",
+            "slug": "renamed-mcp",
+        },
+    )
+
+    assert resp.status_code == 422, resp.text

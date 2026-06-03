@@ -1,7 +1,7 @@
 """MCP 服务器管理路由"""
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from yuxi.agents.mcp.service import (
@@ -28,6 +28,8 @@ mcp = APIRouter(prefix="/system/mcp-servers", tags=["mcp"])
 
 
 class CreateMcpServerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     slug: str = Field(..., description="稳定标识")
     name: str = Field(..., description="展示名称")
     transport: str = Field(..., description="传输类型：sse/streamable_http/stdio")
@@ -44,6 +46,8 @@ class CreateMcpServerRequest(BaseModel):
 
 
 class UpdateMcpServerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str | None = Field(None, description="展示名称")
     transport: str | None = Field(None, description="传输类型")
     url: str | None = Field(None, description="服务器 URL")

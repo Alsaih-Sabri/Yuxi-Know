@@ -69,33 +69,9 @@
                       <h3>编辑 MCP</h3>
                       <p>修改后保存会立即更新当前 MCP 配置。</p>
                     </div>
-                    <div class="mode-slider" :class="{ 'is-json': formMode === 'json' }">
-                      <span class="mode-slider-thumb"></span>
-                      <button
-                        type="button"
-                        class="lucide-icon-btn mode-slider-btn"
-                        :class="{ active: formMode === 'form' }"
-                        title="表单模式"
-                        aria-label="切换到表单模式"
-                        @click="formMode = 'form'"
-                      >
-                        <Rows3 :size="14" />
-                      </button>
-                      <button
-                        type="button"
-                        class="lucide-icon-btn mode-slider-btn"
-                        :class="{ active: formMode === 'json' }"
-                        title="JSON 模式"
-                        aria-label="切换到 JSON 模式"
-                        @click="formMode = 'json'"
-                      >
-                        <Braces :size="14" />
-                      </button>
-                    </div>
                   </div>
 
                   <a-form
-                    v-if="formMode === 'form'"
                     layout="vertical"
                     class="extension-form inline-edit-form"
                   >
@@ -232,23 +208,6 @@
                       </template>
                     </section>
                   </a-form>
-
-                  <div v-else class="json-mode">
-                    <div class="json-mode-header">
-                      <span>JSON 配置</span>
-                      <small>适合批量调整完整 MCP 配置，保存前请确认 JSON 格式有效。</small>
-                    </div>
-                    <a-textarea
-                      v-model:value="jsonContent"
-                      :rows="15"
-                      placeholder="请输入 JSON 配置"
-                      class="json-textarea"
-                    />
-                    <div class="json-actions">
-                      <a-button size="small" @click="formatJson">格式化</a-button>
-                      <a-button size="small" @click="parseJsonToForm">解析到表单</a-button>
-                    </div>
-                  </div>
 
                   <div class="edit-panel-actions">
                     <a-button @click="cancelEdit" :disabled="editLoading" class="lucide-icon-btn">
@@ -461,9 +420,7 @@ import {
   Settings2,
   Wrench,
   Save,
-  X,
-  Rows3,
-  Braces
+  X
 } from 'lucide-vue-next'
 import { mcpApi } from '@/apis/mcp_api'
 import { formatFullDateTime } from '@/utils/time'
@@ -486,8 +443,6 @@ const toggleToolLoading = ref(null)
 
 const isEditing = ref(false)
 const editLoading = ref(false)
-const formMode = ref('form')
-const jsonContent = ref('')
 
 const editForm = reactive({
   slug: '',
@@ -554,13 +509,11 @@ const resetEditForm = (data) => {
     tags: data?.tags || [],
     icon: data?.icon || ''
   })
-  jsonContent.value = data ? JSON.stringify(data, null, 2) : ''
 }
 
 const startEdit = () => {
   if (!server.value) return
   detailTab.value = 'general'
-  formMode.value = 'form'
   resetEditForm(server.value)
   isEditing.value = true
 }
@@ -570,36 +523,7 @@ const cancelEdit = () => {
   resetEditForm(server.value)
 }
 
-const formatJson = () => {
-  try {
-    const obj = JSON.parse(jsonContent.value)
-    jsonContent.value = JSON.stringify(obj, null, 2)
-  } catch {
-    message.error('JSON 格式错误，无法格式化')
-  }
-}
-
-const parseJsonToForm = () => {
-  try {
-    const obj = JSON.parse(jsonContent.value)
-    resetEditForm(obj)
-    formMode.value = 'form'
-    message.success('已解析到表单')
-  } catch {
-    message.error('JSON 格式错误')
-  }
-}
-
 const buildEditPayload = () => {
-  if (formMode.value === 'json') {
-    try {
-      return JSON.parse(jsonContent.value)
-    } catch {
-      message.error('JSON 格式错误')
-      return null
-    }
-  }
-
   let headers = null
   if (editForm.headersText.trim()) {
     try {
@@ -850,56 +774,6 @@ onMounted(() => {
     }
   }
 
-  .mode-slider {
-    position: relative;
-    display: inline-grid;
-    grid-template-columns: 1fr 1fr;
-    width: 72px;
-    height: 32px;
-    padding: 3px;
-    border: 1px solid var(--gray-150);
-    border-radius: 8px;
-    background: var(--gray-50);
-    flex-shrink: 0;
-  }
-
-  .mode-slider-thumb {
-    position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 32px;
-    height: 24px;
-    border-radius: 6px;
-    background: var(--gray-0);
-    box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
-    transition: transform 0.18s ease;
-  }
-
-  .mode-slider.is-json .mode-slider-thumb {
-    transform: translateX(34px);
-  }
-
-  .mode-slider-btn {
-    position: relative;
-    z-index: 1;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 24px;
-    padding: 0;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    color: var(--gray-500);
-    cursor: pointer;
-    transition: color 0.15s ease;
-
-    &.active {
-      color: var(--main-color);
-    }
-  }
-
   .inline-edit-form {
     display: flex;
     flex-direction: column;
@@ -931,8 +805,7 @@ onMounted(() => {
     }
   }
 
-  .form-section-title,
-  .json-mode-header {
+  .form-section-title {
     display: flex;
     flex-direction: column;
     gap: 3px;
@@ -970,8 +843,7 @@ onMounted(() => {
     color: var(--gray-500);
   }
 
-  .config-textarea,
-  .json-textarea {
+  .config-textarea {
     font-family: @mono-font;
     font-size: 13px;
     line-height: 1.6;
@@ -979,18 +851,6 @@ onMounted(() => {
 
   .env-editor-shell {
     padding: 0;
-  }
-
-  .json-mode {
-    .json-mode-header {
-      margin-bottom: 14px;
-    }
-
-    .json-actions {
-      margin-top: 12px;
-      display: flex;
-      gap: 8px;
-    }
   }
 
   .edit-panel-actions {
