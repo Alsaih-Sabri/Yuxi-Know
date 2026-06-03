@@ -13,11 +13,11 @@
         :title="segment.raw"
       >
         <component
-          :is="getTokenIcon(segment)"
+          :is="getMentionIconComponent(segment.type, segment.value)"
           class="mention-ref-icon"
-          :style="getIconStyle(segment)"
-          :stroke-width="2.2"
-          :size="15"
+          :style="getMentionIconStyle(segment.type, segment.value)"
+          :stroke-width="MENTION_ICON_STROKE_WIDTH"
+          :size="MENTION_ICON_SIZE"
         />
         <span class="mention-ref-label">{{ getTokenLabel(segment) }}</span>
       </span>
@@ -27,9 +27,12 @@
 
 <script setup>
 import { computed } from 'vue'
-import { FolderFilled } from '@ant-design/icons-vue'
-import { BookMarked, BookOpen, Bot, Plug } from 'lucide-vue-next'
-import { getFileIcon, getFileIconColor } from '@/utils/file_utils'
+import {
+  getMentionIconComponent,
+  getMentionIconStyle,
+  MENTION_ICON_SIZE,
+  MENTION_ICON_STROKE_WIDTH
+} from '@/utils/mention_icon_utils'
 import { getMentionDisplayLabel, parseMentionText } from '@/utils/mention_utils'
 
 const props = defineProps({
@@ -48,29 +51,6 @@ const props = defineProps({
 })
 
 const segments = computed(() => parseMentionText(props.content))
-
-const typeIcons = {
-  knowledge: BookOpen,
-  skill: BookMarked,
-  mcp: Plug,
-  subagent: Bot
-}
-
-const getTokenIcon = (segment) => {
-  if (segment.type === 'file') {
-    return segment.value.endsWith('/') ? FolderFilled : getFileIcon(segment.value)
-  }
-  return typeIcons[segment.type] || Plug
-}
-
-const getIconStyle = (segment) => {
-  if (segment.type === 'file') {
-    return {
-      color: segment.value.endsWith('/') ? '#ffa940' : getFileIconColor(segment.value)
-    }
-  }
-  return null
-}
 
 const getTokenLabel = (segment) =>
   getMentionDisplayLabel(segment.type, segment.value, props.displayLabels)

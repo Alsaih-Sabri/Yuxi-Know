@@ -269,11 +269,27 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch, onBeforeUnmount, useSlots } from 'vue'
+import {
+  ref,
+  computed,
+  onMounted,
+  nextTick,
+  watch,
+  onBeforeUnmount,
+  useSlots,
+  h,
+  render
+} from 'vue'
 import { SendOutlined, ArrowUpOutlined, PauseOutlined, FolderFilled } from '@ant-design/icons-vue'
 import { Paperclip } from 'lucide-vue-next'
 import { searchMentionFiles } from '@/apis/mention_api'
 import { getFileIcon, getFileIconColor } from '@/utils/file_utils'
+import {
+  getMentionIconComponent,
+  getMentionIconStyle,
+  MENTION_ICON_SIZE,
+  MENTION_ICON_STROKE_WIDTH
+} from '@/utils/mention_icon_utils'
 import {
   buildMentionDisplayLabels,
   expandMentionDeletionRange,
@@ -438,20 +454,10 @@ const serializeEditorNode = (node) => {
 const serializeEditorContent = () => serializeEditorNode(inputRef.value)
 const getEditorRawValue = () => (inputRef.value ? serializeEditorContent() : inputValue.value)
 
-const getEditorMentionIconSvg = (type) => {
-  if (type === 'knowledge') {
-    return '<svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></svg>'
-  }
-  if (type === 'skill') {
-    return '<svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>'
-  }
-  if (type === 'subagent') {
-    return '<svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>'
-  }
-  if (type === 'mcp') {
-    return '<svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8v5a6 6 0 0 1-12 0V8Z"/></svg>'
-  }
-  return '<svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>'
+const unmountEditorMentionIcons = () => {
+  inputRef.value
+    ?.querySelectorAll('.mention-ref-icon[data-vue-icon]')
+    .forEach((container) => render(null, container))
 }
 
 const createEditorMentionElement = (segment) => {
@@ -465,10 +471,15 @@ const createEditorMentionElement = (segment) => {
 
   const icon = document.createElement('span')
   icon.className = 'mention-ref-icon'
-  icon.innerHTML = getEditorMentionIconSvg(segment.type)
-  if (segment.type === 'file') {
-    icon.style.color = segment.value.endsWith('/') ? '#ffa940' : getFileIconColor(segment.value)
-  }
+  icon.dataset.vueIcon = 'true'
+  Object.assign(icon.style, getMentionIconStyle(segment.type, segment.value) || {})
+  render(
+    h(getMentionIconComponent(segment.type, segment.value), {
+      size: MENTION_ICON_SIZE,
+      strokeWidth: MENTION_ICON_STROKE_WIDTH
+    }),
+    icon
+  )
   token.appendChild(icon)
 
   const label = document.createElement('span')
@@ -487,6 +498,7 @@ const renderEditorContent = (raw = '') => {
   const editor = inputRef.value
   if (!editor) return
 
+  unmountEditorMentionIcons()
   editor.replaceChildren()
   parseMentionText(raw).forEach((segment) => {
     editor.appendChild(
@@ -1165,6 +1177,7 @@ onMounted(() => {
 
 // 组件卸载时清除定时器和事件监听器
 onBeforeUnmount(() => {
+  unmountEditorMentionIcons()
   if (debounceTimer.value) {
     clearTimeout(debounceTimer.value)
   }

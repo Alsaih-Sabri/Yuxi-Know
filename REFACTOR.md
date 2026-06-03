@@ -15,9 +15,7 @@
 - [x] 移除 lightrag
 - [x] 新增图谱构建，支持自定义 Schema、支持自定义并发数，知识库与向量检索解耦
 - [x] 知识图谱抽取要求支持并发处理
-
-
-## 权限部分
+- [ ] UV 的版本
 - [x] Agent 的 user_id 使用的有歧义，从数据库表到代码中都修改为统一使用 yuxi_id 来代替
 - [ ] 权限新增一个 guest 的预设字段，暂无任何权限
 - [ ] rename database table name, such as skills -> agent_skills, subagents -> agent_subagents, mcp, tool_call, 等等
