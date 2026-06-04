@@ -1530,10 +1530,7 @@ defineExpose({
       .resource-name {
         color: var(--gray-800);
         font-weight: 500;
-        flex: 0 1 auto;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        flex: 0 0 auto;
         white-space: nowrap;
       }
 
