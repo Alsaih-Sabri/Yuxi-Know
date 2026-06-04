@@ -103,6 +103,27 @@ BUILTIN_PROVIDERS: list[dict[str, Any]] = [
         "models_endpoint": "https://api.z.ai/api/coding/paas/v4/models",
     },
     {
+        "provider_id": "xiaomi-token-plan-cn",
+        "display_name": "XiaomiMiMo Token Plan",
+        "base_url": "https://token-plan-cn.xiaomimimo.com/v1",
+        "api_key_env": "XIAOMI_MIMO_TOKEN_PLAN_API_KEY",
+        "models_endpoint": "https://token-plan-cn.xiaomimimo.com/v1/models",
+    },
+    {
+        "provider_id": "xiaomi",
+        "display_name": "XiaomiMiMo",
+        "base_url": "https://api.xiaomimimo.com/v1",
+        "api_key_env": "XIAOMI_MIMO_API_KEY",
+        "models_endpoint": "https://api.xiaomimimo.com/v1/models",
+    },
+    {
+        "provider_id": "kimi-for-coding",
+        "display_name": "Kimi Code",
+        "base_url": "https://api.kimi.com/coding/v1",
+        "api_key_env": "KIMI_CODE_API_KEY",
+        "models_endpoint": "https://api.kimi.com/coding/v1/models",
+    },
+    {
         "provider_id": "moonshotai-cn",
         "display_name": "Moonshot",
         "base_url": "https://api.moonshot.cn/v1",
