@@ -24,13 +24,13 @@
 
 ## 简介
 
-语析（Yuxi）是一个基于大模型的智能知识库与知识图谱智能体开发平台。它把 **RAG 检索**、**LightRAG 知识图谱** 与 **LangGraph 多智能体编排** 整合进统一的多租户工作台：管理员配置知识库、模型与权限，用户在类 ChatGPT 的界面中与可挂载 Skills、MCP、子智能体和沙盒工具的智能体对话，并获得带引用来源、知识图谱推理与可交付产物的回答。
+语析（Yuxi）是一个基于大模型的智能知识库与知识图谱智能体开发平台。它把 **RAG 检索**、**Milvus 知识库内知识图谱** 与 **LangGraph 多智能体编排** 整合进统一的多租户工作台：管理员配置知识库、模型与权限，用户在类 ChatGPT 的界面中与可挂载 Skills、MCP、子智能体和沙盒工具的智能体对话，并获得带引用来源、知识图谱推理与可交付产物的回答。
 
 ## 核心特性
 
 - 🤖 **智能体开发** —— 基于 LangGraph 构建，支持子智能体（SubAgents）、Skills、MCP、Tools 与中间件机制；长耗时任务由后台 worker 异步执行，配套沙盒文件系统支持工具产物落盘、预览与下载。
 - 📚 **知识库（RAG）** —— 多格式文档解析（MinerU / PaddleX / OCR），可配置 Embedding 与 Rerank 模型，支持知识库评估与 PDF / 图片在线预览，检索来源回填到对话引用。
-- 🕸️ **知识图谱** —— 基于 LightRAG 的图谱构建与可视化，支持属性图谱，并作为检索增强直接参与智能体推理。
+- 🕸️ **知识图谱** —— 在 Milvus 知识库内构建、展示和检索实体关系图谱，并与 chunk 检索结果融合参与智能体推理。
 - 🏢 **多租户与权限** —— 用户 / 部门级权限管理，模型供应商统一配置，支持 API Key 认证供外部系统集成调用。
 - ⚙️ **平台与工程化** —— Vue + FastAPI 架构，开箱即用的 Docker Compose 部署，支持暗黑模式、LITE 轻量启动与生产级编排。
 
@@ -84,7 +84,7 @@
 - 新增内置 Skills `deep-reporter`，用于指导生成科研报告、行业调研和其他深度分析类长报告
 - 重构内置 Skills/MCP/Subagents 安装/添加/移除机制：内置 skill 支持按需安装、基于 `version + content_hash` 的更新提示与覆盖确认，不再使用服务器级开关切换
 - 新增知识库 PDF、图片的预览功能
-- 重构后端测试目录结构：按 `unit / integration / e2e` 分层迁移现有测试，拆分全局 `conftest.py`，统一测试入口为 `uv run --group test pytest`，并新增独立测试规范文档 `docs/vibe/testing-guidelines.md`
+- 重构后端测试目录结构：按 `unit / integration / e2e` 分层迁移现有测试，拆分全局 `conftest.py`，统一测试入口为 `uv run --group test pytest`，并新增独立测试规范文档 `docs/develop-guides/testing-guidelines.md`
 
 
 ### 修复
@@ -124,7 +124,7 @@
 **1. 克隆代码并初始化**
 
 ```bash
-git clone --branch v0.7.0.dev0 --depth 1 https://github.com/xerrors/Yuxi.git
+git clone --branch v0.7.0.dev1 --depth 1 https://github.com/xerrors/Yuxi.git
 cd Yuxi
 
 # Linux/macOS
