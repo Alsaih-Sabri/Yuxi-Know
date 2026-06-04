@@ -54,7 +54,7 @@
 
 - **模型配置收敛**：移除旧版 v1 模型配置与 Ollama 支持，运行时统一使用 `provider_id:model_id` 与独立 provider 模块，自定义 provider 迁移到数据库
 - **智能体运行时收敛**：用户可见的 `AgentConfig` 收敛为数据库持久化的一级 `Agent`，新增 `/api/agent` 管理与运行接口，前端只提交 `agent_id`
-- **知识库能力收敛**：移除 Upload 与 LightRAG 知识库/图谱能力，知识库类型收敛为 **Milvus** 与只读连接器（**Dify**、**Notion**）；知识图谱仅保留 Milvus 知识库内的构建/展示/检索
+- **知识库能力收敛**：以 Yuxi 自研的 Milvus 知识库/图谱构建、展示、检索链路替换历史 LightRAG 集成，并移除 Upload 类型；知识库类型收敛为 **Milvus** 与只读连接器（**Dify**、**Notion**），减少历史集成带来的兼容性问题
 - **Skill 安装与权限收敛**：以 `source_type / share_config / enabled` 表达来源、生效范围与启用状态；内置 Skill 启动自动入库并默认全局启用，上传/远程统一改为「解析草稿 → 确认安装」
 - **用户身份命名收敛**：业务登录标识统一为字符串 `uid`
 
@@ -89,7 +89,7 @@
 
 ### 修复
 
-- 修复 Lightrag 知识库修改配置后，模型没有切换的 bug [#580](https://github.com/xerrors/Yuxi/issues/580)
+- 修复 LightRAG 知识库修改配置后，模型没有切换的 bug [#580](https://github.com/xerrors/Yuxi/issues/580)
 - 修复数据库获取接口未过滤文件字段而导致的数据包过大的情况
 - 修复 Thread 未绑定 agent_config_id 导致的历史对话切换后上下文配置错乱的问题
 
@@ -151,74 +151,38 @@ docker compose up --build
 <table>
   <tr>
     <td align="center">
-      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260326125852369.png" width="100%" alt="首页"/>
+      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260604203514048.png" width="100%" alt="对话工作台"/>
       <br/>
-      <strong>首页</strong>
+      <strong>对话工作台</strong>
     </td>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/d3e4fe09-fa48-4686-93ea-2c50300ade21" width="100%" alt="Dashboard 统计"/>
+      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260604203704426.png" width="100%" alt="沙盒文件系统"/>
       <br/>
-      <strong>Dashboard 统计</strong>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260326130528866.png" width="100%" alt="智能体配置"/>
-      <br/>
-      <strong>智能体配置</strong>
-    </td>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/06d56525-69bf-463a-8360-286b2cf8796f" width="100%" alt="知识库调用"/>
-      <br/>
-      <strong>知识库调用</strong>
+      <strong>沙盒文件系统</strong>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/0548d89c-15a3-47cf-ba87-1b544f7dd749" width="100%" alt="新建知识库"/>
+      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260604205342546.png" width="100%" alt="Agentic RAG"/>
       <br/>
-      <strong>新建知识库</strong>
+      <strong>Agentic RAG</strong>
     </td>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/21396d04-376b-4e9a-8139-eec8c3cc915a" width="100%" alt="知识库管理"/>
+      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260604204056298.png" width="100%" alt="知识图谱"/>
       <br/>
-      <strong>知识库管理</strong>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/fc46a14b-16fb-47ea-84a0-148a451f3012" width="100%" alt="知识图谱"/>
-      <br/>
-      <strong>知识图谱可视化</strong>
-    </td>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/d8b3de51-2854-455b-956f-2ae2d8d5f677" width="100%" alt="项目文档"/>
-      <br/>
-      <strong>项目使用文档</strong>
+      <strong>知识图谱</strong>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260326130404306.png" width="100%" alt="拓展管理"/>
+      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260604210111977.png" width="100%" alt="检索评估"/>
       <br/>
-      <strong>拓展管理（Skills）</strong>
+      <strong>检索评估</strong>
     </td>
     <td align="center">
-      <img src="https://github.com/user-attachments/assets/9305d7a4-663b-4e5d-a252-211d6caa019b" width="100%" alt="拓展管理（MCPs）"/>
+      <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260604205611168.png" width="100%" alt="多知识源接入"/>
       <br/>
-      <strong>拓展管理（MCPs）</strong>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/13bd22ea-ddde-4262-8c29-69fb948bce44" width="100%" alt="拓展管理（Skills）"/>
-      <br/>
-      <strong>用户/部门权限管理</strong>
-    </td>
-    <td align="center">
-      <img src="https://github.com/user-attachments/assets/cc886b04-719e-4abd-807d-e9955080003d" width="100%" alt="拓展管理（MCPs）"/>
-      <br/>
-      <strong>模型供应商配置</strong>
+      <strong>多知识源接入</strong>
     </td>
   </tr>
 </table>
@@ -229,7 +193,7 @@ docker compose up --build
 
 本项目参考并引用了以下优秀开源项目，在此致以诚挚的感谢：
 
-- [LightRAG](https://github.com/HKUDS/LightRAG) - 直接引入作为图谱构建与检索的基础包
+- [LightRAG](https://github.com/HKUDS/LightRAG) - 早期版本曾参考其图谱构建与检索思路；当前 Yuxi 已实现自研 Milvus 知识库/图谱链路以替换历史集成，降低兼容性问题
 - [DeepAgents](https://github.com/langchain-ai/deepagents) - 直接引入作为深度智能体框架
 - [DeerFlow](https://github.com/bytedance/deer-flow) - 参考了其 Sandbox 智能体架构的实现思路
 - [RAGflow](https://github.com/infiniflow/ragflow) - 参考了其文档 Text Chunking 的分块策略
