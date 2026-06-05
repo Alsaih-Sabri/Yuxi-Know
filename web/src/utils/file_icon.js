@@ -17,15 +17,19 @@ import videoIcon from '@/assets/icons/files/video.svg?url'
 import webIcon from '@/assets/icons/files/web.svg?url'
 import wordIcon from '@/assets/icons/files/word.svg?url'
 import folderIcon from '@/assets/icons/files/folder.svg?url'
+import folderAgentIcon from '@/assets/icons/files/folder-agent.svg?url'
 import folderEnterpriseIcon from '@/assets/icons/files/folder-enterprise.svg?url'
 import folderFavoriteIcon from '@/assets/icons/files/folder-favorite.svg?url'
+import folderKnowledgeIcon from '@/assets/icons/files/folder-knowledge.svg?url'
 import folderPersonalIcon from '@/assets/icons/files/folder-personal.svg?url'
 import folderTrashIcon from '@/assets/icons/files/folder-trash.svg?url'
 
 export const FOLDER_ICONS = {
   default: folderIcon,
+  agent: folderAgentIcon,
   enterprise: folderEnterpriseIcon,
   favorite: folderFavoriteIcon,
+  knowledge: folderKnowledgeIcon,
   personal: folderPersonalIcon,
   trash: folderTrashIcon
 }
@@ -133,7 +137,7 @@ const getExtension = (name) => {
  * @param {string} name 文件名或路径（目录可以 `/` 结尾）
  * @param {object} [options]
  * @param {boolean} [options.isDir] 是否为目录
- * @param {string} [options.folderVariant] 文件夹图标变体：default | enterprise | favorite | personal | trash
+ * @param {string} [options.folderVariant] 文件夹图标变体：default | agent | enterprise | favorite | knowledge | personal | trash
  */
 export const resolveFileIconUrl = (name, { isDir = false, folderVariant = 'default' } = {}) => {
   const isDirectory = isDir || String(name || '').endsWith('/')

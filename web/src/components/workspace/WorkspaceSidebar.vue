@@ -7,7 +7,7 @@
         :class="{ active: activeKey === 'personal' && !isQuickAccessPath(currentPath) }"
         @click="$emit('select-personal')"
       >
-        <FolderKanban :size="16" />
+        <FileTypeIcon is-dir folder-variant="personal" :size="18" />
         <span>个人工作区</span>
       </button>
     </section>
@@ -22,7 +22,7 @@
         }"
         @click="$emit('select-path', savedArtifactsPath)"
       >
-        <Archive :size="15" />
+        <FileTypeIcon is-dir folder-variant="favorite" :size="18" />
         <span>Saved Artifacts</span>
       </button>
       <button
@@ -31,7 +31,7 @@
         :class="{ active: activeKey === 'personal' && isSameOrChildPath(currentPath, agentsPath) }"
         @click="$emit('select-path', agentsPath)"
       >
-        <Bot :size="15" />
+        <FileTypeIcon is-dir folder-variant="agent" :size="18" />
         <span>Agents</span>
       </button>
     </section>
@@ -46,7 +46,7 @@
         :class="{ active: activeKey === `database:${database.kb_id}` }"
         @click="$emit('select-database', database)"
       >
-        <LibraryBig :size="15" />
+        <FileTypeIcon is-dir folder-variant="knowledge" :size="18" />
         <span>{{ database.name }}</span>
       </button>
     </section>
@@ -61,7 +61,7 @@
         :class="{ active: activeKey === `database:${database.kb_id}` }"
         @click="$emit('select-database', database)"
       >
-        <LibraryBig :size="15" />
+        <FileTypeIcon is-dir folder-variant="enterprise" :size="18" />
         <span>{{ database.name }}</span>
       </button>
     </section>
@@ -76,7 +76,7 @@
     <section class="sidebar-section">
       <div class="section-title">共享空间</div>
       <button type="button" class="workspace-nav-item secondary disabled" disabled>
-        <UsersRound :size="15" />
+        <FileTypeIcon is-dir folder-variant="enterprise" :size="18" />
         <span>团队工作区</span>
         <span class="soon-tag">即将支持</span>
       </button>
@@ -86,7 +86,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Archive, Bot, FolderKanban, LibraryBig, UsersRound } from 'lucide-vue-next'
+import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
 
 const savedArtifactsPath = '/saved_artifacts'
 const agentsPath = '/agents/'
@@ -188,6 +188,11 @@ const sharedDatabases = computed(() =>
   &.disabled {
     color: var(--gray-400);
     cursor: not-allowed;
+
+    :deep(.file-type-icon) {
+      opacity: 0.45;
+      filter: grayscale(0.25);
+    }
   }
 }
 

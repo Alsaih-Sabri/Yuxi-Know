@@ -16,7 +16,7 @@ const props = defineProps({
   // 文件名或路径（目录可 `/` 结尾）
   name: { type: String, default: '' },
   isDir: { type: Boolean, default: false },
-  // 文件夹图标变体：default | enterprise | favorite | personal | trash
+  // 文件夹图标变体：default | agent | enterprise | favorite | knowledge | personal | trash
   folderVariant: { type: String, default: 'default' },
   size: { type: Number, default: 16 }
 })
