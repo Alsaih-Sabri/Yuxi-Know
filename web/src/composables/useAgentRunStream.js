@@ -1,46 +1,17 @@
 import { unref } from 'vue'
 import { agentApi } from '@/apis'
 import { handleChatError } from '@/utils/errorHandler'
+import {
+  compareRunSeq,
+  normalizeRunSeq,
+  resolveRunResumeAfterSeq
+} from '@/utils/runStreamResume'
 
 const RUN_TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled', 'interrupted'])
 const ACTIVE_RUN_STORAGE_TTL_MS = 60 * 60 * 1000
 const ACTIVE_RUN_CLIENT_ID = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
-const RUN_SEQ_PATTERN = /^\d+-\d+$/
 
 const getActiveRunStorageKey = (threadId) => `active_run:${threadId}`
-
-const normalizeRunSeq = (value) => {
-  if (value === undefined || value === null) return '0-0'
-  const text = String(value).trim()
-  return RUN_SEQ_PATTERN.test(text) ? text : '0-0'
-}
-
-const parseRunSeq = (value) => {
-  const text = normalizeRunSeq(value)
-  if (!text.includes('-')) {
-    return { major: 0n, minor: 0n }
-  }
-  const [majorRaw, minorRaw] = text.split('-', 2)
-
-  try {
-    const major = BigInt(majorRaw || '0')
-    const minor = BigInt(minorRaw || '0')
-    return { major, minor }
-  } catch {
-    return { major: 0n, minor: 0n }
-  }
-}
-
-const compareRunSeq = (incoming, current) => {
-  const left = parseRunSeq(incoming)
-  const right = parseRunSeq(current)
-
-  if (left.major > right.major) return 1
-  if (left.major < right.major) return -1
-  if (left.minor > right.minor) return 1
-  if (left.minor < right.minor) return -1
-  return 0
-}
 
 const getThreadIdFromObject = (value) => {
   if (!value || typeof value !== 'object') return ''
@@ -359,7 +330,14 @@ export function useAgentRunStream({
           const runRes = await agentApi.getAgentRun(snapshot.run_id)
           const run = runRes?.run
           if (run && !RUN_TERMINAL_STATUSES.has(run.status)) {
-            await startRunStream(threadId, run.id, snapshot.last_seq || '0-0')
+            const afterSeq = resolveRunResumeAfterSeq({
+              snapshot,
+              threadState: ts
+            })
+            if (afterSeq === '0-0') {
+              resetOnGoingConv(threadId)
+            }
+            await startRunStream(threadId, run.id, afterSeq)
             return
           }
         } catch {
@@ -373,6 +351,7 @@ export function useAgentRunStream({
       const active = await agentApi.getThreadActiveRun(threadId)
       const run = active?.run
       if (run && !RUN_TERMINAL_STATUSES.has(run.status)) {
+        resetOnGoingConv(threadId)
         await startRunStream(threadId, run.id, '0-0')
         return
       }
