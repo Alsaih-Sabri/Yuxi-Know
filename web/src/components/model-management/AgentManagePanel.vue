@@ -153,7 +153,6 @@ const agentModalTitle = computed(() => (editingAgentId.value ? '编辑智能体'
 const getAgentIconSrc = (agent) => agent.icon || (agent.id ? generatePixelAvatar(agent.id) : '')
 const getAgentTags = (agent) => [
   ...(!agent?.can_manage ? [{ name: '只读', color: 'default' }] : []),
-  ...(agent?.is_subagent ? [{ name: '子智能体', color: 'purple' }] : []),
   ...(agent?.backend_id ? [{ name: agent.backend_id, color: 'blue' }] : [])
 ]
 const agentPreviewIcon = computed(() => {
