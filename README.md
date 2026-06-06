@@ -65,7 +65,7 @@
 
 
 
-详见 [开发路线图](docs/develop-guides/roadmap.md)。
+详见 [changelog](docs/develop-guides/changelog.md)。
 <details>
 <summary>[2026/04/01] v0.6.0 版本发布</summary>
 
