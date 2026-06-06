@@ -53,7 +53,7 @@
                     v-if="displayItem.type === 'message'"
                     :message="displayItem.message"
                     :is-processing="isDisplayMessageProcessing(row.conv, displayItem)"
-                    :show-refs="showMsgRefs(displayItem.message)"
+                    :show-refs="showMsgRefs(displayItem.message, row.conv)"
                     :hide-tool-calls="true"
                     :mention="mentionConfig"
                     @retry="retryMessage(displayItem.message)"
@@ -972,20 +972,28 @@ const shouldSuppressRefsForApproval = () =>
     isProcessing.value
   )
 
+// 判断某轮对话是否已「收尾」，即可以展示 refs（来源/操作栏）：
+// - 后面紧跟的下一轮以 human message 开头（即用户开启了新一轮）→ 已收尾；
+// - 它是最后一轮，且当前没有正在生成回复 → 已收尾。
+// 反之（后面跟的是没有 human message 的 AI 续写，如 resume 续写；或仍在生成中）→ 未收尾，不展示。
+const isConversationSettled = (conv) => {
+  const convs = conversations.value
+  const idx = convs.indexOf(conv)
+  if (idx === -1) return false
+  const next = convs[idx + 1]
+  if (next) {
+    return next.messages?.[0]?.type === 'human'
+  }
+  return !(isProcessing.value || isReplyLoading.value)
+}
+
 // 计算是否显示Refs组件的条件
 const shouldShowRefs = computed(() => {
-  const convs = conversations.value
-  const lastConv = convs.length ? convs[convs.length - 1] : null
   return (conv) => {
     if (!getLastMessage(conv) || conv.status === 'streaming' || shouldSuppressRefsForApproval()) {
       return false
     }
-    // 回复生成中（含 resume 续写的空窗期）抑制最后一个对话的 refs，避免过早出现操作栏。
-    // 同时看 isReplyLoading：切换/重连时 isStreaming 可能已置 false，但「正在生成回复」仍在显示。
-    if (conv === lastConv && (isProcessing.value || isReplyLoading.value)) {
-      return false
-    }
-    return true
+    return isConversationSettled(conv)
   }
 })
 
@@ -2254,14 +2262,13 @@ const getLastMessage = (conv) => {
   return null
 }
 
-const showMsgRefs = (msg) => {
+const showMsgRefs = (msg, conv) => {
   if (shouldSuppressRefsForApproval()) {
     return false
   }
 
-  // 回复生成中（含 resume 续写的空窗期）不在最后一条消息上过早显示操作栏/来源。
-  // isReplyLoading 兜底：切换/重连时 isStreaming 可能已置 false，但回复仍在生成。
-  if (msg.isLast && (isProcessing.value || isReplyLoading.value)) {
+  // 该消息所在对话未收尾（后面跟的是没有 human message 的 AI 续写，或仍在生成）时不展示
+  if (!isConversationSettled(conv)) {
     return false
   }
 
