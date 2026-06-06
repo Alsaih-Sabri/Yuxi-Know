@@ -43,7 +43,7 @@
 | 文档解析 | MinerU · PaddleX · RapidOCR |
 | 部署 | Docker Compose |
 
-![image-20260606190609377](https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260606190609377.png)
+![image-20260606190609377](https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260606235615139.png)
 
 ## 最新动态
 
