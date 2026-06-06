@@ -3,9 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from yuxi.agents.toolkits.mysql import get_mysql_tools
-from yuxi.agents.toolkits.utils import get_tool_info
-
 
 @dataclass(frozen=True)
 class BuiltinSkillSpec:
@@ -40,7 +37,6 @@ BUILTIN_SKILLS: list[BuiltinSkillSpec] = [
         source_dir=_SKILLS_ROOT / "mysql-reporter",
         description="生成 MySQL 查询报表并生成可视化图表。",
         version="2026.06.05",
-        tool_dependencies=[t["name"] for t in get_tool_info(get_mysql_tools())],
         mcp_dependencies=("mcp-server-chart",),
     ),
 ]
