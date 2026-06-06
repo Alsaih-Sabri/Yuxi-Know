@@ -65,6 +65,7 @@ echo "  - web/package.json"
 echo "  - docker-compose.yml"
 echo "  - docker-compose.prod.yml"
 echo "  - backend/uv.lock"
+echo "  - backend/package/uv.lock"
 if [ "$DEV_MODE" = false ]; then
     echo "  - README.md"
     echo "  - README.en.md"
@@ -120,6 +121,10 @@ perl -0pi -e "s/(^name = \"yuxi\"\nversion = \")[^\"]+/\${1}${NEW_VERSION}/m" \
 perl -0pi -e "s/(^name = \"yuxi-workspace\"\nversion = \")[^\"]+/\${1}${NEW_VERSION}/m" \
     "${PROJECT_ROOT}/backend/uv.lock"
 
+echo "→ 更新 backend/package/uv.lock"
+perl -0pi -e "s/(^name = \"yuxi\"\nversion = \")[^\"]+/\${1}${NEW_VERSION}/m" \
+    "${PROJECT_ROOT}/backend/package/uv.lock"
+
 # -----------------------------------------------------------------------------
 # 6. 更新文档中的版本引用
 # -----------------------------------------------------------------------------
@@ -127,15 +132,15 @@ perl -0pi -e "s/(^name = \"yuxi-workspace\"\nversion = \")[^\"]+/\${1}${NEW_VERS
 # 发布历史记录（如 [2026/04/01] v0.6.1 版本发布）不修改，保持为历史版本记录
 if [ "$DEV_MODE" = false ]; then
     echo "→ 更新 README.md"
-    perl -pi -e "s/(git clone --branch v)[0-9]+\\.[0-9]+\\.[0-9]+/\${1}${NEW_VERSION}/g" \
+    perl -pi -e "s/(git clone --branch v)[0-9]+\\.[0-9]+\\.[0-9]+(\\.[a-zA-Z0-9]+)?/\${1}${NEW_VERSION}/g" \
         "${PROJECT_ROOT}/README.md"
 
     echo "→ 更新 README.en.md"
-    perl -pi -e "s/(git clone --branch v)[0-9]+\\.[0-9]+\\.[0-9]+/\${1}${NEW_VERSION}/g" \
+    perl -pi -e "s/(git clone --branch v)[0-9]+\\.[0-9]+\\.[0-9]+(\\.[a-zA-Z0-9]+)?/\${1}${NEW_VERSION}/g" \
         "${PROJECT_ROOT}/README.en.md"
 
     echo "→ 更新 docs/intro/quick-start.md"
-    perl -pi -e "s/(git clone --branch v)[0-9]+\\.[0-9]+\\.[0-9]+/\${1}${NEW_VERSION}/g" \
+    perl -pi -e "s/(git clone --branch v)[0-9]+\\.[0-9]+\\.[0-9]+(\\.[a-zA-Z0-9]+)?/\${1}${NEW_VERSION}/g" \
         "${PROJECT_ROOT}/docs/intro/quick-start.md"
 else
     echo "→ dev 模式，跳过 README.md、README.en.md 和 docs/intro/quick-start.md 的分支版本更新"

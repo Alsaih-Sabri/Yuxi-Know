@@ -42,6 +42,9 @@ Yuxi is an LLM-powered platform for building knowledge-base and knowledge-graph 
 | Doc parsing | MinerU · PaddleX · RapidOCR |
 | Deployment | Docker Compose |
 
+
+![image-20260606190609377](https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260606190609377.png)
+
 ## Quick Start
 
 **Prerequisites**: [Docker](https://docs.docker.com/get-docker/) and Docker Compose installed, plus at least one OpenAI-compatible LLM API.
@@ -49,7 +52,7 @@ Yuxi is an LLM-powered platform for building knowledge-base and knowledge-graph 
 **1. Clone and initialize**
 
 ```bash
-git clone --branch v0.7.0.dev1 --depth 1 https://github.com/xerrors/Yuxi.git
+git clone --branch v0.7.0.beta1 --depth 1 https://github.com/xerrors/Yuxi.git
 cd Yuxi
 
 # Linux/macOS
