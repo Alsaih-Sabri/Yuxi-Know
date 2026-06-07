@@ -55,7 +55,7 @@
 
 - **模型配置收敛**：移除旧版 v1 模型配置与 Ollama 支持，运行时统一使用 `provider_id:model_id` 与独立 provider 模块，自定义 provider 迁移到数据库
 - **智能体运行时收敛**：用户可见的 `AgentConfig` 收敛为数据库持久化的一级 `Agent`，新增 `/api/agent` 管理与运行接口，前端只提交 `agent_id`
-- **知识库能力收敛**：以 Yuxi 自研的 Milvus 知识库/图谱构建、展示、检索链路替换历史 LightRAG 集成，并移除 Upload 类型；知识库类型收敛为 **Milvus** 与只读连接器（**Dify**、**Notion**），减少历史集成带来的兼容性问题
+- **知识库能力收敛**：以 Yuxi 的知识库增强图谱构建、展示、检索链路替换历史 LightRAG 集成，并移除 Upload 类型；知识库类型收敛为单个类型与只读连接器（**Dify**、**Notion**），减少历史集成带来的兼容性问题
 - **Skill 安装与权限收敛**：以 `source_type / share_config / enabled` 表达来源、生效范围与启用状态；内置 Skill 启动自动入库并默认全局启用，上传/远程统一改为「解析草稿 → 确认安装」
 
 
