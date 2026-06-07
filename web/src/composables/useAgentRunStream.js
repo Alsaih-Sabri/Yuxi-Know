@@ -1,11 +1,7 @@
 import { unref } from 'vue'
 import { agentApi } from '@/apis'
 import { handleChatError } from '@/utils/errorHandler'
-import {
-  compareRunSeq,
-  normalizeRunSeq,
-  resolveRunResumeAfterSeq
-} from '@/utils/runStreamResume'
+import { compareRunSeq, normalizeRunSeq, resolveRunResumeAfterSeq } from '@/utils/runStreamResume'
 
 const RUN_INTERRUPTED_STATUS = 'interrupted'
 const RUN_TERMINAL_STATUSES = new Set(['completed', 'failed', 'cancelled'])

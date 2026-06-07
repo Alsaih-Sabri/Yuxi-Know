@@ -52,7 +52,7 @@ Yuxi is an LLM-powered platform for building knowledge-base and knowledge-graph 
 **1. Clone and initialize**
 
 ```bash
-git clone --branch v0.7.0.beta1 --depth 1 https://github.com/xerrors/Yuxi.git
+git clone --branch v0.7.0.beta2 --depth 1 https://github.com/xerrors/Yuxi.git
 cd Yuxi
 
 # Linux/macOS

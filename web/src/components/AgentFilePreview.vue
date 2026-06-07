@@ -3,7 +3,11 @@
     class="agent-file-preview"
     :class="[
       containerClass,
-      { 'is-full-height': fullHeight, 'is-borderless': borderless, 'has-preview-header': showHeader }
+      {
+        'is-full-height': fullHeight,
+        'is-borderless': borderless,
+        'has-preview-header': showHeader
+      }
     ]"
   >
     <div v-if="showHeader" class="preview-header">

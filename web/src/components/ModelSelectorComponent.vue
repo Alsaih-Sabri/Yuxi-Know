@@ -65,7 +65,9 @@
               :key="`v2-${providerId}`"
             >
               <template #title>
-                <span :title="providerId">{{ getProviderDisplayName(providerId, providerData) }}</span>
+                <span :title="providerId">{{
+                  getProviderDisplayName(providerId, providerData)
+                }}</span>
               </template>
               <a-menu-item
                 v-for="model in providerData.models"

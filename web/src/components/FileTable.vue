@@ -231,7 +231,11 @@
             </span>
           </template>
           <a-button v-else class="main-btn" type="link" @click="openFileDetail(record)">
-            <FileTypeIcon :name="record.displayName || text" :size="16" :style="{ marginRight: '8px' }" />
+            <FileTypeIcon
+              :name="record.displayName || text"
+              :size="16"
+              :style="{ marginRight: '8px' }"
+            />
             {{ record.displayName || text }}
           </a-button>
         </div>

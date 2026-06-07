@@ -175,9 +175,7 @@
                   </div>
                 </div>
 
-                <p class="flow-caption">
-                  智能体发起检索 · 引擎融合向量与图谱 · 召回知识增强生成
-                </p>
+                <p class="flow-caption">智能体发起检索 · 引擎融合向量与图谱 · 召回知识增强生成</p>
               </div>
 
               <div class="stat-row" v-if="realtimeStats.length">

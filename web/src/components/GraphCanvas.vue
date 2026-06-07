@@ -206,7 +206,9 @@ const visibleRelationshipEdges = computed(() =>
 const visibleEntityCount = computed(() => visibleEntityNodes.value.length)
 const visibleRelationshipCount = computed(() => visibleRelationshipEdges.value.length)
 
-const nodeTypeStats = computed(() => buildTypeStats(visibleEntityNodes.value, getNodeVisualLabel, getNodeColor))
+const nodeTypeStats = computed(() =>
+  buildTypeStats(visibleEntityNodes.value, getNodeVisualLabel, getNodeColor)
+)
 
 const edgeTypeStats = computed(() =>
   buildTypeStats(visibleRelationshipEdges.value, getEdgeVisualLabel, getEdgeColor)
@@ -755,7 +757,9 @@ defineExpose({
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    box-shadow: 0 0 0 1px var(--color-bg-container), 0 0 0 2px var(--gray-200);
+    box-shadow:
+      0 0 0 1px var(--color-bg-container),
+      0 0 0 2px var(--gray-200);
   }
 
   .type-name {

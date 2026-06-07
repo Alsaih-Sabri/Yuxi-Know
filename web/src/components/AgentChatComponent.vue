@@ -611,7 +611,9 @@ let panelContainerWidth = 0
 let streamingStateRefreshTimer = null
 
 const formatTodoName = (content) => {
-  return Array.from(String(content || '')).slice(0, TODO_NAME_MAX_LENGTH).join('')
+  return Array.from(String(content || ''))
+    .slice(0, TODO_NAME_MAX_LENGTH)
+    .join('')
 }
 
 const getPanelContainerWidth = () => {
@@ -991,9 +993,7 @@ const currentApprovalQuestions = computed(() =>
 const shouldSuppressRefsForApproval = () =>
   currentApprovalModalVisible.value ||
   Boolean(
-    approvalState.threadId &&
-    currentChatId.value === approvalState.threadId &&
-    isProcessing.value
+    approvalState.threadId && currentChatId.value === approvalState.threadId && isProcessing.value
   )
 
 // 判断某轮对话是否已「收尾」，即可以展示 refs（来源/操作栏）：

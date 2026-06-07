@@ -56,7 +56,9 @@ const props = defineProps({
 const TODO_NAME_MAX_LENGTH = 20
 
 const formatTodoName = (content) => {
-  return Array.from(String(content || '')).slice(0, TODO_NAME_MAX_LENGTH).join('')
+  return Array.from(String(content || ''))
+    .slice(0, TODO_NAME_MAX_LENGTH)
+    .join('')
 }
 
 const formatTodoNameTitle = (content) => String(content || '')

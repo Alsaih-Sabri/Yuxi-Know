@@ -192,7 +192,6 @@ const currentAgentLabel = computed(() => {
   return currentAgentOption.value?.label || '智能体'
 })
 
-
 const agentDropdownOpen = ref(false)
 
 const handleAgentSwitch = async (agentId, hasActiveThread) => {
@@ -214,7 +213,6 @@ const openAgentManagement = () => {
   agentDropdownOpen.value = false
   router.push({ name: 'ModelManageComp', query: { tab: 'agents' } })
 }
-
 </script>
 
 <style lang="less" scoped>
