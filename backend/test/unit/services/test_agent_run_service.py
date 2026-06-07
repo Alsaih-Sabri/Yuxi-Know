@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import json
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
 
 import pytest
 
 import yuxi.services.agent_run_service as agent_run_service
+
+
+def _sse_data(chunk: str) -> dict:
+    for line in chunk.splitlines():
+        if line.startswith("data: "):
+            return json.loads(line.removeprefix("data: "))
+    raise AssertionError(f"SSE chunk has no data line: {chunk}")
 
 
 class _FakeContext:
@@ -119,6 +127,249 @@ async def test_stream_agent_run_events_reads_redis_and_ends_on_end_event(monkeyp
     assert "id: 1700000000000-0" in chunks[0]
     assert chunks[-1].startswith("event: end")
     assert "id: 1700000000001-0" in chunks[-1]
+
+
+@pytest.mark.asyncio
+async def test_stream_agent_run_events_compacts_verbose_false(monkeypatch: pytest.MonkeyPatch):
+    @asynccontextmanager
+    async def fake_session_ctx():
+        yield object()
+
+    class Repo:
+        def __init__(self, db):
+            self.db = db
+
+        async def get_run_for_user(self, run_id: str, uid: str):
+            del run_id, uid
+            return SimpleNamespace(status="completed", thread_id="thread-1")
+
+    async def fake_list_events(run_id: str, *, after_seq: str, limit: int):
+        del run_id, after_seq, limit
+        return [
+            {
+                "seq": "1700000000000-0",
+                "event_type": "metadata",
+                "payload": {
+                    "schema_version": 1,
+                    "run_id": "run-1",
+                    "thread_id": "thread-1",
+                    "event": "metadata",
+                    "payload": {
+                        "request_id": "req-1",
+                        "agent_id": "deep-research",
+                        "backend_id": "ChatbotAgent",
+                        "uid": "user-1",
+                    },
+                    "created_at": "2026-05-27T00:00:00+00:00",
+                },
+                "ts": 1700000000000,
+            },
+            {
+                "seq": "1700000000001-0",
+                "event_type": "custom",
+                "payload": {
+                    "schema_version": 1,
+                    "run_id": "run-1",
+                    "thread_id": "thread-1",
+                    "event": "custom",
+                    "payload": {
+                        "name": "yuxi.init",
+                        "chunk": {
+                            "request_id": "req-1",
+                            "response": None,
+                            "thread_id": "thread-1",
+                            "status": "init",
+                            "meta": {"query": "写一个冒泡排序", "uid": "user-1"},
+                            "msg": {
+                                "role": "user",
+                                "content": "写一个冒泡排序",
+                                "type": "human",
+                                "image_content": "base64-image-data",
+                                "extra_metadata": {
+                                    "request_id": "req-1",
+                                    "attachments": [],
+                                    "debug": "drop-me",
+                                },
+                            },
+                        },
+                    },
+                    "created_at": "2026-05-27T00:00:00+00:00",
+                },
+                "ts": 1700000000001,
+            },
+            {
+                "seq": "1700000000002-0",
+                "event_type": "custom",
+                "payload": {
+                    "schema_version": 1,
+                    "run_id": "run-1",
+                    "thread_id": "thread-1",
+                    "event": "custom",
+                    "payload": {
+                        "name": "yuxi.agent_state",
+                        "chunk": {
+                            "request_id": "req-1",
+                            "response": None,
+                            "thread_id": "thread-1",
+                            "status": "agent_state",
+                            "agent_state": {
+                                "todos": [],
+                                "files": {},
+                                "artifacts": [],
+                                "subagent_runs": [],
+                            },
+                            "meta": {"uid": "user-1"},
+                        },
+                        "agent_state": {
+                            "todos": [],
+                            "files": {},
+                            "artifacts": [],
+                            "subagent_runs": [],
+                        },
+                    },
+                    "created_at": "2026-05-27T00:00:00+00:00",
+                },
+                "ts": 1700000000002,
+            },
+            {
+                "seq": "1700000000003-0",
+                "event_type": "messages",
+                "payload": {
+                    "schema_version": 1,
+                    "run_id": "run-1",
+                    "thread_id": "thread-1",
+                    "event": "messages",
+                    "payload": {
+                        "items": [
+                            {
+                                "request_id": "req-1",
+                                "response": "你",
+                                "thread_id": "thread-1",
+                                "status": "loading",
+                                "stream_event": {
+                                    "type": "tool_call",
+                                    "message_id": "msg-1",
+                                    "tool_call_id": "call-1",
+                                    "name": "ls",
+                                    "args": {"path": "/home/gem/user-data/outputs"},
+                                    "thread_id": "thread-1",
+                                    "namespace": [],
+                                },
+                                "metadata": {
+                                    "langfuse_user_id": "user-1",
+                                    "langgraph_checkpoint_ns": "model:checkpoint",
+                                },
+                            }
+                        ]
+                    },
+                    "created_at": "2026-05-27T00:00:01+00:00",
+                },
+                "ts": 1700000000003,
+            },
+            {
+                "seq": "1700000000004-0",
+                "event_type": "end",
+                "payload": {
+                    "schema_version": 1,
+                    "run_id": "run-1",
+                    "thread_id": "thread-1",
+                    "event": "end",
+                    "payload": {
+                        "status": "completed",
+                        "chunk": {"status": "finished", "request_id": "req-1", "meta": {"uid": "user-1"}},
+                    },
+                    "created_at": "2026-05-27T00:00:02+00:00",
+                },
+                "ts": 1700000000004,
+            },
+        ]
+
+    monkeypatch.setattr(agent_run_service.pg_manager, "get_async_session_context", fake_session_ctx)
+    monkeypatch.setattr(agent_run_service, "AgentRunRepository", Repo)
+    monkeypatch.setattr(agent_run_service, "list_run_stream_events", fake_list_events)
+
+    chunks = []
+    async for chunk in agent_run_service.stream_agent_run_events(
+        run_id="run-1",
+        after_seq="0",
+        current_uid="user-1",
+        verbose=False,
+    ):
+        chunks.append(chunk)
+
+    assert len(chunks) == 3
+
+    init_data = _sse_data(chunks[0])
+    init_chunk = init_data["payload"]["chunk"]
+    assert init_data["request_id"] == "req-1"
+    assert init_data["payload"]["name"] == "yuxi.init"
+    assert "meta" not in init_chunk
+    assert "request_id" not in init_chunk
+    assert "response" not in init_chunk
+    assert "thread_id" not in init_chunk
+    assert "image_content" not in init_chunk["msg"]
+    assert "extra_metadata" not in init_chunk["msg"]
+
+    message_data = _sse_data(chunks[1])
+    message_chunk = message_data["payload"]["items"][0]
+    assert message_data["request_id"] == "req-1"
+    assert "request_id" not in message_chunk
+    assert "metadata" not in message_chunk
+    assert "response" not in message_chunk
+    assert "thread_id" not in message_chunk
+    assert message_chunk["stream_event"]["tool_call_id"] == "call-1"
+    assert "thread_id" not in message_chunk["stream_event"]
+    assert "namespace" not in message_chunk["stream_event"]
+
+    end_data = _sse_data(chunks[2])
+    assert end_data["request_id"] == "req-1"
+    assert end_data["payload"]["status"] == "completed"
+    assert "request_id" not in end_data["payload"]["chunk"]
+    assert "meta" not in end_data["payload"]["chunk"]
+
+
+@pytest.mark.asyncio
+async def test_stream_agent_run_events_compact_fallback_end_keeps_request_id(monkeypatch: pytest.MonkeyPatch):
+    @asynccontextmanager
+    async def fake_session_ctx():
+        yield object()
+
+    class Repo:
+        def __init__(self, db):
+            self.db = db
+
+        async def get_run_for_user(self, run_id: str, uid: str):
+            del run_id, uid
+            return SimpleNamespace(status="completed", thread_id="thread-1", request_id="req-1")
+
+    async def fake_list_events(run_id: str, *, after_seq: str, limit: int):
+        del run_id, after_seq, limit
+        return []
+
+    async def fake_get_last_run_stream_seq(run_id: str):
+        del run_id
+        return "1700000000004-0"
+
+    monkeypatch.setattr(agent_run_service.pg_manager, "get_async_session_context", fake_session_ctx)
+    monkeypatch.setattr(agent_run_service, "AgentRunRepository", Repo)
+    monkeypatch.setattr(agent_run_service, "list_run_stream_events", fake_list_events)
+    monkeypatch.setattr(agent_run_service, "get_last_run_stream_seq", fake_get_last_run_stream_seq)
+
+    chunks = []
+    async for chunk in agent_run_service.stream_agent_run_events(
+        run_id="run-1",
+        after_seq="0",
+        current_uid="user-1",
+        verbose=False,
+    ):
+        chunks.append(chunk)
+
+    assert len(chunks) == 1
+    assert chunks[0].startswith("event: end")
+    assert "id: 1700000000004-0" in chunks[0]
+    data = _sse_data(chunks[0])
+    assert data["request_id"] == "req-1"
+    assert data["payload"] == {"status": "completed"}
 
 
 @pytest.mark.asyncio

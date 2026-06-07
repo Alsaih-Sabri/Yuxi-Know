@@ -286,12 +286,13 @@ async def cancel_agent_run(
 async def stream_run_events(
     run_id: str,
     after_seq: str = "0-0",
+    verbose: bool = Query(default=True, description="是否返回完整事件载荷；false 时仅返回 UI/客户端消费所需字段"),
     last_event_id: str | None = Header(default=None, alias="Last-Event-ID"),
     current_user: User = Depends(get_required_user),
 ):
     cursor = last_event_id or after_seq
     return StreamingResponse(
-        stream_agent_run_events(run_id=run_id, after_seq=cursor, current_uid=str(current_user.uid)),
+        stream_agent_run_events(run_id=run_id, after_seq=cursor, current_uid=str(current_user.uid), verbose=verbose),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"},
     )

@@ -305,7 +305,12 @@ export function useAgentRunStream({
             })
             touchedThreadIds.add(routeThreadId)
             handleStreamChunk(
-              { ...chunk, run_id: chunk.run_id || data.run_id || runId, thread_id: routeThreadId },
+              {
+                ...chunk,
+                request_id: chunk.request_id || data.request_id,
+                run_id: chunk.run_id || data.run_id || runId,
+                thread_id: routeThreadId
+              },
               routeThreadId
             )
           })
@@ -320,6 +325,7 @@ export function useAgentRunStream({
           handleStreamChunk(
             {
               ...payload.chunk,
+              request_id: payload.chunk.request_id || data.request_id,
               run_id: payload.chunk.run_id || data.run_id || runId,
               thread_id: routeThreadId
             },

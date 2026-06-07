@@ -81,6 +81,158 @@ def _format_heartbeat() -> str:
     return ": heartbeat\n\n"
 
 
+def _compact_message_dict(message: dict) -> dict:
+    compact = {
+        key: message[key] for key in ("id", "role", "content", "type", "message_type") if message.get(key) is not None
+    }
+    extra_metadata = message.get("extra_metadata")
+    if isinstance(extra_metadata, dict) and extra_metadata.get("attachments"):
+        compact["extra_metadata"] = {"attachments": extra_metadata["attachments"]}
+    return compact
+
+
+def _compact_semantic_stream_event(stream_event: dict) -> dict:
+    event_type = stream_event.get("type")
+    if event_type == "message_delta":
+        return {
+            key: stream_event[key]
+            for key in ("type", "message_id", "content", "reasoning_content", "additional_reasoning_content")
+            if stream_event.get(key)
+        }
+
+    if event_type in {"tool_call", "tool_call_delta"}:
+        compact = {
+            key: stream_event[key]
+            for key in ("type", "message_id", "tool_call_id", "name", "args", "args_delta")
+            if stream_event.get(key) is not None and stream_event.get(key) != ""
+        }
+        if stream_event.get("index"):
+            compact["index"] = stream_event["index"]
+        return compact
+
+    return {key: value for key, value in stream_event.items() if key not in {"thread_id", "namespace"}}
+
+
+def _compact_tool_stream_event(event: dict) -> dict:
+    compact = {key: event[key] for key in ("method",) if event.get(key)}
+    data = event.get("data")
+    if isinstance(data, dict):
+        compact_data = {
+            key: data[key]
+            for key in ("event", "tool_call_id", "tool_name", "output", "error")
+            if data.get(key) is not None and data.get(key) != ""
+        }
+        if compact_data:
+            compact["data"] = compact_data
+    return compact
+
+
+def _compact_stream_chunk(chunk: dict) -> dict:
+    compact = {
+        key: chunk[key]
+        for key in (
+            "status",
+            "run_id",
+            "parent_run_id",
+            "message",
+            "error_type",
+            "error_message",
+            "retryable",
+            "job_try",
+            "questions",
+            "interrupt_info",
+            "source",
+            "agent_state",
+        )
+        if chunk.get(key) is not None and chunk.get(key) != ""
+    }
+    if isinstance(chunk.get("msg"), dict):
+        compact["msg"] = _compact_message_dict(chunk["msg"])
+    if isinstance(chunk.get("stream_event"), dict):
+        compact["stream_event"] = _compact_semantic_stream_event(chunk["stream_event"])
+    if isinstance(chunk.get("event"), dict):
+        compact["event"] = _compact_tool_stream_event(chunk["event"])
+    return compact
+
+
+def _request_id_from_chunk(chunk: object) -> str | None:
+    if not isinstance(chunk, dict):
+        return None
+    request_id = chunk.get("request_id")
+    if isinstance(request_id, str) and request_id:
+        return request_id
+    msg = chunk.get("msg")
+    extra_metadata = msg.get("extra_metadata") if isinstance(msg, dict) else None
+    if isinstance(extra_metadata, dict):
+        request_id = extra_metadata.get("request_id")
+        if isinstance(request_id, str) and request_id:
+            return request_id
+    return None
+
+
+def _request_id_from_payload(payload: object) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    request_id = payload.get("request_id")
+    if isinstance(request_id, str) and request_id:
+        return request_id
+    request_id = _request_id_from_chunk(payload.get("chunk"))
+    if request_id:
+        return request_id
+    items = payload.get("items")
+    if isinstance(items, list):
+        for item in items:
+            request_id = _request_id_from_chunk(item)
+            if request_id:
+                return request_id
+    return None
+
+
+def _compact_run_event_payload(event_type: str, payload: dict | None) -> dict:
+    if not isinstance(payload, dict):
+        return {}
+
+    if event_type == "messages":
+        compact: dict = {}
+        if isinstance(payload.get("items"), list):
+            compact["items"] = [
+                _compact_stream_chunk(item) if isinstance(item, dict) else item for item in payload["items"]
+            ]
+        if isinstance(payload.get("chunk"), dict):
+            compact["chunk"] = _compact_stream_chunk(payload["chunk"])
+        return compact
+
+    compact = {key: value for key, value in payload.items() if key not in {"chunk", "request_id"}}
+    if isinstance(payload.get("chunk"), dict):
+        compact["chunk"] = _compact_stream_chunk(payload["chunk"])
+    return compact
+
+
+def _is_empty_agent_state(agent_state: object) -> bool:
+    if not isinstance(agent_state, dict):
+        return False
+    return all(not value for value in agent_state.values())
+
+
+def _compact_run_event_envelope(envelope: dict) -> dict | None:
+    event_type = str(envelope.get("event") or "")
+    payload = envelope.get("payload")
+    if event_type == "metadata":
+        return None
+    if event_type == "custom" and isinstance(payload, dict) and payload.get("name") == "yuxi.agent_state":
+        state = payload.get("agent_state")
+        chunk = payload.get("chunk") if isinstance(payload.get("chunk"), dict) else {}
+        if _is_empty_agent_state(state) or _is_empty_agent_state(chunk.get("agent_state")):
+            return None
+
+    compact = {key: envelope[key] for key in ("run_id", "thread_id") if key in envelope}
+    request_id = _request_id_from_payload(payload)
+    if request_id:
+        compact["request_id"] = request_id
+    compact["payload"] = _compact_run_event_payload(event_type, payload)
+    return compact
+
+
 async def create_agent_run_view(
     *,
     query: str | None,
@@ -245,6 +397,7 @@ async def stream_agent_run_events(
     run_id: str,
     after_seq: str,
     current_uid: str,
+    verbose: bool = True,
 ) -> AsyncIterator[str]:
     started_at = utc_now_naive()
     last_heartbeat_ts = started_at
@@ -294,6 +447,10 @@ async def stream_agent_run_events(
                 last_seq = seq
                 event_type = event.get("event_type") or "message"
                 envelope = event.get("payload") or {}
+                if not verbose and isinstance(envelope, dict):
+                    envelope = _compact_run_event_envelope(envelope)
+                    if envelope is None:
+                        continue
                 yield _format_sse(envelope, event=event_type, event_id=seq)
                 if event_type == "end":
                     emitted_terminal = True
@@ -307,14 +464,17 @@ async def stream_agent_run_events(
                     terminal_seq = await get_last_run_stream_seq(run_id)
                 if terminal_seq in {"", "0-0"}:
                     terminal_seq = None
+                terminal_envelope = build_run_event_envelope(
+                    run_id=run_id,
+                    thread_id=run.thread_id,
+                    event_type="end",
+                    payload={"status": run.status, "request_id": run.request_id},
+                    created_at=utc_now_naive().isoformat(),
+                )
+                if not verbose:
+                    terminal_envelope = _compact_run_event_envelope(terminal_envelope)
                 yield _format_sse(
-                    build_run_event_envelope(
-                        run_id=run_id,
-                        thread_id=run.thread_id,
-                        event_type="end",
-                        payload={"status": run.status},
-                        created_at=utc_now_naive().isoformat(),
-                    ),
+                    terminal_envelope,
                     event="end",
                     event_id=terminal_seq,
                 )
