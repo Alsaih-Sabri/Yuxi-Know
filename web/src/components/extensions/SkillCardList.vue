@@ -30,15 +30,6 @@
               <span>上传 Skill</span>
             </a-button>
           </a-upload>
-          <a-button
-            :href="SKILLS_DOC_URL"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="lucide-icon-btn"
-          >
-            <ExternalLink :size="14" />
-            <span>安装文档</span>
-          </a-button>
           <a-tooltip title="刷新 Skills" placement="bottom">
             <a-button class="lucide-icon-btn" :disabled="loading" @click="fetchSkills">
               <RefreshCw :size="14" />
@@ -611,7 +602,6 @@ import {
   Check,
   Plus,
   Minus,
-  ExternalLink,
   LoaderCircle
 } from 'lucide-vue-next'
 import { skillApi } from '@/apis/skill_api'
@@ -623,7 +613,6 @@ import MarkdownPreview from '@/components/common/MarkdownPreview.vue'
 import { formatExtensionCardTitle } from '@/utils/extensionDisplayName'
 
 const BookMarkedIcon = BookMarked
-const SKILLS_DOC_URL = 'https://xerrors.github.io/Yuxi/agents/skills-management.html'
 const RECOMMENDED_SKILLS = [
   {
     slug: 'skill-creator',

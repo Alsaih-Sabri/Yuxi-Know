@@ -1,7 +1,10 @@
 <template>
   <div
     class="agent-file-preview"
-    :class="[containerClass, { 'is-full-height': fullHeight, 'is-borderless': borderless }]"
+    :class="[
+      containerClass,
+      { 'is-full-height': fullHeight, 'is-borderless': borderless, 'has-preview-header': showHeader }
+    ]"
   >
     <div v-if="showHeader" class="preview-header">
       <div class="file-title">
@@ -21,24 +24,15 @@
             {{ variant.label }}
           </button>
         </div>
-        <div v-if="canEdit" class="preview-mode-switch">
-          <button
-            class="preview-mode-btn"
-            :class="{ active: editMode === 'preview' }"
-            @click="editMode = 'preview'"
-            title="预览"
-          >
-            <Eye :size="16" />
-          </button>
-          <button
-            class="preview-mode-btn"
-            :class="{ active: editMode === 'edit' }"
-            @click="editMode = 'edit'"
-            title="编辑"
-          >
-            <Pencil :size="16" />
-          </button>
-        </div>
+        <button
+          v-if="canEdit && editMode !== 'edit'"
+          class="modal-action-btn"
+          @click="editMode = 'edit'"
+          title="编辑"
+          aria-label="编辑"
+        >
+          <FilePen :size="18" />
+        </button>
 
         <div v-if="isHtmlFile" class="preview-mode-switch">
           <button
@@ -86,34 +80,41 @@
       </div>
     </div>
 
+    <div v-if="canEdit && editMode === 'edit'" class="edit-floating-actions">
+      <span v-if="draftChanged" class="edit-status-badge">未保存</span>
+      <button
+        v-if="draftChanged"
+        class="edit-floating-btn edit-floating-btn-primary"
+        :disabled="saving"
+        @click="requestSave"
+        :title="saving ? '保存中' : '保存'"
+        :aria-label="saving ? '保存中' : '保存'"
+      >
+        <Save :size="14" />
+      </button>
+      <button
+        class="edit-floating-btn"
+        :class="{ 'edit-floating-btn-danger': draftChanged }"
+        :disabled="saving"
+        @click="cancelEdit"
+        title="取消"
+        aria-label="取消"
+      >
+        <X :size="14" />
+      </button>
+    </div>
+
     <div
       class="file-content"
       :class="[
         contentClass,
         {
+          'is-editing': canEdit && editMode === 'edit',
           'is-iframe-preview':
             file?.previewType === 'pdf' || (isHtmlFile && htmlPreviewMode === 'render')
         }
       ]"
     >
-      <div v-if="canEdit && editMode === 'edit'" class="edit-floating-actions">
-        <span v-if="draftChanged" class="edit-status-badge">修改未保存</span>
-        <button
-          v-if="draftChanged"
-          class="edit-floating-btn edit-floating-btn-primary"
-          :disabled="saving"
-          @click="requestSave"
-          title="保存"
-        >
-          <Save :size="16" />
-          <span v-if="saving">保存中...</span>
-          <span v-else>保存</span>
-        </button>
-        <button class="edit-floating-btn" :disabled="saving" @click="cancelEdit" title="取消">
-          <X :size="16" />
-          <span>取消</span>
-        </button>
-      </div>
       <template v-if="canEdit && editMode === 'edit'">
         <textarea
           v-model="draftContent"
@@ -255,11 +256,10 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import {
   Code2,
   Download,
-  Eye,
   Globe,
   Maximize,
   PanelRightClose,
-  Pencil,
+  FilePen,
   Save,
   X
 } from 'lucide-vue-next'
@@ -487,6 +487,7 @@ onUnmounted(() => {
 
 <style scoped lang="less">
 .agent-file-preview {
+  position: relative;
   min-width: 0;
   border-radius: 8px;
   overflow: hidden;
@@ -598,6 +599,10 @@ onUnmounted(() => {
   overflow-y: auto;
   border-radius: 0px;
 
+  &.is-editing {
+    overflow: hidden;
+  }
+
   &.is-iframe-preview {
     overflow: hidden;
   }
@@ -627,51 +632,69 @@ onUnmounted(() => {
 }
 
 .edit-floating-actions {
-  position: sticky;
-  top: 0;
-  z-index: 2;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
   gap: 8px;
-  padding: 8px 12px;
-  background: var(--gray-0);
-  border-bottom: 1px solid var(--gray-100);
+  pointer-events: none;
+}
+
+.agent-file-preview.has-preview-header .edit-floating-actions {
+  top: 52px;
 }
 
 .edit-status-badge {
-  margin-right: auto;
-  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--color-warning-100);
+  border-radius: 999px;
+  background: var(--color-warning-50);
+  font-size: 11px;
   line-height: 1;
   color: var(--color-warning-700);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  pointer-events: auto;
+  white-space: nowrap;
 }
 
 .edit-floating-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
-  border: 1px solid var(--gray-200);
-  border-radius: 6px;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--gray-150);
+  border-radius: 50%;
   background: var(--gray-0);
   color: var(--gray-700);
-  font-size: 13px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
+  pointer-events: auto;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
 
   &:hover:not(:disabled) {
+    border-color: var(--gray-250);
     background: var(--gray-50);
-    border-color: var(--gray-300);
     color: var(--gray-900);
   }
 
   &:disabled {
     color: var(--gray-300);
     cursor: not-allowed;
+    opacity: 0.7;
 
     &:hover {
+      border-color: var(--gray-150);
       background: var(--gray-0);
-      border-color: var(--gray-200);
     }
   }
 }
@@ -701,9 +724,17 @@ onUnmounted(() => {
   }
 }
 
+.edit-floating-btn-danger {
+  &:hover:not(:disabled) {
+    border-color: var(--color-error-500);
+    background: var(--color-error-50);
+    color: var(--color-error-700);
+  }
+}
+
 .file-edit-textarea {
   width: 100%;
-  min-height: calc(80vh - 40px);
+  min-height: 100%;
   padding: 12px;
   border: 0;
   outline: none;
@@ -711,8 +742,8 @@ onUnmounted(() => {
   background: var(--gray-0);
   color: var(--gray-1000);
   font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .file-edit-textarea:disabled {

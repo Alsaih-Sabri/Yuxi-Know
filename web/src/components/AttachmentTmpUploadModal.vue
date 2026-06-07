@@ -42,7 +42,13 @@
 
           <div class="attachment-status-row">
             <div class="attachment-status-meta">
-              <a-tag :color="getStatusColor(item.status)">{{ getStatusLabel(item.status) }}</a-tag>
+              <a-tag
+                :color="getStatusColor(item.status)"
+                :bordered="false"
+                class="attachment-status-tag"
+              >
+                {{ getStatusLabel(item.status) }}
+              </a-tag>
               <span>{{ formatFileSize(item.fileSize) }}</span>
               <span v-if="item.error" class="attachment-error">{{ item.error }}</span>
               <span v-else-if="item.parseError" class="attachment-error">{{
@@ -560,15 +566,26 @@ const formatFileSize = (size) => {
   justify-content: space-between;
   gap: 8px;
   color: var(--gray-500);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .attachment-status-meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
+}
+
+.attachment-status-tag {
+  min-height: 18px;
+  margin-inline-end: 0;
+  padding: 0 5px;
+  border: none;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
 }
 
 .attachment-error {

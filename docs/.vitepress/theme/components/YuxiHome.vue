@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { withBase } from 'vitepress'
 
 const GITHUB = 'https://github.com/xerrors/Yuxi'
-const DEMO = 'https://www.bilibili.com/video/BV1DF14BTETq/'
+const DEMO = 'https://www.bilibili.com/video/BV1TZEx6NEit/'
 
 // 关键数字（占位，后续替换为真实数据）
 const stats = [
@@ -126,7 +126,7 @@ const shots = [
   { title: '对话工作台', desc: '类 ChatGPT 的智能体对话与产物交付' },
   { title: '智能体配置', desc: '挂载 Skills / MCP / 子智能体与中间件' },
   { title: '知识图谱可视化', desc: '实体关系抽取与子图检索展示' },
-  { title: '拓展管理', desc: '统一管理 Skills 与 MCP 服务' }
+  { title: '智能体拓展', desc: '统一管理 Skills 与 MCP 服务' }
 ]
 
 // 企业级
@@ -225,7 +225,7 @@ const vReveal = {
         <div class="yx-hero__shot">
           <img
             class="yx-hero__img"
-            src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260604203514048.png"
+            src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260608002434299.png"
             alt="语析 Yuxi 产品界面预览"
             loading="lazy"
           />

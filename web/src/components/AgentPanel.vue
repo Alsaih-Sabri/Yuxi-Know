@@ -673,6 +673,20 @@ watch(
   &.resizing {
     transition: none;
   }
+
+  .panel-header {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  :deep(.side-preview-shell) {
+    border: none;
+  }
+
+  :deep(.preview-header) {
+    min-height: 32px;
+    padding-top: 0;
+  }
 }
 
 .panel-header {

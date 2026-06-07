@@ -221,6 +221,7 @@
 
             <div class="state-panel-body">
               <section
+                v-if="currentTodos.length"
                 class="state-section"
                 :class="{ 'is-collapsed': !isStateSectionExpanded('todos') }"
               >
@@ -248,10 +249,10 @@
                   id="state-section-todos"
                   class="state-section-content"
                 >
-                  <div v-if="currentTodos.length" class="todo-panel-list">
+                  <div class="todo-panel-list">
                     <div
                       v-for="(todo, index) in currentTodos"
-                      :key="`${todo.content}-${index}`"
+                      :key="`${todo.fullContent}-${index}`"
                       class="todo-item"
                     >
                       <div class="todo-item-icon" :class="todo.status || 'unknown'">
@@ -262,15 +263,17 @@
                         <QuestionCircleOutlined v-else />
                       </div>
                       <div class="todo-item-body">
-                        <span class="todo-item-text">{{ todo.content }}</span>
+                        <span class="todo-item-text" :title="todo.fullContent">
+                          {{ todo.displayContent }}
+                        </span>
                       </div>
                     </div>
                   </div>
-                  <div v-else class="state-section-empty">暂无待办</div>
                 </div>
               </section>
 
               <section
+                v-if="currentStateFiles.length"
                 class="state-section"
                 :class="{ 'is-collapsed': !isStateSectionExpanded('files') }"
               >
@@ -296,7 +299,7 @@
                   id="state-section-files"
                   class="state-section-content"
                 >
-                  <div v-if="currentStateFiles.length" class="state-list">
+                  <div class="state-list">
                     <div v-for="file in currentStateFiles" :key="file.key" class="state-list-item">
                       <FileTypeIcon
                         :name="file.name || file.path"
@@ -309,11 +312,11 @@
                       </div>
                     </div>
                   </div>
-                  <div v-else class="state-section-empty">暂无附件或文件</div>
                 </div>
               </section>
 
               <section
+                v-if="currentArtifactFiles.length"
                 class="state-section"
                 :class="{ 'is-collapsed': !isStateSectionExpanded('artifacts') }"
               >
@@ -339,7 +342,7 @@
                   id="state-section-artifacts"
                   class="state-section-content"
                 >
-                  <div v-if="currentArtifactFiles.length" class="state-list">
+                  <div class="state-list">
                     <button
                       v-for="file in currentArtifactFiles"
                       :key="file.path"
@@ -359,11 +362,11 @@
                       </div>
                     </button>
                   </div>
-                  <div v-else class="state-section-empty">暂无产物</div>
                 </div>
               </section>
 
               <section
+                v-if="displaySubagentRuns.length"
                 class="state-section"
                 :class="{ 'is-collapsed': !isStateSectionExpanded('subagents') }"
               >
@@ -389,7 +392,7 @@
                   id="state-section-subagents"
                   class="state-section-content"
                 >
-                  <div v-if="displaySubagentRuns.length" class="state-list">
+                  <div class="state-list">
                     <div
                       v-for="(run, index) in displaySubagentRuns"
                       :key="run.id || `${run.subagent_type || 'subagent'}-${index}`"
@@ -427,9 +430,10 @@
                       </div>
                     </div>
                   </div>
-                  <div v-else class="state-section-empty">暂无子智能体运行</div>
                 </div>
               </section>
+
+              <div v-if="!hasVisibleStateSections" class="state-panel-empty">暂无状态内容</div>
             </div>
           </div>
         </div>
@@ -600,10 +604,15 @@ const agentPanelActivePreviewPath = ref('')
 const agentPanelViewMode = ref('tree')
 const chatContentContainerRef = ref(null)
 const panelWrapperRef = ref(null) // 直接操作 DOM
+const TODO_NAME_MAX_LENGTH = 20
 let resizeStartX = 0
 let resizeStartWidth = 0
 let panelContainerWidth = 0
 let streamingStateRefreshTimer = null
+
+const formatTodoName = (content) => {
+  return Array.from(String(content || '')).slice(0, TODO_NAME_MAX_LENGTH).join('')
+}
 
 const getPanelContainerWidth = () => {
   const container = chatContentContainerRef.value || panelWrapperRef.value?.parentElement
@@ -851,7 +860,15 @@ const currentArtifactFiles = computed(() =>
 )
 const currentTodos = computed(() => {
   const todos = currentAgentState.value?.todos
-  return Array.isArray(todos) ? todos : []
+  if (!Array.isArray(todos)) return []
+  return todos.map((todo) => {
+    const fullContent = String(todo?.content || '')
+    return {
+      ...todo,
+      fullContent,
+      displayContent: formatTodoName(fullContent)
+    }
+  })
 })
 const currentSubagentRuns = computed(() => {
   const runs = currentAgentState.value?.subagent_runs
@@ -939,6 +956,13 @@ const stateSummaryLabel = computed(() => {
     displaySubagentRuns.value.length
   return total ? `${total} 项` : '暂无内容'
 })
+const hasVisibleStateSections = computed(
+  () =>
+    currentTodos.value.length > 0 ||
+    currentStateFiles.value.length > 0 ||
+    currentArtifactFiles.value.length > 0 ||
+    displaySubagentRuns.value.length > 0
+)
 
 const { mentionConfig } = useAgentMentionConfig({
   currentAgentState,
@@ -3140,12 +3164,13 @@ watch(currentChatId, (threadId, oldThreadId) => {
   min-width: 0;
 }
 
-.state-section-empty {
+.state-panel-empty {
   padding: 10px 12px;
   border-radius: 10px;
   background: var(--gray-25);
   color: var(--gray-500);
   font-size: 13px;
+  text-align: center;
 }
 
 .todo-panel-list {
