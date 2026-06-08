@@ -5,7 +5,7 @@ import {
   Plus,
   RefreshCw,
   Trash2,
-  Edit3,
+  SquarePen,
   Bot,
   Microscope,
   MoreVertical,
@@ -438,7 +438,7 @@ defineExpose({
                   <a-menu>
                     <a-menu-item key="edit" @click.stop="openEditAgentModal(agent)">
                       <span class="agent-card-menu-item">
-                        <Edit3 :size="14" />
+                        <SquarePen :size="14" />
                         编辑智能体
                       </span>
                     </a-menu-item>
