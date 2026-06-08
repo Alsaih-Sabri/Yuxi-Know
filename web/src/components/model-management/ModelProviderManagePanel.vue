@@ -741,10 +741,9 @@ defineExpose({
             <span>Provider Type</span>
             <a-select v-model:value="providerForm.provider_type">
               <a-select-option value="openai">openai</a-select-option>
-              <a-select-option value="anthropic">anthropic</a-select-option>
+              <!-- <a-select-option value="anthropic">anthropic</a-select-option>
               <a-select-option value="gemini">gemini</a-select-option>
-              <a-select-option value="openrouter">openrouter</a-select-option>
-              <a-select-option value="lmstudio">lmstudio</a-select-option>
+              <a-select-option value="openrouter">openrouter</a-select-option> -->
             </a-select>
           </label>
         </div>

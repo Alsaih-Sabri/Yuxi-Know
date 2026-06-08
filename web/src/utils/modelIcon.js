@@ -10,7 +10,6 @@ export const modelIcons = {
   dashscope: `${ICON_BASE}/bailian-color.svg`,
   deepseek: `${ICON_BASE}/deepseek-color.svg`,
   google: `${ICON_BASE}/google-color.svg`,
-  lmstudio: `${ICON_BASE}/lmstudio.svg`,
   minimax: `${ICON_BASE}/minimax-color.svg`,
   'minimax-cn': `${ICON_BASE}/minimax-color.svg`,
   modelscope: `${ICON_BASE}/modelscope-color.svg`,
