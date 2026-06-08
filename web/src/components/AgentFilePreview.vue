@@ -1,14 +1,43 @@
 <template>
-  <div class="agent-file-preview" :class="[containerClass, { 'is-full-height': fullHeight }]">
+  <div
+    class="agent-file-preview"
+    :class="[
+      containerClass,
+      {
+        'is-full-height': fullHeight,
+        'is-borderless': borderless,
+        'has-preview-header': showHeader
+      }
+    ]"
+  >
     <div v-if="showHeader" class="preview-header">
       <div class="file-title">
-        <component
-          :is="getFileIcon(filePath)"
-          :style="{ color: getFileIconColor(filePath), fontSize: '18px' }"
-        />
+        <FileTypeIcon v-if="showFileIcon" :name="filePath" :size="18" />
         <span class="file-path-title">{{ filePath }}</span>
       </div>
       <div class="modal-actions">
+        <div v-if="availablePreviewVariants.length > 1" class="preview-mode-switch">
+          <button
+            v-for="variant in availablePreviewVariants"
+            :key="variant.key"
+            class="preview-mode-btn text-mode-btn"
+            :class="{ active: activePreviewVariant === variant.key }"
+            :title="variant.label"
+            @click="$emit('switchVariant', variant.key)"
+          >
+            {{ variant.label }}
+          </button>
+        </div>
+        <button
+          v-if="canEdit && editMode !== 'edit'"
+          class="modal-action-btn"
+          @click="editMode = 'edit'"
+          title="编辑"
+          aria-label="编辑"
+        >
+          <FilePen :size="18" />
+        </button>
+
         <div v-if="isHtmlFile" class="preview-mode-switch">
           <button
             class="preview-mode-btn"
@@ -41,16 +70,64 @@
           @click="openFullscreenPreview"
           title="全屏预览"
         >
-          <Maximize2 :size="18" />
+          <Maximize :size="18" />
         </button>
-        <button v-if="showClose" class="modal-action-btn" @click="$emit('close')" title="关闭">
-          <X :size="18" />
+        <button
+          v-if="showClose"
+          class="modal-action-btn"
+          @click="$emit('close')"
+          :title="closeTitle"
+          :aria-label="closeTitle"
+        >
+          <component :is="closeIconComponent" :size="18" />
         </button>
       </div>
     </div>
 
-    <div class="file-content" :class="contentClass">
-      <template v-if="file?.previewType === 'image' && file?.previewUrl">
+    <div v-if="canEdit && editMode === 'edit'" class="edit-floating-actions">
+      <span v-if="draftChanged" class="edit-status-badge">未保存</span>
+      <button
+        v-if="draftChanged"
+        class="edit-floating-btn edit-floating-btn-primary"
+        :disabled="saving"
+        @click="requestSave"
+        :title="saving ? '保存中' : '保存'"
+        :aria-label="saving ? '保存中' : '保存'"
+      >
+        <Save :size="14" />
+      </button>
+      <button
+        class="edit-floating-btn"
+        :class="{ 'edit-floating-btn-danger': draftChanged }"
+        :disabled="saving"
+        @click="cancelEdit"
+        title="取消"
+        aria-label="取消"
+      >
+        <X :size="14" />
+      </button>
+    </div>
+
+    <div
+      class="file-content"
+      :class="[
+        contentClass,
+        {
+          'is-editing': canEdit && editMode === 'edit',
+          'is-iframe-preview':
+            file?.previewType === 'pdf' || (isHtmlFile && htmlPreviewMode === 'render')
+        }
+      ]"
+    >
+      <template v-if="canEdit && editMode === 'edit'">
+        <textarea
+          v-model="draftContent"
+          class="file-edit-textarea"
+          :disabled="saving"
+          spellcheck="false"
+        />
+      </template>
+      <template v-else-if="file?.previewType === 'image' && file?.previewUrl">
         <div class="image-preview-wrapper">
           <img :src="file.previewUrl" :alt="filePath" class="image-preview" />
         </div>
@@ -62,18 +139,13 @@
         <iframe
           :key="`embedded-${htmlPreviewRenderKey}`"
           class="html-preview"
-          :srcdoc="formatContent(file?.content)"
+          :srcdoc="htmlPreviewSrcdoc"
           :title="filePath"
           sandbox="allow-scripts"
         />
       </template>
       <template v-else-if="isMarkdown">
-        <MdPreview
-          class="flat-md-preview"
-          :modelValue="formatContent(file?.content)"
-          :theme="theme"
-          previewTheme="github"
-        />
+        <MarkdownPreview :content="formatContent(file?.content)" />
       </template>
       <template v-else-if="file?.supported === false">
         <div class="unsupported-preview">
@@ -150,18 +222,13 @@
               <iframe
                 :key="`fullscreen-${htmlPreviewRenderKey}`"
                 class="html-preview fullscreen-embed-preview"
-                :srcdoc="formatContent(file?.content)"
+                :srcdoc="htmlPreviewSrcdoc"
                 :title="filePath"
                 sandbox="allow-scripts"
               />
             </template>
             <template v-else-if="isMarkdown">
-              <MdPreview
-                class="flat-md-preview"
-                :modelValue="formatContent(file?.content)"
-                :theme="theme"
-                previewTheme="github"
-              />
+              <MarkdownPreview :content="formatContent(file?.content)" />
             </template>
             <template v-else-if="file?.supported === false">
               <div class="unsupported-preview fullscreen-unsupported-preview">
@@ -190,13 +257,31 @@
 
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue'
-import { Code2, Download, Globe, Maximize2, X } from 'lucide-vue-next'
-import { MdPreview } from 'md-editor-v3'
+import {
+  Code2,
+  Download,
+  Globe,
+  Maximize,
+  PanelRightClose,
+  FilePen,
+  Save,
+  X
+} from 'lucide-vue-next'
 import hljs from 'highlight.js/lib/common'
-import 'md-editor-v3/lib/preview.css'
+import MarkdownPreview from '@/components/common/MarkdownPreview.vue'
+import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
 import { useThemeStore } from '@/stores/theme'
-import { getFileIcon, getFileIconColor } from '@/utils/file_utils'
-import { getCodeLanguageByPath, isHtmlPreview, isMarkdownPreview } from '@/utils/file_preview'
+import { escapeHtml } from '@/utils/html'
+import {
+  getCodeLanguageByPath,
+  getPreviewFileExtension,
+  isHtmlPreview,
+  isMarkdownPreview
+} from '@/utils/file_preview'
+
+const EDITABLE_EXTENSIONS = new Set(['.md', '.markdown', '.mdx', '.txt'])
+const HTML_PREVIEW_SCALE = 0.75
+const HTML_PREVIEW_SCALE_CSS = `html { zoom: ${HTML_PREVIEW_SCALE} !important; }`
 
 const props = defineProps({
   file: {
@@ -223,7 +308,32 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  closeVariant: {
+    type: String,
+    default: 'close',
+    validator: (value) => ['close', 'collapse-right'].includes(value)
+  },
   fullHeight: {
+    type: Boolean,
+    default: false
+  },
+  showFileIcon: {
+    type: Boolean,
+    default: true
+  },
+  borderless: {
+    type: Boolean,
+    default: false
+  },
+  editable: {
+    type: Boolean,
+    default: false
+  },
+  editAllText: {
+    type: Boolean,
+    default: false
+  },
+  saving: {
     type: Boolean,
     default: false
   },
@@ -237,21 +347,46 @@ const props = defineProps({
   }
 })
 
-defineEmits(['close', 'download'])
+const emit = defineEmits(['close', 'download', 'save', 'switchVariant'])
 
 const themeStore = useThemeStore()
-const theme = computed(() => (themeStore.isDark ? 'dark' : 'light'))
+const closeTitle = computed(() =>
+  props.closeVariant === 'collapse-right' ? '收起预览面板' : '关闭预览'
+)
+const closeIconComponent = computed(() =>
+  props.closeVariant === 'collapse-right' ? PanelRightClose : X
+)
 const htmlPreviewMode = ref('render')
+const editMode = ref('preview')
+const draftContent = ref('')
 const fullscreenPreviewVisible = ref(false)
 const htmlPreviewRenderKey = ref(0)
 
 const isMarkdown = computed(() => isMarkdownPreview(props.filePath, props.file?.previewType))
+const availablePreviewVariants = computed(() => {
+  const variants = props.file?.availableVariants || props.file?.available_variants || []
+  return variants.filter((variant) => variant?.supported !== false && variant?.key)
+})
+const activePreviewVariant = computed(() => props.file?.variant || props.file?.previewVariant || '')
+const canEdit = computed(() => {
+  const previewType = props.file?.previewType
+  return (
+    props.editable &&
+    props.file?.supported !== false &&
+    typeof props.file?.content === 'string' &&
+    (previewType === 'text' || previewType === 'markdown') &&
+    (props.editAllText || EDITABLE_EXTENSIONS.has(getPreviewFileExtension(props.filePath)))
+  )
+})
+const savedContent = computed(() => formatContent(props.file?.content))
+const draftChanged = computed(() => draftContent.value !== savedContent.value)
 const isHtmlFile = computed(
   () =>
     props.file?.previewType === 'text' &&
     typeof props.file?.content === 'string' &&
     isHtmlPreview(props.filePath)
 )
+const htmlPreviewSrcdoc = computed(() => buildHtmlPreviewSrcdoc(props.file?.content))
 const codeThemeClass = computed(() => (themeStore.isDark ? 'hljs-theme-dark' : 'hljs-theme-light'))
 const codeLanguage = computed(() => getCodeLanguageByPath(props.filePath))
 const isCodePreview = computed(
@@ -261,14 +396,6 @@ const isCodePreview = computed(
     !isHtmlFile.value &&
     Boolean(codeLanguage.value)
 )
-
-const escapeHtml = (content) =>
-  String(content)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
 
 const highlightedCodeContent = computed(() => {
   const content = props.file?.content
@@ -293,6 +420,40 @@ const formatContent = (content) => {
   return String(content)
 }
 
+const serializeDoctype = (doctype) => {
+  if (!doctype) return ''
+  const publicId = doctype.publicId ? ` PUBLIC "${doctype.publicId}"` : ''
+  const systemId = doctype.systemId ? ` "${doctype.systemId}"` : ''
+  return `<!DOCTYPE ${doctype.name}${publicId}${systemId}>`
+}
+
+const buildHtmlPreviewSrcdoc = (content) => {
+  const html = formatContent(content)
+  if (!html.trim() || typeof DOMParser === 'undefined') return html
+
+  const doc = new DOMParser().parseFromString(html, 'text/html')
+  const style = doc.createElement('style')
+  style.setAttribute('data-yuxi-html-preview-scale', String(HTML_PREVIEW_SCALE))
+  style.textContent = HTML_PREVIEW_SCALE_CSS
+  doc.head.append(style)
+
+  return `${serializeDoctype(doc.doctype)}${doc.documentElement.outerHTML}`
+}
+
+const syncDraftContent = () => {
+  draftContent.value = savedContent.value
+  editMode.value = 'preview'
+}
+
+const requestSave = () => {
+  if (!canEdit.value || props.saving) return
+  emit('save', draftContent.value)
+}
+
+const cancelEdit = () => {
+  syncDraftContent()
+}
+
 const openFullscreenPreview = () => {
   if (!props.file) return
   fullscreenPreviewVisible.value = true
@@ -308,6 +469,10 @@ watch(
     htmlPreviewMode.value = 'render'
   }
 )
+
+watch([() => props.filePath, () => props.file?.content, canEdit], syncDraftContent, {
+  immediate: true
+})
 
 watch([() => props.filePath, () => props.file?.previewType, () => props.file?.content], () => {
   if (isHtmlFile.value) {
@@ -326,15 +491,22 @@ onUnmounted(() => {
 
 <style scoped lang="less">
 .agent-file-preview {
+  position: relative;
   min-width: 0;
   border-radius: 8px;
   overflow: hidden;
-}
-
-.agent-file-preview.is-full-height {
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   min-height: 0;
+}
+
+.agent-file-preview.is-full-height {
+  max-height: 100vh;
+}
+
+.agent-file-preview.is-borderless {
+  border-radius: 0;
 }
 
 .preview-header {
@@ -381,8 +553,8 @@ onUnmounted(() => {
 
 .modal-action-btn,
 .preview-mode-btn {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -401,17 +573,43 @@ onUnmounted(() => {
   color: var(--gray-900);
 }
 
+.modal-action-btn:disabled,
+.preview-mode-btn:disabled {
+  color: var(--gray-300);
+  cursor: not-allowed;
+}
+
+.modal-action-btn:disabled:hover,
+.preview-mode-btn:disabled:hover {
+  background: transparent;
+  color: var(--gray-300);
+}
+
 .preview-mode-btn.active {
   background: var(--gray-0);
   color: var(--gray-900);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
+.text-mode-btn {
+  width: auto;
+  min-width: 48px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
 .file-content {
   min-height: 300px;
-  max-height: 80vh;
   overflow-y: auto;
   border-radius: 0px;
+
+  &.is-editing {
+    overflow: hidden;
+  }
+
+  &.is-iframe-preview {
+    overflow: hidden;
+  }
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -432,8 +630,129 @@ onUnmounted(() => {
   }
 
   .flat-md-preview {
-    padding: 12px;
+    padding: 16px calc(var(--page-padding) - 4px);
+    font-size: 0.85rem;
   }
+}
+
+.edit-floating-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.agent-file-preview.has-preview-header .edit-floating-actions {
+  top: 52px;
+}
+
+.edit-status-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--color-warning-100);
+  border-radius: 999px;
+  background: var(--color-warning-50);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--color-warning-700);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+  pointer-events: auto;
+  white-space: nowrap;
+}
+
+.edit-floating-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--gray-150);
+  border-radius: 50%;
+  background: var(--gray-0);
+  color: var(--gray-700);
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
+  pointer-events: auto;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--gray-250);
+    background: var(--gray-50);
+    color: var(--gray-900);
+  }
+
+  &:disabled {
+    color: var(--gray-300);
+    cursor: not-allowed;
+    opacity: 0.7;
+
+    &:hover {
+      border-color: var(--gray-150);
+      background: var(--gray-0);
+    }
+  }
+}
+
+.edit-floating-btn-primary {
+  background: var(--color-primary-500);
+  border-color: var(--color-primary-500);
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    background: var(--color-primary-700);
+    border-color: var(--color-primary-700);
+    color: #fff;
+  }
+
+  &:disabled {
+    background: var(--color-primary-500);
+    border-color: var(--color-primary-500);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: not-allowed;
+
+    &:hover {
+      background: var(--color-primary-500);
+      border-color: var(--color-primary-500);
+      color: rgba(255, 255, 255, 0.5);
+    }
+  }
+}
+
+.edit-floating-btn-danger {
+  &:hover:not(:disabled) {
+    border-color: var(--color-error-500);
+    background: var(--color-error-50);
+    color: var(--color-error-700);
+  }
+}
+
+.file-edit-textarea {
+  width: 100%;
+  min-height: 100%;
+  padding: 12px;
+  border: 0;
+  outline: none;
+  resize: none;
+  background: var(--gray-0);
+  color: var(--gray-1000);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.file-edit-textarea:disabled {
+  color: var(--gray-600);
+  background: var(--gray-25);
 }
 
 .file-content pre,
@@ -451,17 +770,17 @@ onUnmounted(() => {
 
 .file-content-pre.code-highlight {
   border-radius: 8px;
-  background: var(--gray-25);
+  background: var(--gray-0);
   white-space: pre;
   overflow-x: auto;
 }
 
 .file-content-pre.code-highlight code {
-  padding: 14px 16px;
   display: block;
   white-space: pre;
   color: inherit;
   min-height: calc(80vh - 40px);
+  background: var(--gray-0);
 }
 
 .image-preview-wrapper {
@@ -473,6 +792,7 @@ onUnmounted(() => {
 .image-preview {
   display: block;
   max-width: 100%;
+  height: 100%;
   max-height: calc(80vh - 32px);
   object-fit: contain;
   border-radius: 6px;
@@ -480,6 +800,7 @@ onUnmounted(() => {
 
 .pdf-preview {
   width: 100%;
+  height: 100%;
   min-height: calc(80vh - 40px);
   border: none;
   border-radius: 6px;
@@ -489,6 +810,7 @@ onUnmounted(() => {
 .html-preview {
   width: 100%;
   min-height: calc(80vh - 40px);
+  height: 100vh;
   border: none;
   border-radius: 0px;
   background: #fff; // HTML 内容通常需要白色背景以保证可读性
@@ -503,6 +825,7 @@ onUnmounted(() => {
   color: var(--gray-600);
   font-size: 14px;
   line-height: 1.6;
+  height: 100%;
   white-space: pre-wrap;
 }
 
@@ -571,13 +894,5 @@ onUnmounted(() => {
 
 .fullscreen-file-content .image-preview {
   max-height: calc(100vh - 48px);
-}
-
-:deep(.flat-md-preview .md-editor) {
-  background: transparent;
-}
-
-:deep(.flat-md-preview .md-editor-preview-wrapper) {
-  padding: 0;
 }
 </style>

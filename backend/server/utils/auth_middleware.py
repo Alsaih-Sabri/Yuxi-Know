@@ -3,14 +3,13 @@ import re
 
 from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
+from sqlalchemy.ext.asyncio import AsyncSession
 from yuxi.storage.postgres.manager import pg_manager
-from yuxi.storage.postgres.models_business import User, APIKey
-from server.utils.auth_utils import AuthUtils
+from yuxi.storage.postgres.models_business import APIKey, User
 from yuxi.utils.datetime_utils import utc_now_naive
+
+from yuxi.utils.auth_utils import AuthUtils
 
 # 定义OAuth2密码承载器，指定token URL
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token", auto_error=False)
@@ -106,8 +105,6 @@ async def get_current_user(
         user_id = payload.get("sub")
         if user_id is None:
             raise credentials_exception
-    except JWTError:
-        raise credentials_exception
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -115,10 +112,16 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    result = await db.execute(select(User).filter(User.id == int(user_id)))
+    result = await db.execute(select(User).filter(User.id == int(user_id), User.is_deleted == 0))
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
+    if user.is_login_locked():
+        raise HTTPException(
+            status_code=status.HTTP_423_LOCKED,
+            detail="登录被锁定，请稍后重试",
+            headers={"X-Lock-Remaining": str(user.get_remaining_lock_time())},
+        )
 
     return user
 

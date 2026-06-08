@@ -12,16 +12,24 @@ export function useAgentThreadState({
   onBeforeResetThread = null,
   onBeforeCleanupThread = null
 }) {
+  const resetThreadUiState = (threadState) => {
+    if (!threadState) return
+    threadState.replyLoadingVisible = false
+    threadState.pendingRequestId = null
+  }
+
   const getThreadState = (threadId) => {
     if (!threadId) return null
     if (!chatState.threadStates[threadId]) {
       chatState.threadStates[threadId] = {
         isStreaming: false,
-        streamAbortController: null,
         runStreamAbortController: null,
         activeRunId: null,
-        runLastSeq: '0',
+        runLastSeq: '0-0',
         lastRetryableJobTry: null,
+        replyLoadingVisible: false,
+        pendingRequestId: null,
+        pendingInterrupt: null,
         onGoingConv: createOnGoingConvState(),
         agentState: null
       }
@@ -31,16 +39,9 @@ export function useAgentThreadState({
 
   const stopThreadStream = (threadId) => {
     if (!threadId) return
-    const threadState = chatState.threadStates[threadId]
     if (typeof onStopThread === 'function') {
       onStopThread(threadId)
     }
-
-    if (!threadState?.streamAbortController) return
-
-    threadState.streamAbortController.abort()
-    threadState.streamAbortController = null
-    threadState.isStreaming = false
   }
 
   const cleanupThreadState = (threadId) => {
@@ -52,9 +53,6 @@ export function useAgentThreadState({
       onBeforeCleanupThread(threadId)
     }
 
-    if (threadState.streamAbortController) {
-      threadState.streamAbortController.abort()
-    }
     if (threadState.runStreamAbortController) {
       threadState.runStreamAbortController.abort()
     }
@@ -73,16 +71,13 @@ export function useAgentThreadState({
         onBeforeResetThread(targetThreadId)
       }
 
-      if (threadState.streamAbortController) {
-        threadState.streamAbortController.abort()
-        threadState.streamAbortController = null
-      }
       if (threadState.runStreamAbortController) {
         threadState.runStreamAbortController.abort()
         threadState.runStreamAbortController = null
       }
 
       threadState.onGoingConv = createOnGoingConvState()
+      resetThreadUiState(threadState)
       return
     }
 

@@ -20,7 +20,7 @@
 
 ```bash
 # 克隆最新版本
-git clone --branch v0.6.0 --depth 1 https://github.com/xerrors/Yuxi.git
+git clone --branch v0.7.0.beta2 --depth 1 https://github.com/xerrors/Yuxi.git
 cd Yuxi
 ```
 
@@ -28,7 +28,7 @@ cd Yuxi
 
 | 版本 | 适用场景 |
 |------|----------|
-| v0.6.x | 当前开发版本，包含最新特性 |
+| v0.7.x | 当前开发版本，包含最新特性 |
 | main | 开发版本，包含最新特性（可能不稳定） |
 
 ### 步骤二：配置环境变量
@@ -175,3 +175,4 @@ docker restart api-dev
 - 了解如何配置模型：阅读 [模型配置](./model-config.md)
 - 探索知识库功能：阅读 [知识库与知识图谱](./knowledge-base.md)
 - 学习智能体开发：阅读 [智能体开发](../agents/agents-config.md)
+- 深入了解配置系统：阅读 [配置系统详解](../advanced/configuration.md)

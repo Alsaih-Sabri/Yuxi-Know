@@ -7,7 +7,12 @@ from importlib import import_module  # noqa: E402
 
 from yuxi.config import config as config  # noqa: E402
 
-__version__ = "0.6.0"
+try:
+    from importlib.metadata import version
+
+    __version__ = version("yuxi")
+except Exception:
+    __version__ = "unknown"
 
 executor = ThreadPoolExecutor()  # noqa: E402
 
@@ -18,11 +23,11 @@ def get_version():
 
 
 def __getattr__(name: str):
-    if name in {"graph_base", "knowledge_base"}:
+    if name == "knowledge_base":
         knowledge = import_module("yuxi.knowledge")
         return getattr(knowledge, name)
     raise AttributeError(f"module 'yuxi' has no attribute {name!r}")
 
 
 def __dir__():
-    return sorted(set(globals()) | {"graph_base", "knowledge_base"})
+    return sorted(set(globals()) | {"knowledge_base"})

@@ -1,7 +1,36 @@
 const MARKDOWN_EXTENSIONS = new Set(['.md', '.markdown', '.mdx'])
-const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg'])
+const IMAGE_EXTENSIONS = new Set([
+  '.apng',
+  '.avif',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.bmp',
+  '.webp',
+  '.svg'
+])
 const PDF_EXTENSIONS = new Set(['.pdf'])
 const HTML_EXTENSIONS = new Set(['.html', '.htm'])
+const CODE_LANGUAGE_ALIASES = {
+  js: 'javascript',
+  ts: 'typescript',
+  py: 'python',
+  sh: 'bash',
+  shell: 'bash',
+  yml: 'yaml',
+  docker: 'dockerfile'
+}
+
+export const normalizeCodeLanguage = (lang) => {
+  const language = String(lang || '')
+    .trim()
+    .split(/[\s:,]/)[0]
+    .toLowerCase()
+
+  return CODE_LANGUAGE_ALIASES[language] || language
+}
+
 const CODE_LANGUAGE_MAP = {
   '.py': 'python',
   '.js': 'javascript',
@@ -72,6 +101,6 @@ export const getPreviewTypeByPath = (path) => {
 }
 
 export const getCodeLanguageByPath = (path) =>
-  CODE_LANGUAGE_MAP[getPreviewFileExtension(path)] || ''
+  normalizeCodeLanguage(CODE_LANGUAGE_MAP[getPreviewFileExtension(path)] || '')
 
 export const isHtmlPreview = (path) => HTML_EXTENSIONS.has(getPreviewFileExtension(path))

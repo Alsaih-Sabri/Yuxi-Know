@@ -8,8 +8,9 @@ Yuxi 支持多种文档格式的智能解析，从简单的文本文件到复杂
 
 | 类型 | 格式 | 说明 |
 |------|------|------|
-| 文本 | .txt, .md, .html | 直接提取内容 |
+| 文本 | .txt, .md, .html, .htm | 直接提取内容 |
 | Word | .docx | 保留格式和结构 |
+| PowerPoint | .pptx | 保留主要文本结构 |
 | PDF | .pdf | 支持文本和图片 PDF |
 | 表格 | .csv, .xls, .xlsx | 识别表格结构 |
 | JSON | .json | 结构化数据 |
@@ -17,7 +18,7 @@ Yuxi 支持多种文档格式的智能解析，从简单的文本文件到复杂
 ### 图片文件
 
 对于图片文件，需要启用 OCR 才能提取文字：
-- .jpg, .jpeg, .png, .bmp, .tiff, .tif, .gif, .webp
+- .jpg, .jpeg, .png, .bmp, .tiff, .tif
 
 ### 压缩包
 
@@ -61,50 +62,45 @@ Yuxi 支持多种文档格式的智能解析，从简单的文本文件到复杂
 
 ## 快速配置
 
-### RapidOCR（推荐入门）
+### RapidOCR
 
-```bash
-# 下载模型
-hf download SWHL/RapidOCR --local-dir ./models/SWHL/RapidOCR
-
-# 配置环境变量
-MODEL_DIR=./models
-
-# 启动服务
-docker compose up -d api
-```
+启动后会默认下载，无需配置
 
 ### MinerU（高精度）
 
-```env
-# .env 配置
-MINERU_VL_SERVER=http://localhost:30000
-MINERU_API_URI=http://localhost:30001
+首先从官网下载最新的 docker-compose 文件：
 
-# 启动服务（需要 GPU）
-docker compose up mineru-vllm-server mineru-api -d
+```bash
+wget https://gcore.jsdelivr.net/gh/opendatalab/MinerU@master/docker/compose.yaml -O docker/mineru.compose.yml
+```
+
+启动服务（需要 GPU）
+
+```bash
+docker compose -f docker/mineru.compose.yml --profile openai-server up -d
 ```
 
 ### MinerU Official（云服务）
 
+从 [MinerU 官网](https://mineru.net) 获取 API 密钥，在 .env 配置环境变量
+
 ```env
-# .env 配置
 MINERU_API_KEY=your-api-key-here
 ```
 
-从 [MinerU 官网](https://mineru.net) 获取 API 密钥。
-
 ### PP-Structure-V3（结构化）
 
+启动服务（需要 GPU）
+
 ```bash
-# 启动服务（需要 GPU）
 docker compose up paddlex -d
 ```
 
 ### DeepSeek OCR（简单云服务）
 
+在 .env 配置（使用已有的 SiliconFlow 密钥）
+
 ```env
-# .env 配置（使用已有的 SiliconFlow 密钥）
 SILICONFLOW_API_KEY=your-api-key-here
 ```
 
@@ -114,7 +110,7 @@ SILICONFLOW_API_KEY=your-api-key-here
 
 在 `.env` 中设置服务器 IP：
 
-```env
+```
 HOST_IP=your_server_ip
 ```
 
@@ -124,3 +120,4 @@ HOST_IP=your_server_ip
 2. **GPU 要求**：MinerU 和 PP-Structure-V3 需要 GPU 支持
 3. **API 密钥**：部分服务需要额外的 API 密钥配置
 4. **超时处理**：复杂文档解析可能耗时较长，可通过 `MINERU_TIMEOUT` 环境变量调整超时时间
+5. **文件大小限制**：单个上传文件大小不超过 100 MB

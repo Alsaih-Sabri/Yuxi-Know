@@ -53,34 +53,15 @@ const router = createRouter({
       ]
     },
     {
-      path: '/graph',
-      name: 'graph',
+      path: '/workspace',
+      name: 'workspace',
       component: AppLayout,
       children: [
         {
           path: '',
-          name: 'GraphComp',
-          component: () => import('../views/GraphView.vue'),
-          meta: { keepAlive: false, requiresAuth: true, requiresAdmin: true }
-        }
-      ]
-    },
-    {
-      path: '/database',
-      name: 'database',
-      component: AppLayout,
-      children: [
-        {
-          path: '',
-          name: 'DatabaseComp',
-          component: () => import('../views/DataBaseView.vue'),
-          meta: { keepAlive: true, requiresAuth: true, requiresAdmin: true }
-        },
-        {
-          path: ':database_id',
-          name: 'DatabaseInfoComp',
-          component: () => import('../views/DataBaseInfoView.vue'),
-          meta: { keepAlive: false, requiresAuth: true, requiresAdmin: true }
+          name: 'WorkspaceComp',
+          component: () => import('../views/WorkspaceView.vue'),
+          meta: { keepAlive: true, requiresAuth: true }
         }
       ]
     },
@@ -98,6 +79,19 @@ const router = createRouter({
       ]
     },
     {
+      path: '/model-manage',
+      name: 'model-manage',
+      component: AppLayout,
+      children: [
+        {
+          path: '',
+          name: 'ModelManageComp',
+          component: () => import('../views/ModelManageView.vue'),
+          meta: { keepAlive: false, requiresAuth: true }
+        }
+      ]
+    },
+    {
       path: '/extensions',
       name: 'extensions',
       component: AppLayout,
@@ -108,17 +102,41 @@ const router = createRouter({
           component: () => import('../views/ExtensionsView.vue'),
           meta: {
             keepAlive: false,
-            requiresAuth: true,
-            requiresAdmin: true,
-            requiresSuperAdmin: true
-          }
+            requiresAuth: true
+          },
+          children: [
+            {
+              path: 'knowledgebase/:kbId',
+              name: 'ExtensionKnowledgeBaseDetail',
+              component: () => import('../views/DataBaseInfoView.vue'),
+              meta: {
+                keepAlive: false,
+                requiresAuth: true,
+                requiresAdmin: true
+              }
+            },
+            {
+              path: 'mcp/:slug',
+              name: 'ExtensionMcpDetail',
+              component: () => import('../components/extensions/McpDetailView.vue'),
+              meta: {
+                keepAlive: false,
+                requiresAuth: true,
+                requiresAdmin: true
+              }
+            },
+            {
+              path: 'skill/:slug',
+              name: 'ExtensionSkillDetail',
+              component: () => import('../components/extensions/SkillDetailView.vue'),
+              meta: {
+                keepAlive: false,
+                requiresAuth: true
+              }
+            }
+          ]
         }
       ]
-    },
-    {
-      path: '/skills',
-      name: 'skills',
-      redirect: '/extensions'
     },
     {
       path: '/:pathMatch(.*)*',
@@ -130,7 +148,7 @@ const router = createRouter({
 })
 
 // 全局前置守卫
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to) => {
   // 检查路由是否需要认证
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth === true)
   const requiresAdmin = to.matched.some((record) => record.meta.requiresAdmin)
@@ -157,8 +175,7 @@ router.beforeEach(async (to, from, next) => {
   if (requiresAuth && !isLoggedIn) {
     // 保存尝试访问的路径，登录后跳转
     sessionStorage.setItem('redirect', to.fullPath)
-    next('/login')
-    return
+    return '/login'
   }
 
   // 如果路由需要管理员权限但用户不是管理员
@@ -170,12 +187,11 @@ router.beforeEach(async (to, from, next) => {
       if (!agentStore.isInitialized) {
         await agentStore.initialize()
       }
-      next('/agent')
+      return '/agent'
     } catch (error) {
       console.error('获取智能体信息失败:', error)
-      next('/agent')
+      return '/agent'
     }
-    return
   }
 
   // 如果路由需要超级管理员权限但用户不是超级管理员
@@ -185,22 +201,20 @@ router.beforeEach(async (to, from, next) => {
       if (!agentStore.isInitialized) {
         await agentStore.initialize()
       }
-      next('/agent')
+      return '/agent'
     } catch (error) {
       console.error('获取智能体信息失败:', error)
-      next('/agent')
+      return '/agent'
     }
-    return
   }
 
   // 如果用户已登录但访问登录页，按 redirect 参数跳转
   if (to.path === '/login' && isLoggedIn) {
-    next(sanitizeRedirect(to.query.redirect))
-    return
+    return sanitizeRedirect(to.query.redirect)
   }
 
   // 其他情况正常导航
-  next()
+  return true
 })
 
 export default router

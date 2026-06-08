@@ -76,6 +76,8 @@ const selectItem = (item) => {
   padding-left: 12px;
   margin-left: 2px;
   border-left: 1px solid var(--gray-200);
+  height: 16px;
+  line-height: 16px;
 }
 
 .switcher-item {
@@ -83,10 +85,10 @@ const selectItem = (item) => {
   align-items: center;
   height: 28px;
   padding: 0 10px;
-  border: 0;
+  border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
-  color: var(--gray-700);
+  color: var(--gray-600);
   font-size: 15px;
   font-weight: 500;
   line-height: 1;
@@ -94,16 +96,25 @@ const selectItem = (item) => {
   cursor: pointer;
   transition:
     background-color 0.2s ease,
-    color 0.2s ease;
+    color 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 
   &:hover {
-    color: var(--main-color);
+    color: var(--gray-900);
     background-color: var(--gray-50);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--main-200);
+    outline-offset: 2px;
   }
 
   &.active {
     color: var(--main-color);
-    background-color: var(--main-40);
+    background-color: color-mix(in srgb, var(--main-color) 6%, var(--gray-0));
+    border-color: transparent;
+    position: relative;
   }
 }
 </style>

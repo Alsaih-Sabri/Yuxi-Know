@@ -18,33 +18,34 @@
         </template>
         <a-button type="text" class="expand-btn">
           <template #icon>
-            <PlusOutlined :class="{ rotated: optionsExpanded }" />
+            <Paperclip :size="16" :class="{ rotated: optionsExpanded }" />
           </template>
         </a-button>
       </a-popover>
       <slot name="actions-left"></slot>
     </div>
 
-    <textarea
+    <div
       ref="inputRef"
-      class="user-input"
-      :value="inputValue"
+      class="user-input mention-editor"
+      role="textbox"
+      aria-multiline="true"
+      :aria-label="placeholder"
+      :contenteditable="disabled ? 'false' : 'true'"
+      :data-placeholder="placeholder"
       @keydown="handleKeyPress"
       @keyup="handleKeyUp"
       @input="handleInput"
       @focus="focusInput"
-      :placeholder="placeholder"
-      :disabled="disabled"
-    />
+      @click="handleEditorClick"
+      @paste="handlePaste"
+      @compositionstart="handleCompositionStart"
+      @compositionend="handleCompositionEnd"
+    ></div>
 
     <!-- @ 提及选择弹窗 -->
-    <div
-      v-if="mentionPopupVisible"
-      ref="mentionDropdownRef"
-      class="mention-dropdown-wrapper"
-      :style="mentionDropdownStyle"
-    >
-      <div class="mention-popup">
+    <div v-if="mentionPopupVisible" ref="mentionDropdownRef" class="mention-dropdown-wrapper">
+      <div class="mention-popup" @mousedown.prevent>
         <!-- 文件列表 -->
         <div v-if="mentionItems.files.length > 0 || showFileSearchPrompt" class="mention-group">
           <div class="mention-group-title">文件</div>
@@ -55,10 +56,40 @@
             <div
               v-for="(item, index) in mentionItems.files"
               :key="'file-' + item.value"
-              :class="['mention-item', { active: isItemSelected('file', index) }]"
+              :class="['mention-item', 'file-item', { active: isItemSelected('file', index) }]"
               @click="insertMention(item)"
             >
-              {{ item.label }}
+              <div class="file-info-left">
+                <FileTypeIcon
+                  :name="item.label"
+                  :is-dir="item.is_dir"
+                  :size="16"
+                  class="file-type-icon"
+                />
+                <span class="file-name" :title="item.label">
+                  <span
+                    v-for="(part, pIdx) in splitTextByQuery(item.label, mentionQuery)"
+                    :key="pIdx"
+                    :class="{ 'query-match': part.isMatch }"
+                    >{{ part.text }}</span
+                  >
+                </span>
+              </div>
+              <span
+                v-if="formatMentionPath(item.description)"
+                class="file-parent-dir"
+                :title="formatMentionPath(item.description)"
+              >
+                <span
+                  v-for="(part, pIdx) in splitTextByQuery(
+                    formatMentionPath(item.description),
+                    mentionQuery
+                  )"
+                  :key="pIdx"
+                  :class="{ 'query-match': part.isMatch }"
+                  >{{ part.text }}</span
+                >
+              </span>
             </div>
           </template>
         </div>
@@ -69,10 +100,36 @@
           <div
             v-for="(item, index) in mentionItems.knowledgeBases"
             :key="'kb-' + item.value"
-            :class="['mention-item', { active: isItemSelected('knowledge', index) }]"
+            :class="[
+              'mention-item',
+              'resource-item',
+              { active: isItemSelected('knowledge', index) }
+            ]"
             @click="insertMention(item)"
           >
-            {{ item.label }}
+            <div class="resource-name">
+              <span
+                v-for="(part, pIdx) in splitTextByQuery(item.label, mentionQuery)"
+                :key="pIdx"
+                :class="{ 'query-match': part.isMatch }"
+                >{{ part.text }}</span
+              >
+            </div>
+            <div
+              v-if="getMentionDescription(item.description)"
+              class="resource-description"
+              :title="getMentionDescription(item.description)"
+            >
+              <span
+                v-for="(part, pIdx) in splitTextByQuery(
+                  getMentionDescription(item.description),
+                  mentionQuery
+                )"
+                :key="pIdx"
+                :class="{ 'query-match': part.isMatch }"
+                >{{ part.text }}</span
+              >
+            </div>
           </div>
         </div>
 
@@ -82,10 +139,32 @@
           <div
             v-for="(item, index) in mentionItems.mcps"
             :key="'mcp-' + item.value"
-            :class="['mention-item', { active: isItemSelected('mcp', index) }]"
+            :class="['mention-item', 'resource-item', { active: isItemSelected('mcp', index) }]"
             @click="insertMention(item)"
           >
-            {{ item.label }}
+            <div class="resource-name">
+              <span
+                v-for="(part, pIdx) in splitTextByQuery(item.label, mentionQuery)"
+                :key="pIdx"
+                :class="{ 'query-match': part.isMatch }"
+                >{{ part.text }}</span
+              >
+            </div>
+            <div
+              v-if="getMentionDescription(item.description)"
+              class="resource-description"
+              :title="getMentionDescription(item.description)"
+            >
+              <span
+                v-for="(part, pIdx) in splitTextByQuery(
+                  getMentionDescription(item.description),
+                  mentionQuery
+                )"
+                :key="pIdx"
+                :class="{ 'query-match': part.isMatch }"
+                >{{ part.text }}</span
+              >
+            </div>
           </div>
         </div>
 
@@ -95,10 +174,32 @@
           <div
             v-for="(item, index) in mentionItems.skills"
             :key="'skill-' + item.value"
-            :class="['mention-item', { active: isItemSelected('skill', index) }]"
+            :class="['mention-item', 'resource-item', { active: isItemSelected('skill', index) }]"
             @click="insertMention(item)"
           >
-            {{ item.label }}
+            <div class="resource-name">
+              <span
+                v-for="(part, pIdx) in splitTextByQuery(item.label, mentionQuery)"
+                :key="pIdx"
+                :class="{ 'query-match': part.isMatch }"
+                >{{ part.text }}</span
+              >
+            </div>
+            <div
+              v-if="getMentionDescription(item.description)"
+              class="resource-description"
+              :title="getMentionDescription(item.description)"
+            >
+              <span
+                v-for="(part, pIdx) in splitTextByQuery(
+                  getMentionDescription(item.description),
+                  mentionQuery
+                )"
+                :key="pIdx"
+                :class="{ 'query-match': part.isMatch }"
+                >{{ part.text }}</span
+              >
+            </div>
           </div>
         </div>
 
@@ -108,10 +209,36 @@
           <div
             v-for="(item, index) in mentionItems.subagents"
             :key="'subagent-' + item.value"
-            :class="['mention-item', { active: isItemSelected('subagent', index) }]"
+            :class="[
+              'mention-item',
+              'resource-item',
+              { active: isItemSelected('subagent', index) }
+            ]"
             @click="insertMention(item)"
           >
-            {{ item.label }}
+            <div class="resource-name">
+              <span
+                v-for="(part, pIdx) in splitTextByQuery(item.label, mentionQuery)"
+                :key="pIdx"
+                :class="{ 'query-match': part.isMatch }"
+                >{{ part.text }}</span
+              >
+            </div>
+            <div
+              v-if="getMentionDescription(item.description)"
+              class="resource-description"
+              :title="getMentionDescription(item.description)"
+            >
+              <span
+                v-for="(part, pIdx) in splitTextByQuery(
+                  getMentionDescription(item.description),
+                  mentionQuery
+                )"
+                :key="pIdx"
+                :class="{ 'query-match': part.isMatch }"
+                >{{ part.text }}</span
+              >
+            </div>
           </div>
         </div>
 
@@ -143,8 +270,37 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick, watch, onBeforeUnmount, useSlots } from 'vue'
-import { SendOutlined, ArrowUpOutlined, PauseOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import {
+  ref,
+  computed,
+  onMounted,
+  nextTick,
+  watch,
+  onBeforeUnmount,
+  useSlots,
+  h,
+  render
+} from 'vue'
+import { SendOutlined, ArrowUpOutlined, PauseOutlined } from '@ant-design/icons-vue'
+import { Paperclip } from 'lucide-vue-next'
+import { searchMentionFiles } from '@/apis/mention_api'
+import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
+import {
+  getMentionIconComponent,
+  getMentionIconStyle,
+  MENTION_ICON_SIZE,
+  MENTION_ICON_STROKE_WIDTH
+} from '@/utils/mention_icon_utils'
+import {
+  buildMentionDisplayLabels,
+  expandMentionDeletionRange,
+  findActiveMentionQuery,
+  formatMentionToken,
+  getMentionDisplayLabel,
+  mentionTypePrefixMap,
+  parseMentionText,
+  replaceRawRange
+} from '@/utils/mention_utils'
 
 // 点击外部关闭下拉框
 const mentionDropdownRef = ref(null)
@@ -195,6 +351,10 @@ const props = defineProps({
   mention: {
     type: Object,
     default: () => null
+  },
+  threadId: {
+    type: String,
+    default: ''
   }
 })
 
@@ -203,44 +363,324 @@ const slots = useSlots()
 
 // @ 提及功能是否启用
 const mentionEnabled = computed(() => {
-  if (!props.mention) return false
-  const { files, knowledgeBases, mcps, skills, subagents } = props.mention
-  return (
-    (Array.isArray(files) && files.length > 0) ||
-    (Array.isArray(knowledgeBases) && knowledgeBases.length > 0) ||
-    (Array.isArray(mcps) && mcps.length > 0) ||
-    (Array.isArray(skills) && skills.length > 0) ||
-    (Array.isArray(subagents) && subagents.length > 0)
-  )
+  return !!props.mention
 })
 
-const mentionTypePrefixMap = {
-  file: 'file',
-  knowledge: 'knowledge',
-  mcp: 'mcp',
-  skill: 'skill',
-  subagent: 'subagent'
+const mentionDisplayLabels = computed(() => buildMentionDisplayLabels(props.mention || {}))
+
+let lastRawSelectionRange = null
+let lastSyncedEditorValue = props.modelValue || ''
+
+const getStoredRawSelectionRange = () => {
+  const length = getEditorRawValue().length
+  if (!lastRawSelectionRange) {
+    return { start: length, end: length, collapsed: true }
+  }
+
+  const start = Math.max(0, Math.min(lastRawSelectionRange.start, length))
+  const end = Math.max(start, Math.min(lastRawSelectionRange.end, length))
+  return { start, end, collapsed: start === end }
 }
 
-const formatMentionToken = (type, value) => {
-  const prefix = mentionTypePrefixMap[type] || type
-  return `@${prefix}:${value}`
+const rememberRawSelectionRange = (range) => {
+  lastRawSelectionRange = { ...range }
+  return range
+}
+
+const formatMentionPath = (path) => {
+  if (!path) return ''
+  let cleanPath = path.replace(/^\/?home\/gem\/user-data\/?/, '')
+  if (cleanPath.startsWith('/')) {
+    cleanPath = cleanPath.substring(1)
+  }
+  // 如果以 / 结尾，说明它是一个目录，我们先去掉末尾的 / 之后再算父目录
+  let isDir = cleanPath.endsWith('/')
+  let pathForParent = isDir ? cleanPath.substring(0, cleanPath.length - 1) : cleanPath
+
+  const lastSlashIndex = pathForParent.lastIndexOf('/')
+  if (lastSlashIndex === -1) {
+    return ''
+  }
+  return pathForParent.substring(0, lastSlashIndex + 1)
+}
+
+const getMentionDescription = (description) => {
+  const value = String(description || '').trim()
+  if (!value || value === '暂无描述') return ''
+  return value
+}
+
+// 高性能且安全的关键字切片高亮解析函数 (100% 防御 XSS，避开危险的 v-html)
+const splitTextByQuery = (text, query) => {
+  if (!text) return []
+  if (!query) return [{ text, isMatch: false }]
+
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const regex = new RegExp(`(${escapedQuery})`, 'gi')
+  const parts = text.split(regex)
+
+  return parts.map((part) => ({
+    text: part,
+    isMatch: part.toLowerCase() === query.toLowerCase()
+  }))
+}
+
+const isTextNode = (node) => node?.nodeType === Node.TEXT_NODE
+const isElementNode = (node) => node?.nodeType === Node.ELEMENT_NODE
+const isMentionNode = (node) => isElementNode(node) && node.dataset?.mentionRaw !== undefined
+const isLineBreakNode = (node) => isElementNode(node) && node.tagName === 'BR'
+const childIndex = (node) => Array.prototype.indexOf.call(node.parentNode?.childNodes || [], node)
+
+const getRawNodeLength = (node) => {
+  if (!node) return 0
+  if (isTextNode(node)) return node.textContent?.length || 0
+  if (isMentionNode(node)) return node.dataset.mentionRaw?.length || 0
+  if (isLineBreakNode(node)) return 1
+  return Array.from(node.childNodes || []).reduce(
+    (total, child) => total + getRawNodeLength(child),
+    0
+  )
+}
+
+const serializeEditorNode = (node) => {
+  if (!node) return ''
+  if (isTextNode(node)) return node.textContent || ''
+  if (isMentionNode(node)) return node.dataset.mentionRaw || ''
+  if (isLineBreakNode(node)) return '\n'
+  return Array.from(node.childNodes || [])
+    .map((child) => serializeEditorNode(child))
+    .join('')
+}
+
+const serializeEditorContent = () => serializeEditorNode(inputRef.value)
+const getEditorRawValue = () => (inputRef.value ? serializeEditorContent() : inputValue.value)
+
+const unmountEditorMentionIcons = () => {
+  inputRef.value
+    ?.querySelectorAll('.mention-ref-icon[data-vue-icon]')
+    .forEach((container) => render(null, container))
+}
+
+const createEditorMentionElement = (segment) => {
+  const token = document.createElement('span')
+  token.className = `mention-ref-token mention-ref-${segment.type} mention-ref-editable`
+  token.contentEditable = 'false'
+  token.dataset.mentionRaw = segment.raw
+  token.dataset.mentionType = segment.type
+  token.dataset.mentionValue = segment.value
+  token.title = segment.raw
+
+  const icon = document.createElement('span')
+  icon.className = 'mention-ref-icon'
+  icon.dataset.vueIcon = 'true'
+  if (segment.type === 'file') {
+    render(
+      h(FileTypeIcon, {
+        name: segment.value,
+        isDir: segment.value.endsWith('/'),
+        size: MENTION_ICON_SIZE
+      }),
+      icon
+    )
+  } else {
+    Object.assign(icon.style, getMentionIconStyle(segment.type, segment.value) || {})
+    render(
+      h(getMentionIconComponent(segment.type, segment.value), {
+        size: MENTION_ICON_SIZE,
+        strokeWidth: MENTION_ICON_STROKE_WIDTH
+      }),
+      icon
+    )
+  }
+  token.appendChild(icon)
+
+  const label = document.createElement('span')
+  label.className = 'mention-ref-label'
+  label.textContent = getMentionDisplayLabel(
+    segment.type,
+    segment.value,
+    mentionDisplayLabels.value
+  )
+  token.appendChild(label)
+
+  return token
+}
+
+const renderEditorContent = (raw = '') => {
+  const editor = inputRef.value
+  if (!editor) return
+
+  unmountEditorMentionIcons()
+  editor.replaceChildren()
+  parseMentionText(raw).forEach((segment) => {
+    editor.appendChild(
+      segment.kind === 'text'
+        ? document.createTextNode(segment.text)
+        : createEditorMentionElement(segment)
+    )
+  })
+  lastSyncedEditorValue = String(raw || '')
+}
+
+const isNodeInEditor = (node) => {
+  const editor = inputRef.value
+  if (!editor || !node) return false
+  const element = isElementNode(node) ? node : node.parentNode
+  return element === editor || editor.contains(element)
+}
+
+const getRawOffsetFromDomPoint = (container, offset) => {
+  const editor = inputRef.value
+  if (!editor || !isNodeInEditor(container)) return getEditorRawValue().length
+
+  let rawOffset = 0
+  let found = false
+
+  const visit = (node) => {
+    if (!node || found) return
+
+    if (node === container) {
+      if (isTextNode(node)) {
+        rawOffset += Math.min(offset, node.textContent?.length || 0)
+      } else if (isMentionNode(node)) {
+        rawOffset += offset > 0 ? getRawNodeLength(node) : 0
+      } else {
+        const children = Array.from(node.childNodes || [])
+        for (let index = 0; index < Math.min(offset, children.length); index++) {
+          rawOffset += getRawNodeLength(children[index])
+        }
+      }
+      found = true
+      return
+    }
+
+    if (isTextNode(node) || isMentionNode(node) || isLineBreakNode(node)) {
+      rawOffset += getRawNodeLength(node)
+      return
+    }
+
+    for (const child of Array.from(node.childNodes || [])) {
+      visit(child)
+      if (found) return
+    }
+  }
+
+  visit(editor)
+  return rawOffset
+}
+
+const getRawSelectionRange = () => {
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0 || !isNodeInEditor(selection.anchorNode)) {
+    return getStoredRawSelectionRange()
+  }
+
+  const anchor = getRawOffsetFromDomPoint(selection.anchorNode, selection.anchorOffset)
+  const focus = getRawOffsetFromDomPoint(selection.focusNode, selection.focusOffset)
+  return rememberRawSelectionRange({
+    start: Math.min(anchor, focus),
+    end: Math.max(anchor, focus),
+    collapsed: anchor === focus
+  })
+}
+
+const getDomPointForRawOffset = (rawOffset) => {
+  const editor = inputRef.value
+  const offset = Math.max(0, Math.min(rawOffset, getEditorRawValue().length))
+  let remaining = offset
+
+  const pointBeforeNode = (node) => ({ node: node.parentNode || editor, offset: childIndex(node) })
+  const pointAfterNode = (node) => ({
+    node: node.parentNode || editor,
+    offset: childIndex(node) + 1
+  })
+
+  const visit = (node) => {
+    if (!node) return null
+
+    if (isTextNode(node)) {
+      const length = node.textContent?.length || 0
+      if (remaining <= length) {
+        return { node, offset: remaining }
+      }
+      remaining -= length
+      return null
+    }
+
+    if (isMentionNode(node) || isLineBreakNode(node)) {
+      const length = getRawNodeLength(node)
+      if (remaining === 0) return pointBeforeNode(node)
+      if (remaining <= length) return pointAfterNode(node)
+      remaining -= length
+      return null
+    }
+
+    for (const child of Array.from(node.childNodes || [])) {
+      const point = visit(child)
+      if (point) return point
+    }
+
+    return node === editor ? { node: editor, offset: editor.childNodes.length } : null
+  }
+
+  return visit(editor) || { node: editor, offset: editor?.childNodes.length || 0 }
+}
+
+const restoreEditorSelection = (start, end = start) => {
+  const editor = inputRef.value
+  const selection = window.getSelection()
+  if (!editor || !selection) return
+
+  const startPoint = getDomPointForRawOffset(start)
+  const endPoint = getDomPointForRawOffset(end)
+  const range = document.createRange()
+  range.setStart(startPoint.node, startPoint.offset)
+  range.setEnd(endPoint.node, endPoint.offset)
+  selection.removeAllRanges()
+  selection.addRange(range)
+  rememberRawSelectionRange({ start, end, collapsed: start === end })
+  editor.focus()
+}
+
+const updateRawValue = (value, caretStart, caretEnd = caretStart) => {
+  renderEditorContent(value)
+  emit('update:modelValue', value)
+  nextTick(() => {
+    restoreEditorSelection(caretStart, caretEnd)
+    adjustTextareaHeight()
+    if (mentionEnabled.value) {
+      checkMentionTrigger()
+    }
+  })
+}
+
+const replaceCurrentRawSelection = (replacement) => {
+  const currentValue = getEditorRawValue()
+  const range = getRawSelectionRange()
+  const nextValue = replaceRawRange(currentValue, range.start, range.end, replacement)
+  const nextOffset = range.start + replacement.length
+  updateRawValue(nextValue, nextOffset)
 }
 
 // 检测是否在 @ 触发位置
-const checkMentionTrigger = (textarea) => {
-  if (!textarea || !mentionEnabled.value) return false
+const checkMentionTrigger = () => {
+  if (!inputRef.value || !mentionEnabled.value) return false
 
-  const cursorPos = textarea.selectionStart
-  const textBeforeCursor = inputValue.value.slice(0, cursorPos)
+  const selectionRange = getRawSelectionRange()
+  if (!selectionRange.collapsed) {
+    mentionPopupVisible.value = false
+    return false
+  }
 
-  // 检查是否以 @ 结尾（刚输入 @）或 @ 后有内容
-  const atMatch = textBeforeCursor.match(/@(\S*)$/)
-  if (atMatch) {
-    mentionQuery.value = atMatch[1]
+  const activeMention = findActiveMentionQuery(getEditorRawValue(), selectionRange.end)
+  if (activeMention) {
+    const sameQuery = mentionPopupVisible.value && mentionQuery.value === activeMention.query
+    mentionQuery.value = activeMention.query
     mentionPopupVisible.value = true
-    mentionSelectedIndex.value = 0
-    updateMentionItems(mentionQuery.value)
+    if (!sameQuery) {
+      mentionSelectedIndex.value = 0
+      updateMentionItems(mentionQuery.value)
+    }
     return true
   }
 
@@ -250,12 +690,22 @@ const checkMentionTrigger = (textarea) => {
 
 // 更新提及候选项
 const updateMentionItems = (query = '') => {
+  const normalizedQuery = String(query || '')
+  if (!normalizedQuery) {
+    clearTimeout(mentionSearchTimer)
+    if (activeAbortController) {
+      activeAbortController.abort()
+      activeAbortController = null
+    }
+    searchRequestId.value++
+  }
+
   if (!props.mention) {
     mentionItems.value = { files: [], knowledgeBases: [], mcps: [], skills: [], subagents: [] }
     return
   }
 
-  const lowerQuery = query.toLowerCase()
+  const lowerQuery = normalizedQuery.toLowerCase()
   const { files = [], knowledgeBases = [], mcps = [], skills = [], subagents = [] } = props.mention
 
   const filterItems = (list) =>
@@ -264,6 +714,7 @@ const updateMentionItems = (query = '') => {
         item.label,
         item.value,
         item.description,
+        item.resourceId,
         item.tokenLabel,
         item.type,
         mentionTypePrefixMap[item.type]
@@ -275,14 +726,8 @@ const updateMentionItems = (query = '') => {
       )
     })
 
-  const filterFileItems = (list) => {
-    if (!query) {
-      return []
-    }
-    return filterItems(list)
-  }
-
-  const fileItems = files.map((f) => {
+  // 本地临时文件/附件候选项过滤
+  const localFileItems = files.map((f) => {
     const path = f.path || ''
     const fileName = path.split('/').pop() || path
     return {
@@ -295,6 +740,8 @@ const updateMentionItems = (query = '') => {
     }
   })
 
+  const filteredLocalFiles = normalizedQuery ? filterItems(localFileItems) : []
+
   const knowledgeItems = knowledgeBases.map((kb) => {
     const kbName = kb.name || ''
     return {
@@ -303,53 +750,120 @@ const updateMentionItems = (query = '') => {
       type: 'knowledge',
       insertValue: kbName,
       tokenLabel: formatMentionToken('knowledge', kbName),
-      description: kb.db_id
+      description: kb.description || '',
+      resourceId: kb.kb_id
     }
   })
 
   const mcpItems = mcps.map((m) => {
-    const mcpName = m.name || ''
+    const mcpValue = m.slug || m.value || m.id || m.name || ''
+    const mcpLabel = m.name || m.label || mcpValue
     return {
-      value: mcpName,
-      label: mcpName,
+      value: mcpValue,
+      label: mcpLabel,
       type: 'mcp',
-      insertValue: mcpName,
-      tokenLabel: formatMentionToken('mcp', mcpName),
+      insertValue: mcpValue,
+      tokenLabel: formatMentionToken('mcp', mcpLabel),
       description: m.description || ''
     }
   })
 
   const skillItems = skills.map((skill) => {
-    const skillValue = skill.slug || skill.name || skill.id || ''
+    const skillValue = skill.slug || skill.value || skill.id || skill.name || ''
+    const skillLabel = skill.name || skill.label || skillValue
     return {
       value: skillValue,
-      label: skillValue,
+      label: skillLabel,
       type: 'skill',
       insertValue: skillValue,
-      tokenLabel: formatMentionToken('skill', skillValue),
+      tokenLabel: formatMentionToken('skill', skillLabel),
       description: skill.description || ''
     }
   })
 
   const subagentItems = subagents.map((subagent) => {
-    const subagentValue = subagent.id || subagent.value || subagent.name || ''
+    const subagentValue = subagent.id || subagent.value || subagent.slug || subagent.name || ''
     const subagentLabel = subagent.name || subagent.label || subagentValue
     return {
       value: subagentValue,
       label: subagentLabel,
       type: 'subagent',
       insertValue: subagentValue,
-      tokenLabel: formatMentionToken('subagent', subagentValue),
+      tokenLabel: formatMentionToken('subagent', subagentLabel),
       description: subagent.description || ''
     }
   })
 
+  // 初始化设置 mentionItems 状态（使用前端已有的本地过滤结果，瞬间更新，达到零卡顿）
   mentionItems.value = {
-    files: filterFileItems(fileItems),
+    files: filteredLocalFiles,
     knowledgeBases: filterItems(knowledgeItems),
     mcps: filterItems(mcpItems),
     skills: filterItems(skillItems),
     subagents: filterItems(subagentItems)
+  }
+
+  if (normalizedQuery) {
+    const activeThreadId = props.threadId || ''
+    clearTimeout(mentionSearchTimer)
+    if (activeAbortController) {
+      activeAbortController.abort()
+      activeAbortController = null
+    }
+    searchRequestId.value++
+    const currentId = searchRequestId.value
+
+    mentionSearchTimer = setTimeout(async () => {
+      activeAbortController = new AbortController()
+
+      try {
+        const responseData = await searchMentionFiles(
+          activeThreadId,
+          normalizedQuery,
+          activeAbortController.signal
+        )
+
+        // 竞态校验锁，确保是当前最新响应
+        if (currentId === searchRequestId.value && Array.isArray(responseData)) {
+          const remoteFileItems = responseData.map((f) => {
+            const path = f.path || ''
+            const fileName = f.name || path.split('/').pop() || path
+            return {
+              value: path,
+              label: fileName,
+              type: 'file',
+              insertValue: path || fileName,
+              tokenLabel: formatMentionToken('file', fileName),
+              description: path,
+              is_dir: f.is_dir,
+              source: f.source
+            }
+          })
+
+          // 合并本地临时文件与后端高匹配度文件（使用 Set 进行去重，防止重复展示）
+          const seenValues = new Set(filteredLocalFiles.map((x) => x.value))
+          const mergedFiles = [...filteredLocalFiles]
+
+          remoteFileItems.forEach((item) => {
+            if (!seenValues.has(item.value)) {
+              seenValues.add(item.value)
+              mergedFiles.push(item)
+            }
+          })
+
+          mentionItems.value.files = mergedFiles
+        }
+      } catch (error) {
+        // 主动取消的请求我们不作为错误抛出
+        if (error.name !== 'AbortError') {
+          console.error('Mention search error:', error)
+        }
+      } finally {
+        if (currentId === searchRequestId.value) {
+          activeAbortController = null
+        }
+      }
+    }, 250) // 250ms 经典防抖时间
   }
 }
 
@@ -392,46 +906,27 @@ const hasAnyItems = computed(() => {
   )
 })
 
-// 获取弹出框位置
-const mentionDropdownStyle = computed(() => {
-  if (!inputRef.value) return {}
-
-  const textarea = inputRef.value
-  const rect = textarea.getBoundingClientRect()
-  const parentRect = textarea.parentElement.getBoundingClientRect()
-
-  return {
-    position: 'absolute',
-    bottom: `${parentRect.bottom - rect.top + 4}px`,
-    left: `${rect.left - parentRect.left}px`,
-    zIndex: 1000
-  }
-})
 const insertMention = (item) => {
   if (!inputRef.value) return
 
-  const textarea = inputRef.value
-  const cursorPos = textarea.selectionStart
-  const textBeforeCursor = inputValue.value.slice(0, cursorPos)
+  const currentValue = getEditorRawValue()
+  const selectionRange = getRawSelectionRange()
+  const activeMention = findActiveMentionQuery(currentValue, selectionRange.end)
+  if (!activeMention) return
+
   const mentionValue = item.insertValue || item.value
-  const mentionText = formatMentionToken(item.type, mentionValue)
-
-  // 移除 @ 及后面的查询内容，插入完整的提及项
-  const newTextBefore = textBeforeCursor.replace(/@(\S*)$/, `${mentionText} `)
-  const textAfterCursor = inputValue.value.slice(cursorPos)
-
-  const newValue = newTextBefore + textAfterCursor
-  emit('update:modelValue', newValue)
-
-  // 重置光标位置到插入内容之后
-  nextTick(() => {
-    const newCursorPos = newTextBefore.length
-    textarea.setSelectionRange(newCursorPos, newCursorPos)
-    textarea.focus()
-  })
+  const mentionText = `${formatMentionToken(item.type, mentionValue)} `
+  const newValue = replaceRawRange(
+    currentValue,
+    activeMention.start,
+    activeMention.end,
+    mentionText
+  )
+  const newCursorPos = activeMention.start + mentionText.length
 
   mentionPopupVisible.value = false
   mentionQuery.value = ''
+  updateRawValue(newValue, newCursorPos)
 }
 
 // 滚动到选中项
@@ -522,6 +1017,27 @@ const inputValue = computed({
   set: (val) => emit('update:modelValue', val)
 })
 
+const handleMentionDeletion = (e) => {
+  if (e.key !== 'Backspace' && e.key !== 'Delete') return false
+
+  const currentValue = getEditorRawValue()
+  const selectionRange = getRawSelectionRange()
+  const expandedRange = expandMentionDeletionRange(
+    currentValue,
+    selectionRange.start,
+    selectionRange.end,
+    e.key === 'Delete' ? 'forward' : 'backward'
+  )
+
+  if (!expandedRange) return false
+
+  e.preventDefault()
+  const nextValue = replaceRawRange(currentValue, expandedRange.start, expandedRange.end, '')
+  mentionPopupVisible.value = false
+  updateRawValue(nextValue, expandedRange.start)
+  return true
+}
+
 // 处理键盘事件
 const handleKeyPress = (e) => {
   // @ 提及键盘导航
@@ -532,38 +1048,69 @@ const handleKeyPress = (e) => {
     }
   }
 
+  if (handleMentionDeletion(e)) {
+    return
+  }
+
+  if (e.key === 'Enter' && e.shiftKey) {
+    e.preventDefault()
+    replaceCurrentRawSelection('\n')
+    return
+  }
+
   emit('keydown', e)
+}
+
+const shouldCheckMentionOnKeyUp = (e) => {
+  if (!e) return false
+  if (e.key.length === 1) return true
+  return e.key === 'Backspace' || e.key === 'Delete'
 }
 
 // 检测 @ 触发
 const handleKeyUp = (e) => {
-  if (e.key === '@' && mentionEnabled.value) {
+  if (!mentionEnabled.value || isComposing.value || !shouldCheckMentionOnKeyUp(e)) return
+  nextTick(() => {
+    checkMentionTrigger()
+  })
+}
+
+// 处理输入事件
+const handleInput = () => {
+  if (isComposing.value) return
+
+  if (inputRef.value && !inputRef.value.querySelector('.mention-ref-token')) {
+    const text = inputRef.value.textContent || ''
+    if (!text.trim()) {
+      inputRef.value.replaceChildren()
+    }
+  }
+
+  const value = serializeEditorContent()
+  lastSyncedEditorValue = value
+  emit('update:modelValue', value)
+  adjustTextareaHeight()
+
+  if (mentionEnabled.value) {
     nextTick(() => {
-      checkMentionTrigger(e.target)
+      checkMentionTrigger()
     })
   }
 }
 
-// 处理输入事件
-const handleInput = (e) => {
-  const value = e.target.value
-  emit('update:modelValue', value)
+const handlePaste = (e) => {
+  e.preventDefault()
+  const text = e.clipboardData?.getData('text/plain') || ''
+  replaceCurrentRawSelection(text)
+}
 
-  // 检测 @ 触发（每次输入后检查）
-  if (mentionEnabled.value && !mentionPopupVisible.value) {
-    const cursorPos = e.target.selectionStart
-    const textBeforeCursor = value.slice(0, cursorPos)
-    if (textBeforeCursor.endsWith('@')) {
-      checkMentionTrigger(e.target)
-    }
-  }
+const handleCompositionStart = () => {
+  isComposing.value = true
+}
 
-  // 如果弹出框打开，更新查询结果
-  if (mentionPopupVisible.value) {
-    nextTick(() => {
-      checkMentionTrigger(e.target)
-    })
-  }
+const handleCompositionEnd = () => {
+  isComposing.value = false
+  handleInput()
 }
 
 // 处理发送按钮点击
@@ -576,6 +1123,10 @@ const mentionPopupVisible = ref(false)
 const mentionQuery = ref('')
 const mentionItems = ref({ files: [], knowledgeBases: [], mcps: [], skills: [], subagents: [] })
 const mentionSelectedIndex = ref(0)
+const searchRequestId = ref(0)
+const isComposing = ref(false)
+let activeAbortController = null
+let mentionSearchTimer = null
 
 const adjustTextareaHeight = () => {
   if (!inputRef.value) {
@@ -591,11 +1142,30 @@ const adjustTextareaHeight = () => {
 const focusInput = () => {
   if (inputRef.value && !props.disabled) {
     inputRef.value.focus()
+    // 聚焦回来时，如果开启了提及，自动检测当前光标位置是否处于 @提及 范围，是则重新升起弹框
+    if (mentionEnabled.value) {
+      nextTick(() => {
+        checkMentionTrigger()
+      })
+    }
+  }
+}
+
+// 处理输入框点击事件，自适应检测光标是否落入 @提及 范围内以唤醒或更新弹窗
+const handleEditorClick = () => {
+  if (mentionEnabled.value) {
+    nextTick(() => {
+      checkMentionTrigger()
+    })
   }
 }
 
 // 监听输入值变化
-watch(inputValue, () => {
+watch(inputValue, (value) => {
+  if (value !== lastSyncedEditorValue) {
+    renderEditorContent(value || '')
+  }
+
   if (debounceTimer.value) {
     clearTimeout(debounceTimer.value)
   }
@@ -610,6 +1180,7 @@ onMounted(() => {
   document.addEventListener('click', closeMentionPopup)
   nextTick(() => {
     if (inputRef.value) {
+      renderEditorContent(inputValue.value || '')
       adjustTextareaHeight()
       inputRef.value.focus()
     }
@@ -618,8 +1189,15 @@ onMounted(() => {
 
 // 组件卸载时清除定时器和事件监听器
 onBeforeUnmount(() => {
+  unmountEditorMentionIcons()
   if (debounceTimer.value) {
     clearTimeout(debounceTimer.value)
+  }
+  if (mentionSearchTimer) {
+    clearTimeout(mentionSearchTimer)
+  }
+  if (activeAbortController) {
+    activeAbortController.abort()
   }
   document.removeEventListener('click', closeMentionPopup)
 })
@@ -710,6 +1288,10 @@ defineExpose({
   font-family: inherit;
   min-height: 44px; /* Default min-height for multi-line */
   max-height: 200px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  cursor: text;
 
   &:focus {
     outline: none;
@@ -718,6 +1300,58 @@ defineExpose({
 
   &::placeholder {
     color: var(--gray-400);
+  }
+
+  &.mention-editor {
+    position: relative;
+
+    &:empty::before {
+      content: attr(data-placeholder);
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: var(--gray-400);
+      pointer-events: none;
+    }
+  }
+
+  &[contenteditable='false'] {
+    cursor: not-allowed;
+  }
+
+  :deep(.mention-ref-token) {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 2px;
+    max-width: min(100%, 360px);
+    color: var(--main-700);
+    line-height: normal;
+    vertical-align: baseline;
+    white-space: nowrap;
+    user-select: all;
+  }
+
+  :deep(.mention-ref-icon) {
+    position: relative;
+    top: 2px;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    font-size: 13px;
+    line-height: 1;
+    margin-left: 4px;
+  }
+
+  :deep(.mention-ref-icon svg) {
+    display: block;
+  }
+
+  :deep(.mention-ref-label) {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: normal;
+    font-weight: 500;
   }
 }
 
@@ -839,17 +1473,24 @@ defineExpose({
 // @ 提及弹窗样式
 .mention-dropdown-wrapper {
   position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  margin-bottom: 8px;
   z-index: 1000;
 }
 
 .mention-popup {
-  min-width: 240px;
+  width: 100%;
   max-height: 280px;
   overflow-y: auto;
   background: var(--gray-0);
   border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow:
+    0 -4px 16px rgba(0, 0, 0, 0.08),
+    0 4px 16px rgba(0, 0, 0, 0.12);
   border: 1px solid var(--gray-200);
+  padding: 8px 0;
 
   .mention-group {
     margin-bottom: 4px;
@@ -879,11 +1520,126 @@ defineExpose({
     margin: 1px 4px;
     border-radius: 4px;
 
-    &:hover,
-    &.active {
+    &.resource-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      padding: 6px 10px;
+
+      .resource-name {
+        color: var(--gray-800);
+        font-weight: 500;
+        flex: 0 0 auto;
+        white-space: nowrap;
+      }
+
+      .resource-description {
+        color: var(--gray-500);
+        font-size: 12px;
+        line-height: 1.35;
+        flex: 1 1 auto;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    &.file-item {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 0;
+      padding: 6px 10px;
+
+      .file-info-left {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-shrink: 1;
+        min-width: 0;
+
+        .file-type-icon {
+          font-size: 15px;
+          flex-shrink: 0;
+          display: flex;
+          align-items: center;
+        }
+
+        .file-name {
+          font-weight: 500;
+          color: var(--gray-800);
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 13px;
+        }
+      }
+
+      .file-parent-dir {
+        font-size: 11px;
+        color: var(--gray-400);
+        margin-left: 8px;
+        flex-shrink: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        transition: color 0.15s ease;
+      }
+    }
+
+    &:hover {
       background-color: var(--main-10);
       color: var(--main-600);
+
+      &.resource-item {
+        .resource-name {
+          color: var(--main-600);
+        }
+        .resource-description {
+          color: var(--main-400);
+        }
+      }
+
+      &.file-item {
+        .file-info-left .file-name {
+          color: var(--main-600);
+        }
+        .file-parent-dir {
+          color: var(--main-400);
+        }
+      }
     }
+
+    &.active {
+      background-color: var(--gray-50);
+      color: var(--main-600);
+
+      &.resource-item {
+        .resource-name {
+          color: var(--main-600);
+        }
+        .resource-description {
+          color: var(--main-400);
+        }
+      }
+
+      &.file-item {
+        .file-info-left .file-name {
+          color: var(--main-600);
+        }
+        .file-parent-dir {
+          color: var(--main-400);
+        }
+      }
+    }
+  }
+
+  .query-match {
+    color: #fa8c16; /* 明亮温润的金橘色 */
+    font-weight: 700;
   }
 
   .mention-empty {

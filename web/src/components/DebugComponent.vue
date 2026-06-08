@@ -161,7 +161,7 @@ watch(showModal, (isOpen) => {
 import { useConfigStore } from '@/stores/config'
 import { useUserStore } from '@/stores/user'
 import { useDatabaseStore } from '@/stores/database'
-import { useAgentStore } from '@/stores/agent'
+import { isBuiltinAgent, useAgentStore } from '@/stores/agent'
 import { useInfoStore } from '@/stores/info'
 import { useThrottleFn } from '@vueuse/core'
 import {
@@ -423,7 +423,7 @@ const printUserInfo = () => {
     token: userStore.token ? '*** (已隐藏)' : null,
     userId: userStore.userId,
     username: userStore.username,
-    userIdLogin: userStore.userIdLogin,
+    uid: userStore.uid,
     phoneNumber: userStore.phoneNumber,
     avatar: userStore.avatar,
     userRole: userStore.userRole,
@@ -441,7 +441,7 @@ const printDatabaseInfo = async () => {
   try {
     console.log('=== 知识库信息 ===')
     console.log('基本信息:', {
-      databaseId: databaseStore.databaseId,
+      kbId: databaseStore.kbId,
       databaseName: databaseStore.database.name,
       databaseDesc: databaseStore.database.description,
       fileCount: Object.keys(databaseStore.database.files || {}).length
@@ -449,7 +449,6 @@ const printDatabaseInfo = async () => {
 
     console.log('状态信息:', {
       databaseLoading: databaseStore.state.databaseLoading,
-      refrashing: databaseStore.state.refrashing,
       searchLoading: databaseStore.state.searchLoading,
       lock: databaseStore.state.lock,
       autoRefresh: databaseStore.state.autoRefresh,
@@ -484,7 +483,6 @@ const printAgentConfig = async () => {
     console.log('Store 状态:', {
       isInitialized: agentStore.isInitialized,
       selectedAgentId: agentStore.selectedAgentId,
-      defaultAgentId: agentStore.defaultAgentId,
       agentCount: agentStore.agentsList.length,
       loadingStates: {
         isLoadingAgents: agentStore.isLoadingAgents,
@@ -505,7 +503,7 @@ const printAgentConfig = async () => {
     if (agentStore.selectedAgent) {
       console.log('当前选中智能体:', {
         agent: toRaw(agentStore.selectedAgent),
-        isDefault: agentStore.isDefaultAgent,
+        isBuiltin: isBuiltinAgent(agentStore.selectedAgent),
         configurableItemsCount: Object.keys(agentStore.configurableItems).length
       })
 
@@ -681,8 +679,8 @@ const switchToUser = async (user) => {
 .log-container {
   height: calc(80vh - 200px);
   overflow-y: auto;
-  background: var(--gray-0);
-  color: var(--gray-1000);
+  background: #1e1f1f;
+  color: #ffffff;
   border-radius: 5px;
   font-family: 'Consolas', 'Monaco', monospace;
   font-size: 12px;
@@ -752,12 +750,6 @@ const switchToUser = async (user) => {
   padding: 16px;
   text-align: center;
   color: var(--gray-500);
-}
-
-@media (prefers-color-scheme: dark) {
-  .log-container {
-    background: var(--gray-900);
-  }
 }
 
 :fullscreen .log-container {

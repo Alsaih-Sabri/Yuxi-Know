@@ -12,7 +12,7 @@
       <div class="modal-title-wrapper">
         <!-- 左侧：文件名和图标 -->
         <div class="file-title">
-          <component :is="fileIcon" :style="{ color: fileIconColor, fontSize: '18px' }" />
+          <FileTypeIcon :name="file?.filename" :size="18" />
           <span class="file-name">{{ file?.filename || '文件详情' }}</span>
         </div>
 
@@ -87,13 +87,7 @@
 
       <!-- Markdown 模式 -->
       <div v-else-if="viewMode === 'markdown'" class="content-panel flat-md-preview">
-        <MdPreview
-          v-if="mergedContent"
-          :modelValue="mergedContent"
-          :theme="theme"
-          previewTheme="github"
-          class="markdown-content"
-        />
+        <MarkdownPreview v-if="mergedContent" :content="mergedContent" class="markdown-content" />
         <div v-else class="empty-content">
           <p>暂无文件内容</p>
         </div>
@@ -126,18 +120,15 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useDatabaseStore } from '@/stores/database'
-import { useThemeStore } from '@/stores/theme'
 import { message } from 'ant-design-vue'
 import { documentApi } from '@/apis/knowledge_api'
 import { mergeChunks } from '@/utils/chunkUtils'
-import { getFileIcon, getFileIconColor } from '@/utils/file_utils'
 import { getPreviewTypeByPath } from '@/utils/file_preview'
-import { MdPreview } from 'md-editor-v3'
-import 'md-editor-v3/lib/preview.css'
+import MarkdownPreview from '@/components/common/MarkdownPreview.vue'
+import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
 import { Download, ChevronDown, FileText, X } from 'lucide-vue-next'
 
 const store = useDatabaseStore()
-const themeStore = useThemeStore()
 
 const visible = computed({
   get: () => store.state.fileDetailModalVisible,
@@ -147,17 +138,17 @@ const visible = computed({
 const file = computed(() => store.selectedFile)
 const loading = computed(() => store.state.fileDetailLoading)
 
-// 文件图标
-const fileIcon = computed(() => getFileIcon(file.value?.filename))
-const fileIconColor = computed(() => getFileIconColor(file.value?.filename))
-
 const downloadingOriginal = ref(false)
 const downloadingMarkdown = ref(false)
 const sourcePreviewLoading = ref(false)
 const sourcePreviewUrl = ref('')
 
-// 主题设置
-const theme = computed(() => (themeStore.isDark ? 'dark' : 'light'))
+const revokeSourcePreviewUrl = () => {
+  if (sourcePreviewUrl.value) {
+    window.URL.revokeObjectURL(sourcePreviewUrl.value)
+    sourcePreviewUrl.value = ''
+  }
+}
 
 // 视图模式
 const viewMode = ref('markdown')
@@ -239,20 +230,13 @@ const afterOpenChange = (open) => {
   }
 }
 
-const revokeSourcePreviewUrl = () => {
-  if (sourcePreviewUrl.value) {
-    window.URL.revokeObjectURL(sourcePreviewUrl.value)
-    sourcePreviewUrl.value = ''
-  }
-}
-
 const loadSourcePreview = async () => {
-  if (!file.value?.file_id || !store.databaseId || !hasSourcePreview.value) return
+  if (!file.value?.file_id || !store.kbId || !hasSourcePreview.value) return
   if (sourcePreviewUrl.value) return
 
   sourcePreviewLoading.value = true
   try {
-    const response = await documentApi.downloadDocument(store.databaseId, file.value.file_id)
+    const response = await documentApi.downloadDocument(store.kbId, file.value.file_id)
     const blob = await response.blob()
     revokeSourcePreviewUrl()
     sourcePreviewUrl.value = window.URL.createObjectURL(blob)
@@ -280,15 +264,15 @@ const handleDownloadOriginal = async () => {
     return
   }
 
-  const dbId = store.databaseId
-  if (!dbId) {
+  const kbId = store.kbId
+  if (!kbId) {
     message.error('无法获取数据库ID，请刷新页面后重试')
     return
   }
 
   downloadingOriginal.value = true
   try {
-    const response = await documentApi.downloadDocument(dbId, file.value.file_id)
+    const response = await documentApi.downloadDocument(kbId, file.value.file_id)
 
     // 获取文件名
     const contentDisposition = response.headers.get('content-disposition')

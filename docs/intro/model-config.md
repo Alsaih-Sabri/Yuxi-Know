@@ -1,243 +1,99 @@
 # 模型配置
 
-## 对话模型
+## 概述
 
-系统支持多种大语言模型服务商，通过配置对应的 API 密钥即可使用：
+系统统一通过 **系统设置 → 模型配置** 页面管理所有模型（对话模型、嵌入模型、重排模型），无需修改配置文件。
 
-| 服务商                                           | 环境变量                | 特点                  |
-| ------------------------------------------------ | ----------------------- | --------------------- |
-| [硅基流动](https://cloud.siliconflow.cn/i/Eo5yTHGJ) | `SILICONFLOW_API_KEY` | 🆓 免费额度，默认推荐 |
-| OpenAI                                           | `OPENAI_API_KEY`      | GPT 系列模型          |
-| DeepSeek                                         | `DEEPSEEK_API_KEY`    | 国产大模型            |
-| [MiniMax](https://platform.minimaxi.com/)        | `MINIMAX_API_KEY`     | M2.7/M2.5 系列，百万 token 上下文 |
-| OpenRouter                                       | `OPENROUTER_API_KEY`  | 多模型聚合平台        |
-| 智谱清言                                         | `ZHIPUAI_API_KEY`     | GLM 系列模型          |
-| 阿里云百炼                                       | `DASHSCOPE_API_KEY`   | 通义千问系列          |
+## 配置路径
 
-其余还支持火山豆包、Together、vLLM、Ollama 等。
-
-### 配置方法
-
-在 `.env` 文件中添加对应的环境变量：
-
-::: tip 免费获取 API Key
-[硅基流动](https://cloud.siliconflow.cn/i/Eo5yTHGJ) 注册即送 16 元额度，支持多种开源模型。
-:::
-
-<<< @/../.env.template#model_provider{bash 5}
-
-## 自定义模型供应商
-
-::: tip 自定义模型供应商仅支持对话模型
-自定义模型供应商仅支持对话模型，嵌入模型和重排模型请修改配置文件
-:::
-
-系统提供了完整的自定义供应商管理功能，支持通过 Web 界面直接添加、编辑、测试和删除自定义模型供应商。
-
-### 使用方法
-
-系统支持任何 OpenAI 兼容的云服务提供商
-
-#### 1. Web 界面操作（推荐）
-
-访问 **系统设置 > 模型配置**，在"自定义供应商"部分点击 **添加自定义供应商**。这里的密钥可以直接填写也可以填写对应的环境变量名称。
-
-#### 2. 配置文件操作
-
-如需通过配置文件管理，编辑 `saves/config/custom_providers.toml`：
-
-```toml
-[model_names.local-vllm]
-name = "本地 vLLM 服务"
-url = "https://docs.vllm.ai"
-base_url = "http://localhost:8000/v1"
-default = "Qwen/Qwen2.5-7B-Instruct"
-env = "LOCAL_VLLM_API_KEY"
-models = [
-    "Qwen/Qwen2.5-7B-Instruct",
-    "Qwen/Qwen2.5-14B-Instruct",
-]
-custom = true
-
-[model_names.local-ollama]
-name = "本地 Ollama"
-url = "https://ollama.com"
-base_url = "http://localhost:11434/v1"
-default = "llama3.2"
-env = "NO_API_KEY"
-models = ["llama3.2", "qwen2.5"]
-custom = true
+```
+系统设置 → 模型配置
 ```
 
-然后在 `.env` 文件中添加对应的环境变量：
+## API 凭证配置
 
-```env
-LOCAL_VLLM_API_KEY=your_api_key_here
-```
+支持两种凭证配置方式：
 
-### API 端点
+| 方式 | 适用场景 |
+|------|----------|
+| 环境变量 | 生产环境或不愿在界面暴露 Key 的场景 |
+| 直接填写 | 开发调试，追求配置便利性 |
 
-系统提供以下 API 端点管理自定义供应商：
+**环境变量方式**：在供应商配置中填写变量名（如 `SILICONFLOW_API_KEY`），确保运行时环境已配置对应变量。
 
-- `GET /api/system/custom-providers` - 获取所有自定义供应商
-- `POST /api/system/custom-providers` - 添加自定义供应商
-- `PUT /api/system/custom-providers/{provider_id}` - 更新自定义供应商
-- `DELETE /api/system/custom-providers/{provider_id}` - 删除自定义供应商
-- `POST /api/system/custom-providers/{provider_id}/test` - 测试供应商连接
+**直接填写方式**：在供应商配置中直接填入 API Key。
 
-### 常见配置示例
+## 供应商管理
 
-#### vLLM 本地服务
+### 内置供应商模板
 
-```toml
-[model_names.vllm-local]
-name = "vLLM 本地服务"
-base_url = "http://localhost:8000/v1"
-default = "Qwen/Qwen2.5-7B-Instruct"
-env = "NO_API_KEY"
-models = [
-    "Qwen/Qwen2.5-7B-Instruct",
-    "Qwen/Qwen2.5-14B-Instruct",
-    "meta-llama/Llama-3.1-8B-Instruct"
-]
-```
+系统启动时会同步一组内置 provider 模板。模板只提供 Provider ID、Base URL、凭证环境变量和远端模型发现地址；实际是否可用仍取决于你是否配置凭证、启用供应商并添加模型。
 
-#### Ollama 本地服务
+| 供应商 | Provider ID | 支持类型 | 凭证环境变量 |
+|--------|-------------|----------|--------------|
+| OpenAI | `openai` | chat | `OPENAI_API_KEY` |
+| DeepSeek | `deepseek` | chat | `DEEPSEEK_API_KEY` |
+| DashScope | `alibaba` | chat, embedding, rerank | `DASHSCOPE_API_KEY` |
+| Aliyun Coding Plan | `alibaba-coding-plan-cn` | chat | `DASHSCOPE_API_KEY` |
+| Aliyun Coding Plan International | `alibaba-coding-plan` | chat | `DASHSCOPE_API_KEY` |
+| Zhipu BigModel | `zhipuai` | chat | `ZHIPUAI_API_KEY` |
+| Zhipu BigModel Coding Plan | `zhipuai-coding-plan` | chat | `ZHIPUAI_API_KEY` |
+| Z.AI | `zai` | chat | `ZAI_API_KEY` |
+| Z.AI Coding Plan | `zai-coding-plan` | chat | `ZAI_API_KEY` |
+| XiaomiMiMo Token Plan | `xiaomi-token-plan-cn` | chat | `XIAOMI_MIMO_TOKEN_PLAN_API_KEY` |
+| XiaomiMiMo | `xiaomi` | chat | `XIAOMI_MIMO_API_KEY` |
+| Kimi Code | `kimi-for-coding` | chat | `KIMI_CODE_API_KEY` |
+| Moonshot | `moonshotai-cn` | chat | `MOONSHOT_API_KEY` |
+| Moonshot International | `moonshotai` | chat | `MOONSHOT_API_KEY` |
+| MiniMax | `minimax-cn` | chat | `MINIMAX_API_KEY` |
+| MiniMax International | `minimax` | chat | `MINIMAX_API_KEY` |
+| OpenRouter | `openrouter` | chat, embedding | `OPENROUTER_API_KEY` |
+| ModelScope | `modelscope` | chat | `MODELSCOPE_ACCESS_TOKEN` |
+| OpenCode | `opencode` | chat | 无默认环境变量 |
+| SiliconFlow | `siliconflow-cn` | chat, embedding, rerank | `SILICONFLOW_API_KEY` |
+| SiliconFlow International | `siliconflow` | chat, embedding, rerank | `SILICONFLOW_GLOBAL_API_KEY` |
 
-```toml
-[model_names.ollama-local]
-name = "Ollama 本地服务"
-base_url = "http://localhost:11434/v1"
-default = "llama3.2"
-env = "NO_API_KEY"
-models = [
-    "llama3.2:latest",
-    "qwen2.5:latest",
-    "codellama:latest"
-]
-```
+其中 `alibaba`、`siliconflow-cn` 预置了部分 embedding / rerank 模型；其他供应商通常需要进入详情页通过「获取远程模型」或「手动添加」补充模型。
 
-#### 第三方 API 中转服务
+### 操作流程
 
-```toml
-[model_names.api-proxy]
-name = "API 中转服务"
-base_url = "https://api-proxy.example.com/v1"
-default = "gpt-5"
-env = "API_PROXY_KEY"
-models = [
-    "gpt-5",
-    "deepseek-chat",
-    "claude-4.6-sonnet"
-]
-```
+1. **新增供应商**：点击「新增供应商」，填写基本信息（Provider ID、Base URL 等）
+2. **配置凭证**：填写 API Key 或环境变量名
+3. **启用供应商**：开启供应商状态开关
+4. **获取模型**：进入供应商详情，点击「获取远程模型」从 API 拉取可用模型列表
 
-### 故障排除
+## 模型管理
 
-1. **测试连接失败**: 检查 API 地址格式和 API 密钥配置
-2. **模型不可用**: 确认模型名称拼写和服务端是否支持该模型
-3. **权限错误**: 确保用户具有管理员权限
-4. **配置未生效**: 检查环境变量配置和服务重启状态
+### 添加模型
 
-## 多模态模型
+**方式一：从远端拉取**
 
-系统支持图片作为输入，与文本结合形成多模态查询。
+进入供应商详情 → 点击「获取远程模型」→ 从候选列表中选择添加
 
-### 支持的图片格式
+**方式二：手动添加**
 
-- JPEG、PNG、WebP、GIF、BMP
-- 最大 10MB
-- 超过 5MB 会自动压缩
+进入供应商详情 → 点击「手动添加」→ 填写模型 ID 和类型
 
-### 使用方式
+### 配置参数
 
-在对话接口中传入图片数据：
+嵌入模型（embedding）需配置向量维度，请参考模型提供商的规格说明。
 
-```json
-{
-    "query": "这张图片里有什么？",
-    "image_content": "<base64编码的图片数据>",
-    "config": {},
-    "meta": {}
-}
-```
+### 移除模型
 
-系统会自动将图片转换为符合模型要求的格式，支持多模态的模型会同时处理图片和文本信息。
+在供应商详情的已启用模型列表中移除不需要的模型。
 
-### 支持多模态的模型
+## 模型标识格式
 
-大多数主流模型提供商都支持多模态能力，选择模型时需确认模型本身支持图片输入。
+运行时模型统一使用 `provider_id:model_id` 格式，例如 `siliconflow-cn:Pro/BAAI/bge-m3`。`model_id` 可以包含 `/`，系统只按第一个 `:` 区分供应商与模型 ID。
 
-## 嵌入模型和重排序模型
+旧版 `provider/model`、旧版知识库 JSON 模型字段、配置文件中的 `model_names` / `embed_model_names` / `reranker_names` 不再作为运行时模型来源。历史知识库或 Agent 配置如果仍保存旧格式，需要在界面中重新选择新版模型后保存。
 
-#### 1. 配置模型信息
+## Ollama 支持
 
-在 `backend/package/yuxi/config/static/models.py` 中的默认配置部分添加：
+当前版本不再内置 Ollama provider type，也不再提供 Ollama embedding 运行时适配。已有 Ollama embedding 知识库需要管理员选择新的 embedding 模型并重建索引，避免不同向量空间混用。
 
-```python
-# 默认嵌入模型配置
-DEFAULT_EMBED_MODELS: dict[str, EmbedModelInfo] = {
-    # ... 现有配置 ...
+## 常见问题
 
-    "vllm/Qwen/Qwen3-Embedding-0.6B": EmbedModelInfo(
-        name="Qwen/Qwen3-Embedding-0.6B",
-        dimension=1024,
-        base_url="http://localhost:8000/v1/embeddings",
-        api_key="no_api_key",
-    ),
-}
+**凭证缺失警告**：检查 API Key 是否正确配置，或确认环境变量是否已设置。
 
-# 默认重排序模型配置
-DEFAULT_RERANKERS: dict[str, RerankerInfo] = {
-    # ... 现有配置 ...
-
-    "vllm/BAAI/bge-reranker-v2-m3": RerankerInfo(
-        name="BAAI/bge-reranker-v2-m3",
-        base_url="http://localhost:8000/v1/rerank",
-        api_key="no_api_key",
-    ),
-}
-```
-
-#### 2. 动态配置（可选）
-
-你也可以通过代码动态添加本地模型：
-
-```python
-from yuxi.config import config
-from yuxi.config.static.models import EmbedModelInfo, RerankerInfo
-
-# 添加本地嵌入模型
-config.embed_model_names["local/embed-model"] = EmbedModelInfo(
-    name="local-embed-model",
-    dimension=1024,
-    base_url="http://localhost:8000/v1/embeddings",
-    api_key="no_api_key",
-)
-
-# 添加本地重排序模型
-config.reranker_names["local/reranker-model"] = RerankerInfo(
-    name="local-reranker-model",
-    base_url="http://localhost:8000/v1/rerank",
-    api_key="no_api_key",
-)
-
-# 保存配置
-config.save()
-```
-
-#### 3. 启动模型服务
-
-```bash
-# 启动嵌入模型
-vllm serve Qwen/Qwen3-Embedding-0.6B \
-  --task embed \
-  --dtype auto \
-  --port 8000
-
-# 启动重排序模型
-vllm serve BAAI/bge-reranker-v2-m3 \
-  --task score \
-  --dtype fp16 \
-  --port 8000
-```
+**模型配置未生效**：确认模型已添加至供应商的已启用列表中。

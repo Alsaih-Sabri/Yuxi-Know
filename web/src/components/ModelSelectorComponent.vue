@@ -1,19 +1,21 @@
 <template>
-  <a-dropdown trigger="click">
-    <div class="model-select" :class="modelSelectClasses" @click.prevent>
+  <a-dropdown
+    trigger="click"
+    :open="dropdownOpen"
+    :disabled="props.disabled"
+    @open-change="handleOpenChange"
+  >
+    <div class="model-select" :class="modelSelectClasses" @click.prevent.stop @mousedown.stop>
       <div class="model-select-content">
         <div class="model-info">
-          <a-tooltip :title="displayModelText" placement="right">
-            <span class="model-text text"> {{ displayModelText }} </span>
-          </a-tooltip>
-          <span class="model-provider">{{ displayModelProvider }}</span>
+          <span class="model-text text" :title="displayModelTitle">{{ displayModelText }}</span>
         </div>
-        <div class="model-status-controls">
+        <div v-if="resolvedSize !== 'nano'" class="model-status-controls">
           <span
-            v-if="currentModelStatus"
+            v-if="state.currentModelStatus"
             class="model-status-indicator"
-            :class="currentModelStatus.status"
-            :title="getCurrentModelStatusTooltip()"
+            :class="state.currentModelStatus.status"
+            :title="getCurrentModelStatusTitle()"
           >
             {{ modelStatusIcon }}
           </span>
@@ -22,7 +24,7 @@
             type="text"
             :loading="state.checkingStatus"
             @click.stop="checkCurrentModelStatus"
-            :disabled="state.checkingStatus"
+            :disabled="props.disabled || state.checkingStatus"
             class="status-check-button"
           >
             {{ state.checkingStatus ? '检查中...' : '检查' }}
@@ -31,38 +33,67 @@
       </div>
     </div>
     <template #overlay>
-      <a-menu class="scrollable-menu">
-        <a-menu-item-group
-          v-for="(item, key) in modelKeys"
-          :key="key"
-          :title="modelNames[item]?.name"
-        >
-          <a-menu-item
-            v-for="(model, idx) in modelNames[item]?.models"
-            :key="`${item}-${idx}`"
-            @click="handleSelectModel(item, model)"
+      <div class="model-dropdown" @click.stop>
+        <div class="model-search">
+          <a-input
+            v-model:value="modelSearchKeyword"
+            placeholder="搜索模型"
+            allow-clear
+            @keydown.stop
           >
-            {{ model }}
-          </a-menu-item>
-        </a-menu-item-group>
-      </a-menu>
+            <template #suffix>
+              <button
+                :disabled="props.disabled || state.refreshingCache"
+                :title="state.refreshingCache ? '刷新中...' : '刷新缓存'"
+                class="cache-refresh-button"
+                @mousedown.prevent.stop
+                @click.stop="refreshCache"
+              >
+                <RefreshCw :size="13" :class="{ spin: state.refreshingCache }" />
+              </button>
+            </template>
+          </a-input>
+        </div>
+        <a-menu class="scrollable-menu">
+          <a-menu-item v-if="loadingV2Models" key="loading" disabled>加载中...</a-menu-item>
+          <a-menu-item v-else-if="!hasFilteredModels" key="empty" disabled
+            >暂无匹配模型</a-menu-item
+          >
+          <template v-else>
+            <a-menu-item-group
+              v-for="(providerData, providerId) in filteredV2Models"
+              :key="`v2-${providerId}`"
+            >
+              <template #title>
+                <span :title="providerId">{{
+                  getProviderDisplayName(providerId, providerData)
+                }}</span>
+              </template>
+              <a-menu-item
+                v-for="model in providerData.models"
+                :key="model.spec"
+                @click="handleSelectV2Model(model.spec)"
+              >
+                {{ model.display_name }}
+              </a-menu-item>
+            </a-menu-item-group>
+          </template>
+        </a-menu>
+      </div>
     </template>
   </a-dropdown>
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue'
-import { useConfigStore } from '@/stores/config'
-import { chatModelApi } from '@/apis/system_api'
+import { computed, reactive, ref } from 'vue'
+import { modelProviderApi } from '@/apis/system_api'
+import { RefreshCw } from 'lucide-vue-next'
+import { useModelStatus } from '@/composables/useModelStatus'
 
 const props = defineProps({
   model_spec: {
     type: String,
     default: ''
-  },
-  sep: {
-    type: String,
-    default: '/'
   },
   placeholder: {
     type: String,
@@ -71,33 +102,122 @@ const props = defineProps({
   size: {
     type: String,
     default: 'small',
-    validator: (value) => ['small', 'middle', 'large'].includes(value)
+    validator: (value) => ['nano', 'small', 'middle', 'large'].includes(value)
+  },
+  disabled: {
+    type: Boolean,
+    default: false
+  },
+  displayName: {
+    type: String,
+    default: 'full',
+    validator: (value) => ['full', 'short', 'mini'].includes(value)
   }
 })
 
-const configStore = useConfigStore()
 const emit = defineEmits(['select-model'])
 
+// v2 模型数据：每次展开下拉时实时从后端拉取
+const v2Models = ref({})
+const loadingV2Models = ref(false)
+const dropdownOpen = ref(false)
+const modelSearchKeyword = ref('')
+
+const filteredV2Models = computed(() => {
+  const keyword = modelSearchKeyword.value.trim().toLowerCase()
+  if (!keyword) return v2Models.value
+
+  return Object.entries(v2Models.value).reduce((result, [providerId, providerData]) => {
+    const models = (providerData.models || []).filter((model) => {
+      return [
+        providerId,
+        getProviderDisplayName(providerId, providerData),
+        model.spec,
+        model.model_id,
+        model.display_name
+      ].some((value) =>
+        String(value || '')
+          .toLowerCase()
+          .includes(keyword)
+      )
+    })
+
+    if (models.length) {
+      result[providerId] = { ...providerData, models }
+    }
+
+    return result
+  }, {})
+})
+
+const hasFilteredModels = computed(() => {
+  return Object.values(filteredV2Models.value).some((providerData) => providerData.models?.length)
+})
+
+const getProviderDisplayName = (providerId, providerData = {}) => {
+  return (
+    providerData.provider_display_name ||
+    providerData.display_name ||
+    providerData.name ||
+    providerId
+  )
+}
+
+// 拉取 v2 模型列表
+const fetchV2Models = async () => {
+  if (loadingV2Models.value) return
+  loadingV2Models.value = true
+  try {
+    const response = await modelProviderApi.getV2Models('chat')
+    if (response.success) {
+      v2Models.value = response.data || {}
+    }
+  } catch (error) {
+    console.warn('Failed to load v2 models:', error)
+  } finally {
+    loadingV2Models.value = false
+  }
+}
+
+// 下拉展开时触发实时刷新（仅在打开瞬间触发，关闭时忽略）
+const handleOpenChange = (open) => {
+  if (props.disabled) {
+    dropdownOpen.value = false
+    return
+  }
+  dropdownOpen.value = open
+  if (open) fetchV2Models()
+}
+
+// 强制刷新缓存
+const refreshCache = async () => {
+  if (props.disabled || state.refreshingCache) return
+  state.refreshingCache = true
+  try {
+    await modelProviderApi.refreshModelCache()
+    // 刷新后重新拉取模型列表
+    await fetchV2Models()
+  } catch (error) {
+    console.error('Failed to refresh cache:', error)
+  } finally {
+    state.refreshingCache = false
+  }
+}
+
 // 状态管理
+useModelStatus()
 const state = reactive({
-  currentModelStatus: null, // 当前模型状态
-  checkingStatus: false // 是否正在检查状态
+  currentModelStatus: null,
+  checkingStatus: false,
+  refreshingCache: false
 })
 
-// 从configStore中获取所需数据
-const modelNames = computed(() => configStore.config?.model_names)
-const modelStatus = computed(() => configStore.config?.model_provider_status)
-
-// 筛选 modelStatus 中为真的key
-const modelKeys = computed(() => {
-  return Object.keys(modelStatus.value || {}).filter((key) => modelStatus.value?.[key])
-})
-
-const resolvedSep = computed(() => props.sep || '/')
 const resolvedSize = computed(() => props.size || 'small')
 const modelSelectClasses = computed(() => ({
+  'model-select--nano': resolvedSize.value === 'nano',
   'model-select--middle': resolvedSize.value === 'middle',
-  'model-select--large': resolvedSize.value === 'large'
+  'model-select--large': resolvedSize.value === 'large',
+  'model-select--disabled': props.disabled
 }))
 const buttonSize = computed(() => {
   if (resolvedSize.value === 'large') return 'large'
@@ -105,46 +225,41 @@ const buttonSize = computed(() => {
   return 'small'
 })
 
-const resolvedModel = computed(() => {
-  const spec = props.model_spec || ''
-  const sep = resolvedSep.value
-  if (spec && sep) {
-    const index = spec.indexOf(sep)
-    if (index !== -1) {
-      const provider = spec.slice(0, index)
-      const name = spec.slice(index + sep.length)
-      if (provider && name) {
-        return { provider, name }
-      }
-    }
+const extractModelName = (spec) => {
+  const separatorIndex = spec.indexOf(':')
+  return separatorIndex >= 0 ? spec.slice(separatorIndex + 1) : spec
+}
+
+const displayModelText = computed(() => {
+  const spec = props.model_spec
+  if (!spec) return props.placeholder
+
+  const modelName = extractModelName(spec)
+  if (props.displayName === 'mini') {
+    return modelName.includes('/') ? modelName.split('/').pop() : modelName
   }
-  return { provider: '', name: '' }
+  if (props.displayName === 'short') return modelName
+  return spec
 })
 
-const displayModelProvider = computed(() => resolvedModel.value.provider || '')
-const displayModelName = computed(() => resolvedModel.value.name || '')
-const displayModelText = computed(() => displayModelName.value || props.placeholder)
-
-// 当前模型状态
-const currentModelStatus = computed(() => {
-  return state.currentModelStatus
-})
+const displayModelTitle = computed(() => props.model_spec || props.placeholder)
 
 // 检查当前模型状态
 const checkCurrentModelStatus = async () => {
-  const { provider, name } = resolvedModel.value
-  if (!provider || !name) return
+  if (props.disabled) return
+  const spec = props.model_spec
+  if (!spec) return
 
   try {
     state.checkingStatus = true
-    const response = await chatModelApi.getModelStatus(provider, name)
-    if (response.status) {
-      state.currentModelStatus = response.status
+    const response = await modelProviderApi.getModelStatusBySpec(spec)
+    if (response.data) {
+      state.currentModelStatus = response.data
     } else {
       state.currentModelStatus = null
     }
   } catch (error) {
-    console.error(`检查当前模型 ${provider}/${name} 状态失败:`, error)
+    console.error(`检查模型 ${spec} 状态失败:`, error)
     state.currentModelStatus = { status: 'error', message: error.message }
   } finally {
     state.checkingStatus = false
@@ -152,7 +267,7 @@ const checkCurrentModelStatus = async () => {
 }
 
 const modelStatusIcon = computed(() => {
-  const status = currentModelStatus.value
+  const status = state.currentModelStatus
   if (!status) return '○'
   if (status.status === 'available') return '✓'
   if (status.status === 'unavailable') return '✗'
@@ -160,9 +275,8 @@ const modelStatusIcon = computed(() => {
   return '○'
 })
 
-// 获取当前模型状态提示文本
-const getCurrentModelStatusTooltip = () => {
-  const status = currentModelStatus.value
+const getCurrentModelStatusTitle = () => {
+  const status = state.currentModelStatus
   if (!status) return '状态未知'
 
   let statusText = ''
@@ -174,158 +288,104 @@ const getCurrentModelStatusTooltip = () => {
   return `${statusText}: ${message}`
 }
 
-// 选择模型的方法
-const handleSelectModel = async (provider, name) => {
-  const sep = resolvedSep.value || '/'
-  const separator = sep || '/'
-  const spec = `${provider}${separator}${name}`
+// 选择 v2 模型的方法
+const handleSelectV2Model = (spec) => {
+  if (props.disabled) return
   emit('select-model', spec)
+  dropdownOpen.value = false
 }
 </script>
 
 <style lang="less" scoped>
-// 变量定义
-@status-success: var(--color-success-500);
-@status-error: var(--color-error-500);
-@status-warning: var(--color-warning-500);
-@status-default: var(--gray-500);
-@border-radius: 8px;
-@scrollbar-width: 6px;
-@status-indicator-padding: 2px 4px;
-@status-check-button-padding: 0 4px;
-@status-check-button-font-size: 12px;
-@status-indicator-font-size: 11px;
-@model-provider-color: var(--gray-500);
+@import '@/assets/css/model-selector-common.less';
 
-// 主选择器样式
-.model-select {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 4px 8px;
-  cursor: pointer;
-  border: 1px solid var(--gray-200);
-  border-radius: @border-radius;
-  background-color: var(--gray-0);
-  min-width: 0;
+// 状态检查按钮
+.status-check-button {
+  font-size: 12px;
+  padding: 0 4px;
+}
+
+// 缓存刷新按钮
+.cache-refresh-button {
+  font-size: 12px;
+  padding: 0;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-
-  // 修饰符类
-  &.borderless {
-    border: none;
-  }
-
-  &.max-width {
-    max-width: 380px;
-  }
-
-  &.model-select--middle {
-    font-size: 15px;
-  }
-
-  &.model-select--large {
-    font-size: 16px;
-  }
-
-  // 内容区域
-  .model-select-content {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    width: 100%;
-
-    // 模型信息区域
-    .model-info {
-      flex: 1;
-      min-width: 0;
-      overflow: hidden;
-
-      .model-text {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        color: var(--gray-1000);
-        white-space: nowrap;
-      }
-
-      .model-provider {
-        color: @model-provider-color;
-        margin-left: 4px;
-      }
-    }
-
-    // 状态控制区域
-    .model-status-controls {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      flex: 0;
-      margin-left: auto;
-
-      // 状态指示器
-      .model-status-indicator {
-        font-size: @status-indicator-font-size;
-        font-weight: bold;
-        padding: @status-indicator-padding;
-        border-radius: 3px;
-
-        // 状态样式修饰符
-        &.available {
-          color: @status-success;
-        }
-
-        &.unavailable {
-          color: @status-error;
-        }
-
-        &.error {
-          color: @status-warning;
-        }
-      }
-
-      // 检查按钮
-      .status-check-button {
-        font-size: @status-check-button-font-size;
-        padding: @status-check-button-padding;
-      }
-    }
-  }
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background-color: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
 }
 
-// 滚动菜单样式
-.scrollable-menu {
-  max-height: 300px;
-  overflow-y: auto;
-
-  // 自定义滚动条样式
-  &::-webkit-scrollbar {
-    width: @scrollbar-width;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: transparent;
-    border-radius: 3px;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--gray-400);
-    border-radius: 3px;
-
-    &:hover {
-      background: var(--gray-500);
-    }
-  }
+.model-select--nano {
+  max-width: 100%;
+  height: 30px;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--gray-600);
+  background: transparent;
+  transition: all 0.2s ease;
+  user-select: none;
 }
-</style>
 
-<style lang="less" scoped>
-// 将全局样式移到scoped中以避免样式污染
+.model-select--nano:hover {
+  color: var(--gray-900);
+  background: var(--gray-50);
+}
+
+.model-select--nano .model-text {
+  color: currentColor;
+}
+
+.model-select--disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.model-dropdown {
+  min-width: 280px;
+  max-width: 420px;
+  overflow: hidden;
+  background: var(--gray-0);
+  border-radius: 8px;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+}
+
+.model-search {
+  padding: 8px;
+  border-bottom: 1px solid var(--gray-100);
+}
+
 :deep(.ant-dropdown-menu) {
   &.scrollable-menu {
-    max-height: 300px;
+    max-height: 260px;
     overflow-y: auto;
+    box-shadow: none;
+  }
+
+  .ant-dropdown-menu-item,
+  .ant-dropdown-menu-submenu-title {
+    border-radius: 6px;
+  }
+
+  .ant-dropdown-menu-item:hover,
+  .ant-dropdown-menu-submenu-title:hover,
+  .ant-dropdown-menu-item-active,
+  .ant-dropdown-menu-submenu-title-active {
+    background: var(--gray-50);
+  }
+
+  .ant-dropdown-menu-item-selected,
+  .ant-dropdown-menu-item-selected:hover,
+  .ant-dropdown-menu-item-selected.ant-dropdown-menu-item-active {
+    color: var(--gray-1000);
+    background: var(--main-50);
   }
 }
 </style>

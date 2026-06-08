@@ -1,6 +1,11 @@
 from pymilvus import CollectionSchema, DataType, FieldSchema, Function, FunctionType
 
-from yuxi.knowledge.implementations.milvus import CONTENT_ANALYZER_PARAMS, CONTENT_SPARSE_FIELD, MilvusKB
+from yuxi.knowledge.implementations.milvus import (
+    CONTENT_ANALYZER_PARAMS,
+    CONTENT_SPARSE_FIELD,
+    VECTOR_METRIC_TYPE,
+    MilvusKB,
+)
 
 
 class FakeHit:
@@ -8,7 +13,6 @@ class FakeHit:
         self.distance = distance
         self.entity = {
             "content": content,
-            "source": "demo.md",
             "chunk_id": "chunk-1",
             "file_id": "file-1",
             "chunk_index": 0,
@@ -32,15 +36,35 @@ class FakeCollection:
 
 def make_kb(collection: FakeCollection) -> MilvusKB:
     kb = MilvusKB.__new__(MilvusKB)
-    kb.databases_meta = {"db": {"embed_info": {}}}
-    kb._get_query_params = lambda db_id: {}
-    kb._get_embedding_function = lambda embed_info: lambda texts: [[0.1, 0.2] for _ in texts]
+    kb.databases_meta = {"db": {"embedding_model_spec": "test-provider:test-embedding"}}
+    kb.files_meta = {"file-1": {"filename": "demo.md", "kb_id": "db"}}
+    kb._get_query_params = lambda kb_id: {}
+    kb._get_embedding_function = lambda embedding_model_spec, **kwargs: lambda texts: [[0.1, 0.2] for _ in texts]
 
-    async def get_collection(db_id: str):
+    async def get_collection(kb_id: str):
         return collection
 
     kb._get_milvus_collection = get_collection
     return kb
+
+
+def test_build_chunk_pg_records_preserves_extraction_result():
+    kb = MilvusKB.__new__(MilvusKB)
+
+    records = kb._build_chunk_pg_records(
+        "db",
+        [
+            {
+                "chunk_id": "chunk-1",
+                "file_id": "file-1",
+                "chunk_index": 0,
+                "content": "content",
+                "extraction_result": {"entities": ["alpha"]},
+            }
+        ],
+    )
+
+    assert records[0]["extraction_result"] == {"entities": ["alpha"]}
 
 
 async def test_keyword_mode_uses_milvus_bm25_search():
@@ -67,6 +91,18 @@ async def test_keyword_mode_uses_milvus_bm25_search():
     assert search_call["limit"] == 7
 
 
+async def test_vector_mode_ignores_metric_type_override():
+    collection = FakeCollection()
+    kb = make_kb(collection)
+
+    chunks = await kb.aquery("vector query", "db", search_mode="vector", metric_type="L2")
+
+    assert chunks[0]["content"] == "BM25 result"
+    search_call = collection.search_calls[0]
+    assert search_call["anns_field"] == "embedding"
+    assert search_call["param"]["metric_type"] == VECTOR_METRIC_TYPE
+
+
 async def test_hybrid_mode_uses_milvus_native_hybrid_search():
     collection = FakeCollection()
     kb = make_kb(collection)
@@ -90,6 +126,7 @@ async def test_hybrid_mode_uses_milvus_native_hybrid_search():
     vector_request, bm25_request = hybrid_call["reqs"]
     assert vector_request.anns_field == "embedding"
     assert vector_request.data == [[0.1, 0.2]]
+    assert vector_request.param["metric_type"] == VECTOR_METRIC_TYPE
     assert bm25_request.anns_field == CONTENT_SPARSE_FIELD
     assert bm25_request.data == ["hybrid query"]
     assert bm25_request.limit == 8
@@ -118,6 +155,7 @@ def test_query_params_config_uses_bm25_parameters():
 
     option_keys = {option["key"] for option in config["options"]}
     assert "keyword_top_k" not in option_keys
+    assert "metric_type" not in option_keys
     assert {
         "bm25_top_k",
         "vector_weight",

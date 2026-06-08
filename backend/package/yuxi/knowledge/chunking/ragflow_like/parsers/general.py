@@ -4,6 +4,8 @@ from typing import Any
 
 from yuxi.knowledge.chunking.ragflow_like import nlp
 
+GENERAL_HARD_LIMIT_RATIO = 1.5
+
 
 def _unescape_delimiter(delimiter: str) -> str:
     return delimiter.replace("\\n", "\n").replace("\\r", "\r").replace("\\t", "\t").replace("\\\\", "\\")
@@ -30,6 +32,25 @@ def _iter_sections(markdown_content: str, delimiter: str) -> list[tuple[str, str
     return sections
 
 
+def _ensure_chunk_token_limit(chunks: list[str], chunk_token_num: int) -> list[str]:
+    """对输出 chunk 做 token 上限保护：默认 512 token 时允许到 768 再硬切。"""
+    max_tokens = int(chunk_token_num or 0)
+    if max_tokens <= 0:
+        return [c.strip() for c in chunks if c and c.strip()]
+
+    hard_limit = max(max_tokens, int(max_tokens * GENERAL_HARD_LIMIT_RATIO))
+    protected: list[str] = []
+    for chunk in chunks:
+        cleaned = (chunk or "").strip()
+        if not cleaned:
+            continue
+        if nlp.count_tokens(cleaned) <= max_tokens:
+            protected.append(cleaned)
+        else:
+            protected.extend(nlp.hard_split_by_token_limit(cleaned, max_tokens, hard_limit_token_num=hard_limit))
+    return protected
+
+
 def chunk_markdown(markdown_content: str, parser_config: dict[str, Any] | None = None) -> list[str]:
     parser_config = parser_config or {}
 
@@ -38,9 +59,10 @@ def chunk_markdown(markdown_content: str, parser_config: dict[str, Any] | None =
     overlapped_percent = int(parser_config.get("overlapped_percent", 0) or 0)
 
     sections = _iter_sections(markdown_content, delimiter)
-    return nlp.naive_merge(
+    chunks = nlp.naive_merge(
         sections,
         chunk_token_num=chunk_token_num,
         delimiter=delimiter,
         overlapped_percent=overlapped_percent,
     )
+    return _ensure_chunk_token_limit(chunks, chunk_token_num)
