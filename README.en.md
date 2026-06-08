@@ -24,6 +24,8 @@
 
 Yuxi is an LLM-powered platform for building knowledge-base and knowledge-graph agents. It unifies **RAG retrieval**, **Milvus-backed in-knowledge-base graphs**, and **LangGraph multi-agent orchestration** into a single multi-tenant workspace: administrators configure knowledge bases, models, and permissions, while users chat — in a ChatGPT-like interface — with agents that can mount Skills, MCPs, sub-agents, and sandbox tools, and receive answers with cited sources, graph-based reasoning, and deliverable artifacts.
 
+Navigation: [Introduction](https://xerrors.github.io/Yuxi/) ｜ [Quick Start](https://xerrors.github.io/Yuxi/intro/quick-start) ｜ [Roadmap](https://xerrors.github.io/Yuxi/develop-guides/roadmap); for the latest updates, see the [changelog](https://xerrors.github.io/Yuxi/develop-guides/changelog).
+
 ## Core Features
 
 - 🤖 **Agent development** — Built on LangGraph, with sub-agents (SubAgents), Skills, MCPs, Tools, and middleware; long-running tasks run asynchronously on a background worker, backed by a sandbox file system for persisting, previewing, and downloading tool artifacts.
