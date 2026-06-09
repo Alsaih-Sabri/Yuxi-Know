@@ -16,6 +16,7 @@ from sqlalchemy import Integer, String, cast, distinct, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from server.utils.auth_middleware import get_admin_user, get_db
+from yuxi.repositories.agent_repository import AgentRepository
 from yuxi.repositories.conversation_repository import ConversationRepository
 from yuxi.storage.postgres.models_business import User
 from yuxi.utils.datetime_utils import UTC, ensure_shanghai, shanghai_now, utc_now
@@ -487,7 +488,7 @@ async def get_agent_analytics(
 ):
     """获取智能体分析（管理员权限）"""
     try:
-        from yuxi.storage.postgres.models_business import Agent, Conversation, Message, MessageFeedback, ToolCall
+        from yuxi.storage.postgres.models_business import Conversation, Message, MessageFeedback, ToolCall
 
         # 获取所有智能体
         agents_result = await db.execute(
@@ -561,8 +562,8 @@ async def get_agent_analytics(
         agent_slugs = [agent_id for agent_id, _ in agents if agent_id]
         agent_names = {}
         if agent_slugs:
-            agent_names_result = await db.execute(select(Agent.slug, Agent.name).where(Agent.slug.in_(agent_slugs)))
-            agent_names = {slug: name for slug, name in agent_names_result.all()}
+            agent_repo = AgentRepository(db)
+            agent_names = {agent.slug: agent.name for agent in await agent_repo.list_by_slugs(agent_slugs)}
 
         return AgentAnalytics(
             total_agents=total_agents,
@@ -738,7 +739,7 @@ async def get_call_timeseries_stats(
 ):
     """获取调用分析时间序列统计（管理员权限）"""
     try:
-        from yuxi.storage.postgres.models_business import Agent, Conversation, Message, ToolCall
+        from yuxi.storage.postgres.models_business import Conversation, Message, ToolCall
 
         # 计算时间范围（使用北京时间 UTC+8）
         now = utc_now()
@@ -900,8 +901,8 @@ async def get_call_timeseries_stats(
         if type == "agents" and categories:
             agent_slugs = [c for c in categories if c]
             if agent_slugs:
-                result = await db.execute(select(Agent.slug, Agent.name).where(Agent.slug.in_(agent_slugs)))
-                agent_names = {slug: name for slug, name in result.all()}
+                agent_repo = AgentRepository(db)
+                agent_names = {agent.slug: agent.name for agent in await agent_repo.list_by_slugs(agent_slugs)}
 
         # 重新组织数据：按时间点分组每个类别的数据
         time_data = {}
