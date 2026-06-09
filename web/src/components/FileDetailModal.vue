@@ -1,7 +1,7 @@
 <template>
   <a-modal
     v-model:open="visible"
-    width="1200px"
+    width="800px"
     :footer="null"
     :closable="false"
     wrap-class-name="file-detail"

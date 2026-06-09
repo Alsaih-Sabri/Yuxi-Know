@@ -231,7 +231,7 @@ def _message_chunk_yuxi_events(
                     "type": "tool_call_delta",
                     "message_id": message_id,
                     "tool_call_id": tool_call_chunk.get("id"),
-                    "name": tool_call_chunk.get("name"),
+                    "name": tool_call_chunk.get("name") or None,
                     "args_delta": args_delta,
                     "index": tool_call_chunk.get("index") if tool_call_chunk.get("index") is not None else 0,
                     **route,
@@ -377,7 +377,7 @@ async def _save_ai_message(
         for tc in tool_calls_data:
             await conv_repo.add_tool_call(
                 message_id=ai_msg.id,
-                tool_name=tc.get("name", "unknown"),
+                tool_name=tc.get("name") or "unknown",
                 tool_input=tc.get("args", {}),
                 status="pending",
                 langgraph_tool_call_id=tc.get("id"),

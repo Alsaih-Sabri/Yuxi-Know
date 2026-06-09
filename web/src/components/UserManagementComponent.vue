@@ -105,7 +105,7 @@
                     <a-menu>
                       <a-menu-item key="edit" @click.stop="showEditUserModal(user)">
                         <span class="user-card-menu-item">
-                          <Pencil :size="14" />
+                          <SquarePen :size="14" />
                           编辑用户
                         </span>
                       </a-menu-item>
@@ -261,7 +261,7 @@ import { useUserStore } from '@/stores/user'
 import { departmentApi } from '@/apis'
 import {
   Plus,
-  Pencil,
+  SquarePen,
   Trash2,
   User,
   UserLock,

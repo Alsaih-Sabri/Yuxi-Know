@@ -72,15 +72,6 @@
     <section v-else-if="!databases.length" class="sidebar-section">
       <div class="sidebar-muted">暂无可访问知识库</div>
     </section>
-
-    <section class="sidebar-section">
-      <div class="section-title">共享空间</div>
-      <button type="button" class="workspace-nav-item secondary disabled" disabled>
-        <FileTypeIcon is-dir folder-variant="enterprise" :size="18" />
-        <span>团队工作区</span>
-        <span class="soon-tag">即将支持</span>
-      </button>
-    </section>
   </aside>
 </template>
 
@@ -184,23 +175,6 @@ const sharedDatabases = computed(() =>
     min-height: 32px;
     font-size: 13px;
   }
-
-  &.disabled {
-    color: var(--gray-400);
-    cursor: not-allowed;
-
-    :deep(.file-type-icon) {
-      opacity: 0.45;
-      filter: grayscale(0.25);
-    }
-  }
-}
-
-.soon-tag {
-  flex: 0 0 auto;
-  margin-left: auto;
-  color: var(--gray-400);
-  font-size: 11px;
 }
 
 .sidebar-muted {

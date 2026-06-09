@@ -10,7 +10,7 @@ set -euo pipefail
 #
 # 该脚本从 backend/package/pyproject.toml 读取当前版本，
 # 自动同步所有需要硬编码版本号的位置。
-# --dev 模式不会更新 README.md 和 docs/intro/quick-start.md 中 git clone --branch 的版本号。
+# --dev 模式不会更新 README.md、docs/intro/quick-start.md 和文档首页中 git clone --branch 的版本号。
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -70,6 +70,7 @@ if [ "$DEV_MODE" = false ]; then
     echo "  - README.md"
     echo "  - README.en.md"
     echo "  - docs/intro/quick-start.md"
+    echo "  - docs/.vitepress/theme/components/YuxiHome.vue"
 fi
 echo ""
 read -rp "确认继续? [y/N] " confirm
@@ -142,8 +143,12 @@ if [ "$DEV_MODE" = false ]; then
     echo "→ 更新 docs/intro/quick-start.md"
     perl -pi -e "s/(git clone --branch v)[0-9]+\\.[0-9]+\\.[0-9]+(\\.[a-zA-Z0-9]+)?/\${1}${NEW_VERSION}/g" \
         "${PROJECT_ROOT}/docs/intro/quick-start.md"
+
+    echo "→ 更新 docs/.vitepress/theme/components/YuxiHome.vue"
+    perl -pi -e "s/(git clone --branch v)[0-9]+\\.[0-9]+\\.[0-9]+(\\.[a-zA-Z0-9]+)?/\${1}${NEW_VERSION}/g" \
+        "${PROJECT_ROOT}/docs/.vitepress/theme/components/YuxiHome.vue"
 else
-    echo "→ dev 模式，跳过 README.md、README.en.md 和 docs/intro/quick-start.md 的分支版本更新"
+    echo "→ dev 模式，跳过 README.md、README.en.md、docs/intro/quick-start.md 和文档首页的分支版本更新"
 fi
 
 # -----------------------------------------------------------------------------

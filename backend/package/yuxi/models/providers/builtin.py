@@ -24,12 +24,6 @@ BUILTIN_PROVIDERS: list[dict[str, Any]] = [
     #     "api_key_env": "GEMINI_API_KEY",
     #     "models_endpoint": "https://generativelanguage.googleapis.com/v1beta/models",
     # },
-    # {
-    #     "provider_id": "lmstudio",
-    #     "display_name": "LM Studio",
-    #     "base_url": "http://localhost:1234/v1",
-    #     "models_endpoint": "http://localhost:1234/v1/models",
-    # },
     {
         "provider_id": "deepseek",
         "display_name": "DeepSeek",
