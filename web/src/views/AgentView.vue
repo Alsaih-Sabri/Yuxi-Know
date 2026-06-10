@@ -78,20 +78,6 @@
               </template>
             </a-dropdown>
           </template>
-
-          <template #header-right="{ sideActive, hasActiveThread, toggleAgentPanel }">
-            <button
-              v-if="hasActiveThread"
-              type="button"
-              class="agent-nav-btn agent-state-btn"
-              :class="{ active: sideActive === 'file' }"
-              title="查看文件"
-              @click.stop="toggleAgentPanel"
-            >
-              <FolderKanban size="18" class="nav-btn-icon" />
-              <span class="hide-text">文件</span>
-            </button>
-          </template>
         </AgentChatComponent>
       </div>
     </div>
@@ -101,7 +87,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { Settings2, ChevronDown, Check, FolderKanban } from 'lucide-vue-next'
+import { Settings2, ChevronDown, Check } from 'lucide-vue-next'
 import { useRoute, useRouter } from 'vue-router'
 import AgentChatComponent from '@/components/AgentChatComponent.vue'
 import { isBuiltinAgent, useAgentStore } from '@/stores/agent'
