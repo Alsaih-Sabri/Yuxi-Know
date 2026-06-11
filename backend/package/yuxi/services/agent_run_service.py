@@ -351,7 +351,7 @@ async def create_agent_run_view(
             conversation_id=conversation.id,
             role="user",
             content=input_content,
-            message_type="resume" if run_type == "resume" else "text",
+            message_type="resume" if run_type == "resume" else "multimodal_image" if image_content else "text",
             image_content=image_content,
             run_id=run_id,
             request_id=request_id,

@@ -1283,12 +1283,68 @@ const historyConversations = computed(() => {
   return MessageProcessor.convertServerHistoryToMessages(currentThreadMessages.value)
 })
 
+function getMessageRequestId(message) {
+  const metadataRequestId = message?.extra_metadata?.request_id
+  if (typeof metadataRequestId === 'string' && metadataRequestId.trim()) return metadataRequestId.trim()
+  if (message?.type === 'human' && typeof message.id === 'string' && message.id.trim()) {
+    return message.id.trim()
+  }
+  return null
+}
+
+function mergeLocalImageFields(message, localMessage) {
+  if (!localMessage?.image_content || message?.image_content) return message
+  return {
+    ...message,
+    message_type: localMessage.message_type || message.message_type,
+    image_content: localMessage.image_content,
+    extra_metadata: message.extra_metadata || {}
+  }
+}
+
+function mergeOngoingUserMessageIntoHistory(historyConvs, ongoingMessages) {
+  if (!Array.isArray(historyConvs) || !historyConvs.length || !Array.isArray(ongoingMessages)) {
+    return { historyConvs, ongoingMessages }
+  }
+
+  const firstOngoingMessage = ongoingMessages[0]
+  if (!firstOngoingMessage || firstOngoingMessage.type !== 'human') {
+    return { historyConvs, ongoingMessages }
+  }
+
+  const lastHistoryConv = historyConvs[historyConvs.length - 1]
+  const historyMessages = Array.isArray(lastHistoryConv?.messages) ? lastHistoryConv.messages : []
+  const historyHumanIndex = historyMessages.findIndex((message) => message?.type === 'human')
+  if (historyHumanIndex === -1) return { historyConvs, ongoingMessages }
+
+  const historyHuman = historyMessages[historyHumanIndex]
+  const historyRequestId = getMessageRequestId(historyHuman)
+  const ongoingRequestId = getMessageRequestId(firstOngoingMessage)
+  if (!historyRequestId || !ongoingRequestId || historyRequestId !== ongoingRequestId) {
+    return { historyConvs, ongoingMessages }
+  }
+
+  const patchedHistoryHuman = mergeLocalImageFields(historyHuman, firstOngoingMessage)
+  if (patchedHistoryHuman === historyHuman) {
+    return { historyConvs, ongoingMessages: ongoingMessages.slice(1) }
+  }
+
+  const patchedHistoryMessages = [...historyMessages]
+  patchedHistoryMessages[historyHumanIndex] = patchedHistoryHuman
+  const patchedHistoryConvs = [...historyConvs]
+  patchedHistoryConvs[historyConvs.length - 1] = {
+    ...lastHistoryConv,
+    messages: patchedHistoryMessages
+  }
+  return { historyConvs: patchedHistoryConvs, ongoingMessages: ongoingMessages.slice(1) }
+}
+
 const conversations = computed(() => {
   const historyConvs = historyConversations.value
-  const mergedOngoingMessages = stripDuplicatedOngoingHumanMessage(
-    historyConvs,
-    onGoingConvMessages.value
-  )
+  const {
+    historyConvs: mergedHistoryConvs,
+    ongoingMessages: mergedOngoingMessages
+  } = mergeOngoingUserMessageIntoHistory(historyConvs, onGoingConvMessages.value)
 
   // 如果有进行中的消息且线程状态显示正在流式处理，添加进行中的对话
   if (mergedOngoingMessages.length > 0) {
@@ -1296,9 +1352,9 @@ const conversations = computed(() => {
       messages: mergedOngoingMessages,
       status: 'streaming'
     }
-    return [...historyConvs, onGoingConv]
+    return [...mergedHistoryConvs, onGoingConv]
   }
-  return historyConvs
+  return mergedHistoryConvs
 })
 
 const conversationRows = computed(() => {
@@ -1389,49 +1445,6 @@ const buildOptimisticHumanMessage = ({
   }
 
   return message
-}
-
-const getMessageRequestId = (message) => {
-  if (!message || typeof message !== 'object') return null
-
-  const metadataRequestId = message.extra_metadata?.request_id
-  if (typeof metadataRequestId === 'string' && metadataRequestId.trim()) {
-    return metadataRequestId.trim()
-  }
-
-  if (message.type === 'human' && typeof message.id === 'string' && message.id.trim()) {
-    return message.id.trim()
-  }
-
-  return null
-}
-
-// 历史消息已落库时，ongoing 里仍会保留当前轮的本地 user message；
-// 切回线程后按 request_id 去掉这条重复消息，只保留仍在流式更新的部分。
-const stripDuplicatedOngoingHumanMessage = (historyConvs, ongoingMessages) => {
-  if (!Array.isArray(historyConvs) || !historyConvs.length || !Array.isArray(ongoingMessages)) {
-    return ongoingMessages
-  }
-
-  const firstOngoingMessage = ongoingMessages[0]
-  if (!firstOngoingMessage || firstOngoingMessage.type !== 'human') {
-    return ongoingMessages
-  }
-
-  const lastHistoryConv = historyConvs[historyConvs.length - 1]
-  const historyMessages = Array.isArray(lastHistoryConv?.messages) ? lastHistoryConv.messages : []
-  const lastHistoryHuman = historyMessages.find((message) => message?.type === 'human')
-  if (!lastHistoryHuman) {
-    return ongoingMessages
-  }
-
-  const historyRequestId = getMessageRequestId(lastHistoryHuman)
-  const ongoingRequestId = getMessageRequestId(firstOngoingMessage)
-  if (!historyRequestId || !ongoingRequestId || historyRequestId !== ongoingRequestId) {
-    return ongoingMessages
-  }
-
-  return ongoingMessages.slice(1)
 }
 
 // 发送 runs 前先在前端插入一条用户消息，避免等待 worker 轮询后消息才出现。
