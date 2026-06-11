@@ -25,7 +25,7 @@ API Key 是一种用于身份验证的密钥字符串，外部系统可以通过
 Yuxi 后端服务绑定在 `0.0.0.0:5050`，不会自动探测或对外宣告本机 IP。实际访问地址取决于部署环境：
 
 - **本地开发**：`http://localhost:5050`
-- **生产部署（Nginx 反向代理）**：`http://<服务器IP或域名>`（默认 80 端口）
+- **生产部署（Nginx 反向代理）**：**强烈建议使用 HTTPS**，即 `https://<服务器域名>`（443 端口）。由于 API Key 会在请求头中以明文形式传输，使用 HTTP（80 端口）会导致密钥在网络传输过程中被窃听或篡改，必须避免
 
 完整的 API 交互流程可参考自动生成的 Swagger 文档：`{base_url}/docs`。
 
@@ -53,7 +53,7 @@ Authorization: Bearer yxkey_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 import json
 import requests
 
-base_url = "http://your-yuxi-server"
+base_url = "https://your-yuxi-server"  # 生产环境务必使用 HTTPS；本地开发可改为 http://localhost:5050
 headers = {
     "Authorization": "Bearer yxkey_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     "Content-Type": "application/json",
@@ -146,6 +146,8 @@ Yuxi 的 API 接口统一支持两种认证方式：
 系统根据 token 的前缀自动判断认证方式。以 `yxkey_` 开头的 token 被视为 API Key，其他 token 则作为 JWT Token 处理。这种设计使得同一个接口可以同时支持外部系统（使用 API Key）和内部前端应用（使用用户登录态）调用。
 
 ## 安全注意事项
+
+**传输层安全**：API Key 在请求头中以明文形式传输，**生产环境必须通过 HTTPS（443 端口）调用**，避免在公网上以 HTTP 明文传输造成密钥泄露。建议在 Nginx 反向代理层启用 TLS 并强制 HTTP 重定向到 HTTPS。
 
 保管好 API Key 密钥是最重要的安全原则。由于 API Key 一旦泄露就可能被滥用，建议不要将密钥硬编码在代码中，而是通过环境变量或配置中心来管理。如果怀疑密钥泄露，应立即在管理界面禁用该 API Key 并重新生成。启用密钥过期功能是一种良好的安全实践，可以设置较短的有效期并定期轮换。
 
