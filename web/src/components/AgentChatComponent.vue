@@ -29,7 +29,7 @@
             aria-controls="agent-state-panel"
             @click.stop="toggleStatePanel"
           >
-            <SquareCheck size="18" class="nav-btn-icon" />
+            <LayoutList size="18" class="nav-btn-icon" />
             <span class="hide-text">状态</span>
           </button>
           <button
@@ -157,6 +157,9 @@
                 @remove-attachment="handleAttachmentRemove"
               >
                 <template #actions-left-extra>
+                  <slot name="input-actions-left" :has-active-thread="!!currentChatId"></slot>
+                </template>
+                <template #actions-right-extra>
                   <div class="input-model-selector">
                     <ModelSelectorComponent
                       :model_spec="currentModelSpec"
@@ -166,9 +169,6 @@
                       @select-model="handleModelSelect"
                     />
                   </div>
-                  <slot name="input-actions-left" :has-active-thread="!!currentChatId"></slot>
-                </template>
-                <template #actions-right-extra>
                   <slot name="input-actions-right" :has-active-thread="!!currentChatId"></slot>
                 </template>
               </AgentInputArea>
@@ -497,7 +497,7 @@ import {
   onDeactivated
 } from 'vue'
 import { message } from 'ant-design-vue'
-import { ChevronDown, FolderKanban, RefreshCw, SquareCheck } from 'lucide-vue-next'
+import { ChevronDown, FolderKanban, RefreshCw, LayoutList } from 'lucide-vue-next'
 import { formatFileSize } from '@/utils/file_utils'
 import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
 import { generatePixelAvatar } from '@/utils/pixelAvatar'
@@ -2757,7 +2757,8 @@ watch(currentChatId, (threadId, oldThreadId) => {
 
 .side-panel--state.is-docked {
   align-self: flex-start;
-  margin: 0 8px 8px 0;
+  margin: 8px 8px 8px 0;
+  max-height: calc(100% - 16px);
 }
 
 .side-panel--state.is-floating {
