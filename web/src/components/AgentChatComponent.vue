@@ -29,7 +29,7 @@
             aria-controls="agent-state-panel"
             @click.stop="toggleStatePanel"
           >
-            <SquareCheck size="18" class="nav-btn-icon" />
+            <LayoutList size="18" class="nav-btn-icon" />
             <span class="hide-text">状态</span>
           </button>
           <button
@@ -157,6 +157,9 @@
                 @remove-attachment="handleAttachmentRemove"
               >
                 <template #actions-left-extra>
+                  <slot name="input-actions-left" :has-active-thread="!!currentChatId"></slot>
+                </template>
+                <template #actions-right-extra>
                   <div class="input-model-selector">
                     <ModelSelectorComponent
                       :model_spec="currentModelSpec"
@@ -166,9 +169,6 @@
                       @select-model="handleModelSelect"
                     />
                   </div>
-                  <slot name="input-actions-left" :has-active-thread="!!currentChatId"></slot>
-                </template>
-                <template #actions-right-extra>
                   <slot name="input-actions-right" :has-active-thread="!!currentChatId"></slot>
                 </template>
               </AgentInputArea>
@@ -497,7 +497,7 @@ import {
   onDeactivated
 } from 'vue'
 import { message } from 'ant-design-vue'
-import { ChevronDown, FolderKanban, RefreshCw, SquareCheck } from 'lucide-vue-next'
+import { ChevronDown, FolderKanban, RefreshCw, LayoutList } from 'lucide-vue-next'
 import { formatFileSize } from '@/utils/file_utils'
 import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
 import { generatePixelAvatar } from '@/utils/pixelAvatar'
@@ -1285,7 +1285,8 @@ const historyConversations = computed(() => {
 
 function getMessageRequestId(message) {
   const metadataRequestId = message?.extra_metadata?.request_id
-  if (typeof metadataRequestId === 'string' && metadataRequestId.trim()) return metadataRequestId.trim()
+  if (typeof metadataRequestId === 'string' && metadataRequestId.trim())
+    return metadataRequestId.trim()
   if (message?.type === 'human' && typeof message.id === 'string' && message.id.trim()) {
     return message.id.trim()
   }
@@ -1341,10 +1342,8 @@ function mergeOngoingUserMessageIntoHistory(historyConvs, ongoingMessages) {
 
 const conversations = computed(() => {
   const historyConvs = historyConversations.value
-  const {
-    historyConvs: mergedHistoryConvs,
-    ongoingMessages: mergedOngoingMessages
-  } = mergeOngoingUserMessageIntoHistory(historyConvs, onGoingConvMessages.value)
+  const { historyConvs: mergedHistoryConvs, ongoingMessages: mergedOngoingMessages } =
+    mergeOngoingUserMessageIntoHistory(historyConvs, onGoingConvMessages.value)
 
   // 如果有进行中的消息且线程状态显示正在流式处理，添加进行中的对话
   if (mergedOngoingMessages.length > 0) {
@@ -2757,7 +2756,8 @@ watch(currentChatId, (threadId, oldThreadId) => {
 
 .side-panel--state.is-docked {
   align-self: flex-start;
-  margin: 0 8px 8px 0;
+  margin: 8px 8px 8px 0;
+  max-height: calc(100% - 16px);
 }
 
 .side-panel--state.is-floating {
