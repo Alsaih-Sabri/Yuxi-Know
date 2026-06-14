@@ -22,6 +22,8 @@ from yuxi.knowledge.utils.mindmap_utils import (
     get_database_mindmap_data,
     get_mindmap_database_files,
     get_mindmap_databases_overview,
+    get_mindmap_diff,
+    remove_file_from_mindmap,
 )
 from yuxi.knowledge.utils.sample_question_utils import (
     generate_database_sample_questions,
@@ -267,11 +269,12 @@ async def generate_mindmap(
     kb_id: str,
     file_ids: list[str] | None = Body(default=None, description="选择的文件ID列表"),
     user_prompt: str = Body(default="", description="用户自定义提示词"),
+    incremental: bool = Body(default=False, description="是否增量更新"),
     current_user: User = Depends(get_admin_user),
 ):
-    """使用 AI 分析知识库文件，生成思维导图结构。"""
+    """使用 AI 分析知识库文件，生成思维导图结构。支持增量更新模式。"""
     try:
-        return await generate_database_mindmap(kb_id, file_ids, user_prompt)
+        return await generate_database_mindmap(kb_id, file_ids, user_prompt, incremental)
     except HTTPException:
         raise
     except Exception as e:
@@ -289,6 +292,18 @@ async def get_database_mindmap(kb_id: str, current_user: User = Depends(get_admi
     except Exception as e:
         logger.error(f"获取知识库思维导图失败: {e}, {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"获取知识库思维导图失败: {str(e)}")
+
+
+@knowledge.get("/databases/{kb_id}/mindmap/diff")
+async def get_mindmap_diff_route(kb_id: str, current_user: User = Depends(get_admin_user)):
+    """检测思维导图与知识库文件的变更差异。"""
+    try:
+        return await get_mindmap_diff(kb_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"检测思维导图变更失败: {e}, {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"检测思维导图变更失败: {str(e)}")
 
 
 @knowledge.get("/databases/{kb_id}")
@@ -896,6 +911,11 @@ async def batch_delete_documents(
 
             await _delete_document_storage_objects(kb_id, doc_id, file_path)
 
+            # 先清理思维导图中对该文件的引用
+            removed_filename = file_meta_info.get("meta", {}).get("filename", "")
+            if removed_filename:
+                await remove_file_from_mindmap(kb_id, doc_id, removed_filename)
+
             # 无论MinIO删除是否成功，都继续从知识库删除
             await knowledge_base.delete_file(kb_id, doc_id)
             deleted_count += 1
@@ -932,6 +952,11 @@ async def delete_document(kb_id: str, doc_id: str, current_user: User = Depends(
         file_path = file_meta_info.get("meta", {}).get("path", "")
 
         await _delete_document_storage_objects(kb_id, doc_id, file_path)
+
+        # 先清理思维导图中对该文件的引用（需要文件名，删除后无法获取）
+        removed_filename = file_meta_info.get("meta", {}).get("filename", "")
+        if removed_filename:
+            await remove_file_from_mindmap(kb_id, doc_id, removed_filename)
 
         # 无论MinIO删除是否成功，都继续从知识库删除
         await knowledge_base.delete_file(kb_id, doc_id)
