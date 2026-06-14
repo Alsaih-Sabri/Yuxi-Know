@@ -1,5 +1,6 @@
 """思维导图工具函数。"""
 
+import copy
 import json
 import textwrap
 from datetime import datetime, timezone
@@ -169,6 +170,15 @@ def detect_mindmap_changes(
     current_files: dict[str, dict[str, Any]],
 ) -> dict[str, Any]:
     """对比思维导图追踪的文件与知识库当前文件，返回变更信息。"""
+    # 兼容旧数据：如果存在思维导图但缺少追踪的 file_ids，通过叶子节点反向重建映射
+    if mindmap_data and not mindmap_file_ids:
+        leaf_filenames = _collect_leaf_filenames(mindmap_data)
+        mindmap_file_ids = {
+            fid: info.get("filename", "")
+            for fid, info in current_files.items()
+            if info.get("filename", "") in leaf_filenames
+        }
+
     if not mindmap_data or not mindmap_file_ids:
         added_files = [
             {"file_id": fid, "filename": info.get("filename", ""), "type": info.get("type", "")}
@@ -238,8 +248,9 @@ def remove_files_from_mindmap(mindmap_data: dict[str, Any], removed_filenames: s
     if not removed_filenames:
         return mindmap_data
 
-    root_name = mindmap_data.get("content", "")
-    result = _prune_mindmap_node(mindmap_data, removed_filenames, root_name)
+    mindmap_copy = copy.deepcopy(mindmap_data)
+    root_name = mindmap_copy.get("content", "")
+    result = _prune_mindmap_node(mindmap_copy, removed_filenames, root_name)
     return result if result is not None else {"content": root_name, "children": []}
 
 
@@ -517,3 +528,48 @@ async def remove_file_from_mindmap(kb_id: str, file_id: str, filename: str | Non
         logger.info(f"思维导图中已移除文件: {removed_filename}")
     except Exception as e:
         logger.error(f"从思维导图移除文件失败: {e}")
+
+
+async def batch_remove_files_from_mindmap(kb_id: str, removals: list[tuple[str, str]]) -> None:
+    """批量从思维导图中移除已删除文件的叶子节点（单次 DB 读写，无 AI 调用）。
+
+    Args:
+        kb_id: 知识库 ID
+        removals: [(file_id, filename), ...] 待移除的文件列表
+    """
+    if not removals:
+        return
+
+    kb = await KnowledgeBaseRepository().get_by_kb_id(kb_id)
+    if not kb or not kb.mindmap:
+        return
+
+    stale_filenames: set[str] = set()
+    stale_file_ids: set[str] = set()
+
+    for file_id, filename in removals:
+        if kb.mindmap_file_ids and file_id in kb.mindmap_file_ids:
+            stale_filenames.add(kb.mindmap_file_ids[file_id])
+            stale_file_ids.add(file_id)
+        elif filename:
+            stale_filenames.add(filename)
+            stale_file_ids.add(file_id)
+
+    if not stale_filenames:
+        return
+
+    updated_mindmap = remove_files_from_mindmap(kb.mindmap, stale_filenames)
+    updated_file_ids = (
+        {fid: name for fid, name in kb.mindmap_file_ids.items() if fid not in stale_file_ids}
+        if kb.mindmap_file_ids
+        else None
+    )
+
+    try:
+        await KnowledgeBaseRepository().update(kb_id, {
+            "mindmap": updated_mindmap,
+            "mindmap_file_ids": updated_file_ids,
+        })
+        logger.info(f"思维导图批量清理完成: {kb_id}, 移除 {len(stale_filenames)} 个文件")
+    except Exception as e:
+        logger.error(f"从思维导图批量移除文件失败: {e}")
