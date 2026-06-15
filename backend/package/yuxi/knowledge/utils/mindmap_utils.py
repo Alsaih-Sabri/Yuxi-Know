@@ -3,7 +3,7 @@
 import copy
 import json
 import textwrap
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import HTTPException
@@ -310,7 +310,15 @@ async def update_mindmap_incremental(kb_id: str, user_prompt: str = "") -> dict[
         }
 
     mindmap_data = kb.mindmap
-    updated_file_ids = dict(kb.mindmap_file_ids) if kb.mindmap_file_ids else {}
+    if kb.mindmap_file_ids:
+        updated_file_ids = dict(kb.mindmap_file_ids)
+    else:
+        leaf_filenames = _collect_leaf_filenames(mindmap_data)
+        updated_file_ids = {
+            fid: info.get("filename", "")
+            for fid, info in current_files.items()
+            if info.get("filename", "") in leaf_filenames
+        }
 
     if changes["removed_file_ids"]:
         removed_filenames = {updated_file_ids[fid] for fid in changes["removed_file_ids"] if fid in updated_file_ids}
@@ -326,7 +334,9 @@ async def update_mindmap_incremental(kb_id: str, user_prompt: str = "") -> dict[
                 {"role": "system", "content": MINDMAP_INCREMENTAL_SYSTEM_PROMPT},
                 {
                     "role": "user",
-                    "content": build_mindmap_incremental_user_message(db_name, mindmap_data, added_files_info, user_prompt),
+                    "content": build_mindmap_incremental_user_message(
+                        db_name, mindmap_data, added_files_info, user_prompt
+                    ),
                 },
             ]
             response = await model.call(messages, stream=False)
@@ -341,7 +351,7 @@ async def update_mindmap_incremental(kb_id: str, user_prompt: str = "") -> dict[
         for f in changes["added_files"]:
             updated_file_ids[f["file_id"]] = f["filename"]
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     metadata = {
         "generated_at": now,
         "file_count": len(updated_file_ids),
@@ -349,11 +359,14 @@ async def update_mindmap_incremental(kb_id: str, user_prompt: str = "") -> dict[
     }
 
     try:
-        await KnowledgeBaseRepository().update(kb_id, {
-            "mindmap": mindmap_data,
-            "mindmap_file_ids": updated_file_ids,
-            "mindmap_metadata": metadata,
-        })
+        await KnowledgeBaseRepository().update(
+            kb_id,
+            {
+                "mindmap": mindmap_data,
+                "mindmap_file_ids": updated_file_ids,
+                "mindmap_metadata": metadata,
+            },
+        )
         logger.info(f"思维导图增量更新成功: {kb_id}")
     except Exception as save_error:
         logger.error(f"保存思维导图失败: {save_error}")
@@ -412,7 +425,7 @@ async def generate_database_mindmap(
 
     logger.info("思维导图生成成功")
 
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
     mindmap_file_ids = {fid: all_files[fid].get("filename", "") for fid in selected_file_ids if fid in all_files}
     mindmap_metadata = {
         "generated_at": now,
@@ -421,11 +434,14 @@ async def generate_database_mindmap(
     }
 
     try:
-        await KnowledgeBaseRepository().update(kb_id, {
-            "mindmap": mindmap_data,
-            "mindmap_file_ids": mindmap_file_ids,
-            "mindmap_metadata": mindmap_metadata,
-        })
+        await KnowledgeBaseRepository().update(
+            kb_id,
+            {
+                "mindmap": mindmap_data,
+                "mindmap_file_ids": mindmap_file_ids,
+                "mindmap_metadata": mindmap_metadata,
+            },
+        )
         logger.info(f"思维导图已保存到知识库: {kb_id}")
     except Exception as save_error:
         logger.error(f"保存思维导图失败: {save_error}")
@@ -518,13 +534,18 @@ async def remove_file_from_mindmap(kb_id: str, file_id: str, filename: str | Non
         return
 
     updated_mindmap = remove_files_from_mindmap(kb.mindmap, {removed_filename})
-    updated_file_ids = {fid: name for fid, name in kb.mindmap_file_ids.items() if fid != file_id} if kb.mindmap_file_ids else None
+    updated_file_ids = (
+        {fid: name for fid, name in kb.mindmap_file_ids.items() if fid != file_id} if kb.mindmap_file_ids else None
+    )
 
     try:
-        await KnowledgeBaseRepository().update(kb_id, {
-            "mindmap": updated_mindmap,
-            "mindmap_file_ids": updated_file_ids,
-        })
+        await KnowledgeBaseRepository().update(
+            kb_id,
+            {
+                "mindmap": updated_mindmap,
+                "mindmap_file_ids": updated_file_ids,
+            },
+        )
         logger.info(f"思维导图中已移除文件: {removed_filename}")
     except Exception as e:
         logger.error(f"从思维导图移除文件失败: {e}")
@@ -566,10 +587,13 @@ async def batch_remove_files_from_mindmap(kb_id: str, removals: list[tuple[str, 
     )
 
     try:
-        await KnowledgeBaseRepository().update(kb_id, {
-            "mindmap": updated_mindmap,
-            "mindmap_file_ids": updated_file_ids,
-        })
+        await KnowledgeBaseRepository().update(
+            kb_id,
+            {
+                "mindmap": updated_mindmap,
+                "mindmap_file_ids": updated_file_ids,
+            },
+        )
         logger.info(f"思维导图批量清理完成: {kb_id}, 移除 {len(stale_filenames)} 个文件")
     except Exception as e:
         logger.error(f"从思维导图批量移除文件失败: {e}")

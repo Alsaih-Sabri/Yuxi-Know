@@ -23,8 +23,6 @@ from yuxi.knowledge.utils.mindmap_utils import (
     get_mindmap_database_files,
     get_mindmap_databases_overview,
     get_mindmap_diff,
-    remove_file_from_mindmap,
-    batch_remove_files_from_mindmap,
 )
 from yuxi.knowledge.utils.sample_question_utils import (
     generate_database_sample_questions,
@@ -925,10 +923,6 @@ async def batch_delete_documents(
             logger.error(f"批量删除过程中删除文档 {doc_id} 失败: {e}, {traceback.format_exc()}")
             failed_items.append({"doc_id": doc_id, "error": str(e)})
 
-    # 批量清理思维导图（单次 DB 读写）
-    if mindmap_removals:
-        await batch_remove_files_from_mindmap(kb_id, mindmap_removals)
-
     if failed_items:
         if deleted_count == 0:
             raise HTTPException(status_code=400, detail=f"批量删除失败: 所有 {len(failed_items)} 个文件均未删除。")
@@ -958,11 +952,6 @@ async def delete_document(kb_id: str, doc_id: str, current_user: User = Depends(
         file_path = file_meta_info.get("meta", {}).get("path", "")
 
         await _delete_document_storage_objects(kb_id, doc_id, file_path)
-
-        # 先清理思维导图中对该文件的引用（需要文件名，删除后无法获取）
-        removed_filename = file_meta_info.get("meta", {}).get("filename", "")
-        if removed_filename:
-            await remove_file_from_mindmap(kb_id, doc_id, removed_filename)
 
         # 无论MinIO删除是否成功，都继续从知识库删除
         await knowledge_base.delete_file(kb_id, doc_id)
