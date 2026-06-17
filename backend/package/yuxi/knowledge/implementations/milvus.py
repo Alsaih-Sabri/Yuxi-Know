@@ -2,6 +2,7 @@ import asyncio
 import os
 import time
 import traceback
+import weakref
 from dataclasses import MISSING, dataclass, field, fields
 from functools import partial
 from typing import Any
@@ -43,12 +44,46 @@ MAX_GRAPH_ENTITY_TOP_K = 100
 MAX_GRAPH_TRIPLE_TOP_K = 100
 MAX_GRAPH_TOP_K = 200
 MAX_GRAPH_NODES = 5000
-_milvus_query_offload_semaphore = asyncio.Semaphore(MILVUS_QUERY_OFFLOAD_LIMIT)
+_milvus_query_offload_semaphore_refs: dict[
+    int,
+    tuple[weakref.ReferenceType[asyncio.AbstractEventLoop], weakref.ReferenceType[asyncio.Semaphore]],
+] = {}
+
+
+def _get_milvus_query_offload_semaphore() -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    loop_id = id(loop)
+    entry = _milvus_query_offload_semaphore_refs.get(loop_id)
+    if entry is not None:
+        loop_ref, semaphore_ref = entry
+        semaphore = semaphore_ref()
+        if loop_ref() is loop and semaphore is not None:
+            return semaphore
+
+    semaphore = asyncio.Semaphore(MILVUS_QUERY_OFFLOAD_LIMIT)
+
+    def cleanup(ref, stale_loop_id=loop_id):
+        current_entry = _milvus_query_offload_semaphore_refs.get(stale_loop_id)
+        if current_entry is not None and current_entry[1] is ref:
+            _milvus_query_offload_semaphore_refs.pop(stale_loop_id, None)
+
+    _milvus_query_offload_semaphore_refs[loop_id] = (weakref.ref(loop), weakref.ref(semaphore, cleanup))
+    return semaphore
 
 
 async def _run_milvus_query_io(func, /, *args, **kwargs):
-    async with _milvus_query_offload_semaphore:
-        return await asyncio.to_thread(func, *args, **kwargs)
+    semaphore = _get_milvus_query_offload_semaphore()
+    await semaphore.acquire()
+    task = asyncio.create_task(asyncio.to_thread(func, *args, **kwargs))
+
+    def release_capacity(completed_task: asyncio.Task):
+        semaphore.release()
+        if completed_task.cancelled():
+            return
+        completed_task.exception()
+
+    task.add_done_callback(release_capacity)
+    return await asyncio.shield(task)
 
 
 def _clamp_int(value: Any, default: int, minimum: int, maximum: int) -> int:

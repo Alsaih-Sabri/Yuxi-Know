@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import weakref
 from typing import Any
 
 from yuxi.knowledge.graphs.extractors import GraphExtractor, GraphExtractorFactory, normalize_extraction_result
@@ -34,12 +35,46 @@ NEO4J_QUERY_OFFLOAD_LIMIT = 8
 NEO4J_QUERY_MAX_NODES = 1000
 NEO4J_SEED_SUBGRAPH_MAX_NODES = 5000
 NEO4J_SEED_ENTITY_MAX_IDS = 500
-_neo4j_query_offload_semaphore = asyncio.Semaphore(NEO4J_QUERY_OFFLOAD_LIMIT)
+_neo4j_query_offload_semaphore_refs: dict[
+    int,
+    tuple[weakref.ReferenceType[asyncio.AbstractEventLoop], weakref.ReferenceType[asyncio.Semaphore]],
+] = {}
+
+
+def _get_neo4j_query_offload_semaphore() -> asyncio.Semaphore:
+    loop = asyncio.get_running_loop()
+    loop_id = id(loop)
+    entry = _neo4j_query_offload_semaphore_refs.get(loop_id)
+    if entry is not None:
+        loop_ref, semaphore_ref = entry
+        semaphore = semaphore_ref()
+        if loop_ref() is loop and semaphore is not None:
+            return semaphore
+
+    semaphore = asyncio.Semaphore(NEO4J_QUERY_OFFLOAD_LIMIT)
+
+    def cleanup(ref, stale_loop_id=loop_id):
+        current_entry = _neo4j_query_offload_semaphore_refs.get(stale_loop_id)
+        if current_entry is not None and current_entry[1] is ref:
+            _neo4j_query_offload_semaphore_refs.pop(stale_loop_id, None)
+
+    _neo4j_query_offload_semaphore_refs[loop_id] = (weakref.ref(loop), weakref.ref(semaphore, cleanup))
+    return semaphore
 
 
 async def _run_neo4j_query_io(func, /, *args, **kwargs):
-    async with _neo4j_query_offload_semaphore:
-        return await asyncio.to_thread(func, *args, **kwargs)
+    semaphore = _get_neo4j_query_offload_semaphore()
+    await semaphore.acquire()
+    task = asyncio.create_task(asyncio.to_thread(func, *args, **kwargs))
+
+    def release_capacity(completed_task: asyncio.Task):
+        semaphore.release()
+        if completed_task.cancelled():
+            return
+        completed_task.exception()
+
+    task.add_done_callback(release_capacity)
+    return await asyncio.shield(task)
 
 
 def _clamp_int(value: Any, default: int, minimum: int, maximum: int) -> int:
