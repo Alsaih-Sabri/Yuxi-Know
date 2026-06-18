@@ -32,9 +32,6 @@ from yuxi.utils.datetime_utils import utc_isoformat
 GRAPH_CONFIG_KEY = "graph_build_config"
 GRAPH_TASK_TYPE = "knowledge_graph_index"
 NEO4J_QUERY_OFFLOAD_LIMIT = 8
-NEO4J_QUERY_MAX_NODES = 1000
-NEO4J_SEED_SUBGRAPH_MAX_NODES = 5000
-NEO4J_SEED_ENTITY_MAX_IDS = 500
 _neo4j_query_offload_semaphore_refs: dict[
     int,
     tuple[weakref.ReferenceType[asyncio.AbstractEventLoop], weakref.ReferenceType[asyncio.Semaphore]],
@@ -75,14 +72,6 @@ async def _run_neo4j_query_io(func, /, *args, **kwargs):
 
     task.add_done_callback(release_capacity)
     return await asyncio.shield(task)
-
-
-def _clamp_int(value: Any, default: int, minimum: int, maximum: int) -> int:
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        parsed = default
-    return min(max(parsed, minimum), maximum)
 
 
 class MilvusGraphService:
@@ -554,7 +543,7 @@ class MilvusGraphService:
             return {"nodes": [], "edges": []}
 
         label = safe_neo4j_label(effective_kb_id)
-        limit = _clamp_int(max_nodes, 50, 1, NEO4J_QUERY_MAX_NODES)
+        limit = max_nodes
         try:
             return await _run_neo4j_query_io(
                 self._query_nodes_sync,
@@ -596,8 +585,7 @@ class MilvusGraphService:
     ) -> dict[str, Any]:
         if not entity_ids:
             return {"nodes": [], "edges": []}
-        max_nodes = _clamp_int(max_nodes, NEO4J_SEED_SUBGRAPH_MAX_NODES, 1, NEO4J_SEED_SUBGRAPH_MAX_NODES)
-        seed_entity_ids = list(dict.fromkeys(entity_ids))[:NEO4J_SEED_ENTITY_MAX_IDS]
+        seed_entity_ids = list(dict.fromkeys(entity_ids))
         label = safe_neo4j_label(kb_id)
         cypher = f"""
         MATCH (seed:Entity:MilvusKB:`{label}`)
@@ -652,7 +640,6 @@ class MilvusGraphService:
     ) -> list[tuple[str, float]]:
         if not seed_weights:
             return []
-        max_nodes = _clamp_int(max_nodes, NEO4J_SEED_SUBGRAPH_MAX_NODES, 1, NEO4J_SEED_SUBGRAPH_MAX_NODES)
         subgraph = await self.query_seed_subgraph(
             kb_id,
             entity_ids=list(seed_weights.keys()),
@@ -728,11 +715,14 @@ class MilvusGraphService:
         ORDER BY node_label
         """
         try:
-            records = await _run_neo4j_query_io(neo4j_read, self.driver, cypher, kb_id=effective_kb_id)
+            records = await _run_neo4j_query_io(self._get_labels_sync, cypher, effective_kb_id)
             return [record["node_label"] for record in records]
         except Exception as e:
             logger.error(f"Failed to get Milvus graph labels: {e}")
             return []
+
+    def _get_labels_sync(self, cypher: str, kb_id: str) -> list[Any]:
+        return neo4j_read(self.driver, cypher, kb_id=kb_id)
 
     async def get_stats(self, kb_id: str | None = None) -> dict[str, Any]:
         effective_kb_id = kb_id or self.kb_id

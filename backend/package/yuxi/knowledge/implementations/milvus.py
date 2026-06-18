@@ -37,13 +37,6 @@ CONTENT_ANALYZER_PARAMS = {"type": "chinese"}
 VECTOR_METRIC_TYPE = "COSINE"
 MILVUS_CHUNK_EMBED_BATCH_SIZE = 200
 MILVUS_QUERY_OFFLOAD_LIMIT = 8
-MAX_FINAL_TOP_K = 100
-MAX_RECALL_TOP_K = 200
-MAX_BM25_TOP_K = 200
-MAX_GRAPH_ENTITY_TOP_K = 100
-MAX_GRAPH_TRIPLE_TOP_K = 100
-MAX_GRAPH_TOP_K = 200
-MAX_GRAPH_NODES = 5000
 _milvus_query_offload_semaphore_refs: dict[
     int,
     tuple[weakref.ReferenceType[asyncio.AbstractEventLoop], weakref.ReferenceType[asyncio.Semaphore]],
@@ -84,14 +77,6 @@ async def _run_milvus_query_io(func, /, *args, **kwargs):
 
     task.add_done_callback(release_capacity)
     return await asyncio.shield(task)
-
-
-def _clamp_int(value: Any, default: int, minimum: int, maximum: int) -> int:
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError):
-        parsed = default
-    return min(max(parsed, minimum), maximum)
 
 
 @dataclass(kw_only=True)
@@ -204,12 +189,12 @@ class MilvusRetrievalConfig:
         },
     )
     graph_max_nodes: int = field(
-        default=5000,
+        default=10000,
         metadata={
             "label": "图检索最大节点数",
             "type": "number",
             "min": 100,
-            "max": MAX_GRAPH_NODES,
+            "max": 50000,
             "depend_on": ("use_graph_retrieval", True),
             "description": "2-hop 扩散子图最多读取的节点数量",
         },
@@ -916,7 +901,8 @@ class MilvusKB(KnowledgeBase):
         try:
             # 查询参数（从 merged_kwargs 读取）
             logger.debug(f"Query params: {merged_kwargs}")
-            final_top_k = _clamp_int(merged_kwargs.get("final_top_k", 10), 10, 1, MAX_FINAL_TOP_K)
+            final_top_k = int(merged_kwargs.get("final_top_k", 10))
+            final_top_k = max(final_top_k, 1)
             similarity_threshold = float(merged_kwargs.get("similarity_threshold", 0.2))
             metric_type = VECTOR_METRIC_TYPE
             include_distances = bool(merged_kwargs.get("include_distances", True))
@@ -927,12 +913,8 @@ class MilvusKB(KnowledgeBase):
             use_reranker = bool(merged_kwargs.get("use_reranker", False))
             use_graph_retrieval = bool(merged_kwargs.get("use_graph_retrieval", False))
             if use_reranker or use_graph_retrieval:
-                recall_top_k = _clamp_int(
-                    merged_kwargs.get("recall_top_k", 50),
-                    50,
-                    final_top_k,
-                    MAX_RECALL_TOP_K,
-                )
+                recall_top_k = int(merged_kwargs.get("recall_top_k", 50))
+                recall_top_k = max(recall_top_k, final_top_k)
             else:
                 recall_top_k = final_top_k
 
@@ -972,7 +954,8 @@ class MilvusKB(KnowledgeBase):
                 )
 
             elif search_mode == "keyword":
-                bm25_top_k = _clamp_int(merged_kwargs.get("bm25_top_k", recall_top_k), recall_top_k, 1, MAX_BM25_TOP_K)
+                bm25_top_k = int(merged_kwargs.get("bm25_top_k", recall_top_k))
+                bm25_top_k = max(bm25_top_k, 1)
                 bm25_drop_ratio_search = float(merged_kwargs.get("bm25_drop_ratio_search", 0.0))
                 bm25_search_params = {
                     "metric_type": "BM25",
@@ -1000,7 +983,8 @@ class MilvusKB(KnowledgeBase):
                 embedding_model_spec = self.databases_meta[kb_id].get("embedding_model_spec")
                 embedding_function = self._get_embedding_function(embedding_model_spec, sync=True)
                 query_embedding = await _run_milvus_query_io(embedding_function, [query_text])
-                bm25_top_k = _clamp_int(merged_kwargs.get("bm25_top_k", recall_top_k), recall_top_k, 1, MAX_BM25_TOP_K)
+                bm25_top_k = int(merged_kwargs.get("bm25_top_k", recall_top_k))
+                bm25_top_k = max(bm25_top_k, 1)
                 bm25_drop_ratio_search = float(merged_kwargs.get("bm25_drop_ratio_search", 0.0))
                 vector_weight = float(merged_kwargs.get("vector_weight", 0.7))
                 bm25_weight = float(merged_kwargs.get("bm25_weight", 0.3))
@@ -1105,14 +1089,12 @@ class MilvusKB(KnowledgeBase):
             if not embedding_model_spec:
                 return []
 
-            entity_top_k = _clamp_int(query_params.get("graph_entity_top_k", 10), 10, 1, MAX_GRAPH_ENTITY_TOP_K)
-            triple_top_k = _clamp_int(query_params.get("graph_triple_top_k", 10), 10, 1, MAX_GRAPH_TRIPLE_TOP_K)
-            graph_top_k = _clamp_int(query_params.get("graph_top_k", 20), 20, 1, MAX_GRAPH_TOP_K)
-            graph_max_nodes = _clamp_int(
-                query_params.get("graph_max_nodes", MAX_GRAPH_NODES), MAX_GRAPH_NODES, 1, MAX_GRAPH_NODES
-            )
+            entity_top_k = max(int(query_params.get("graph_entity_top_k", 10)), 1)
+            triple_top_k = max(int(query_params.get("graph_triple_top_k", 10)), 1)
+            graph_top_k = max(int(query_params.get("graph_top_k", 20)), 1)
+            graph_max_nodes = max(int(query_params.get("graph_max_nodes", 10000)), 1)
 
-            vector_store = MilvusGraphVectorStore()
+            vector_store = await _run_milvus_query_io(MilvusGraphVectorStore)
             entity_hits, triple_hits = await asyncio.gather(
                 vector_store.search_entities(
                     kb_id=kb_id,

@@ -15,7 +15,7 @@ DEFAULT_GRAPH_EXPAND_TOP_K = 1
 MAX_GRAPH_EXPAND_TOP_K = 3
 GRAPH_SEED_DECAY = 0.9
 GRAPH_PPR_DAMPING = 0.85
-GRAPH_PPR_MAX_NODES = 5000
+GRAPH_PPR_MAX_NODES = 10000
 
 
 async def collect_kb_chunks(kb_instance: Any, kb_id: str) -> list[dict[str, Any]]:
