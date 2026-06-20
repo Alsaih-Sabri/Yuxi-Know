@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import curses
 import os
 import sys
 import time
@@ -8,9 +7,13 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
+import questionary
 import typer
+from questionary import Choice
 from rich.console import Console
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TextColumn, TimeElapsedColumn
 
 from yuxi_cli.client import ClientError, YuxiClient
 from yuxi_cli.config import ConfigStore, Remote
@@ -21,6 +24,17 @@ DEFAULT_EXCLUDE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".pdf", ".png", ".tif", "
 MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024
 MAX_CONCURRENCY = 10
 UPLOAD_RETRY_ATTEMPTS = 2
+PROMPT_STYLE = questionary.Style(
+    [
+        ("qmark", "fg:#5f6fff bold"),
+        ("question", "bold"),
+        ("pointer", "fg:#5f6fff bold"),
+        ("highlighted", "fg:#5f6fff bold"),
+        ("selected", "fg:#3a7d44"),
+        ("instruction", "fg:#6b7280"),
+        ("answer", "fg:#3a7d44 bold"),
+    ]
+)
 
 
 class KbUploadError(Exception):
@@ -117,7 +131,6 @@ def run_kb_upload(
     if not options.yes:
         selected_extensions = _prompt_select_extensions(
             scanned_files,
-            initial_skipped,
             supported_extensions=supported_extensions,
             include_ext=options.include_ext,
             exclude_ext=options.exclude_ext,
@@ -140,7 +153,7 @@ def run_kb_upload(
         raise KbUploadError("没有可上传的文件")
 
     _print_selection_summary(summary, console)
-    if not options.yes and not typer.confirm("继续上传?", default=True):
+    if not options.yes and not typer.confirm("确认上传?", default=True):
         raise KbUploadError("已取消")
 
     uploaded, failed = upload_files(
@@ -245,7 +258,6 @@ def parse_extension_list(raw: str | None) -> set[str]:
 
 def _prompt_select_extensions(
     files: list[LocalFile],
-    initial_skipped: list[SkippedFile],
     *,
     supported_extensions: set[str],
     include_ext: str | None,
@@ -262,19 +274,18 @@ def _prompt_select_extensions(
         include_ext=include_ext,
         exclude_ext=exclude_ext,
     )
-    unsupported_counts = _unsupported_extension_counts(files, initial_skipped, supported_extensions)
-    try:
-        selected = curses.wrapper(
-            _run_extension_selector,
-            options,
-            selected_extensions,
-            unsupported_counts,
+    selected = _ask_question(
+        questionary.checkbox(
+            "选择要上传的文件类型",
+            choices=_extension_choices(options, selected_extensions),
+            pointer="›",
+            instruction="↑/↓ 移动 · Space 选择/取消 · Enter 确认",
+            style=PROMPT_STYLE,
         )
-    except curses.error as exc:
-        raise KbUploadError("当前终端不支持文件类型多选，请传 --yes 或 --include-ext") from exc
+    )
     if selected is None:
         raise KbUploadError("已取消")
-    return selected
+    return set(selected)
 
 
 def _extension_options(files: list[LocalFile], supported_extensions: set[str]) -> list[ExtensionOption]:
@@ -291,16 +302,6 @@ def _initial_selected_extensions(
     return selected & available_extensions
 
 
-def _unsupported_extension_counts(
-    files: list[LocalFile], initial_skipped: list[SkippedFile], supported_extensions: set[str]
-) -> Counter[str]:
-    counts = Counter(item.extension for item in files if item.extension not in supported_extensions)
-    no_extension_count = sum(1 for item in initial_skipped if item.reason == "no-extension")
-    if no_extension_count:
-        counts["无扩展名"] = no_extension_count
-    return counts
-
-
 def upload_files(
     remote: Remote,
     client_factory,
@@ -312,28 +313,45 @@ def upload_files(
 ) -> tuple[list[UploadResult], list[UploadResult]]:
     uploaded: list[UploadResult] = []
     failed: list[UploadResult] = []
-    completed = 0
-    progress_step = max(1, len(files) // 10)
 
     def upload_one(item: LocalFile) -> UploadResult:
         return _upload_one_with_retry(remote, client_factory, kb_id, item)
+
+    def record_result(result: UploadResult, completed: int) -> None:
+        if result.success:
+            uploaded.append(result)
+            return
+        failed.append(result)
+        console.print(f"[red]✗[/red] {result.local_file.relative_path} ({completed}/{len(files)}): {result.error}")
 
     console.print(f"开始上传: {len(files)} 个文件，并发 {concurrency}")
     try:
         with ThreadPoolExecutor(max_workers=concurrency) as executor:
             future_map = {executor.submit(upload_one, item): item for item in files}
-            for future in as_completed(future_map):
-                completed += 1
-                result = future.result()
-                if result.success:
-                    uploaded.append(result)
-                else:
-                    failed.append(result)
-                    console.print(
-                        f"[red]✗[/red] {result.local_file.relative_path} ({completed}/{len(files)}): {result.error}"
-                    )
-                if completed == len(files) or completed % progress_step == 0:
-                    console.print(f"上传进度: {completed}/{len(files)}")
+            if console.is_terminal:
+                progress = Progress(
+                    TextColumn("[progress.description]{task.description}"),
+                    BarColumn(),
+                    MofNCompleteColumn(),
+                    TextColumn("{task.percentage:>3.0f}%"),
+                    TimeElapsedColumn(),
+                    console=console,
+                )
+                completed = 0
+                with progress:
+                    task_id = progress.add_task("上传进度", total=len(files))
+                    for future in as_completed(future_map):
+                        completed += 1
+                        record_result(future.result(), completed)
+                        progress.advance(task_id)
+            else:
+                completed = 0
+                progress_step = max(1, len(files) // 10)
+                for future in as_completed(future_map):
+                    completed += 1
+                    record_result(future.result(), completed)
+                    if completed == len(files) or completed % progress_step == 0:
+                        console.print(f"上传进度: {completed}/{len(files)}")
     except KeyboardInterrupt as exc:
         raise KbUploadError("已取消上传队列，未添加文档记录") from exc
 
@@ -407,63 +425,29 @@ def _resolve_database(client: YuxiClient, kb_id: str | None, kb_types: dict, con
 
 
 def _prompt_select_database(databases: list[dict]) -> dict:
-    try:
-        selected_index = curses.wrapper(_run_database_selector, databases)
-    except curses.error as exc:
-        raise KbUploadError("当前终端不支持方向键单选，请显式传入 --kb-id") from exc
+    selected_index = _ask_question(
+        questionary.select(
+            "选择知识库",
+            choices=_database_choices(databases),
+            pointer="›",
+            instruction="↑/↓ 移动 · Enter 确认",
+            style=PROMPT_STYLE,
+        )
+    )
     if selected_index is None:
         raise KbUploadError("已取消")
-    return databases[selected_index]
+    return databases[int(selected_index)]
 
 
-def _run_database_selector(stdscr, databases: list[dict]) -> int | None:
-    selected_index = 0
+def _ask_question(question) -> Any:
     try:
-        curses.curs_set(0)
-    except curses.error:
-        pass
-    stdscr.keypad(True)
-
-    while True:
-        stdscr.erase()
-        height, width = stdscr.getmaxyx()
-        _draw_database_selector(stdscr, databases, selected_index, height, width)
-        key = stdscr.getch()
-        if key in {curses.KEY_UP, ord("k")}:
-            selected_index = (selected_index - 1) % len(databases)
-        elif key in {curses.KEY_DOWN, ord("j")}:
-            selected_index = (selected_index + 1) % len(databases)
-        elif key in {curses.KEY_ENTER, 10, 13}:
-            return selected_index
-        elif key in {27, ord("q"), ord("Q"), 3}:
-            return None
+        return question.ask()
+    except (EOFError, KeyboardInterrupt) as exc:
+        raise KbUploadError("已取消") from exc
 
 
-def _draw_database_selector(stdscr, databases: list[dict], selected_index: int, height: int, width: int) -> None:
-    lines = _render_database_select_lines(databases, selected_index)
-    max_lines = max(0, height - 1)
-    max_width = max(1, width - 1)
-    for row, line in enumerate(lines[:max_lines]):
-        clean_line = _strip_ansi(line)
-        attr = curses.A_REVERSE if row >= 3 and row - 3 == selected_index else curses.A_NORMAL
-        stdscr.addnstr(row, 0, clean_line, max_width, attr)
-    stdscr.refresh()
-
-
-def _render_database_select_lines(databases: list[dict], selected_index: int) -> list[str]:
-    lines = [
-        "选择知识库",
-        "↑/↓ 移动 · Enter 确认 · Esc/q 取消",
-        "",
-    ]
-    for index, database in enumerate(databases):
-        marker = "›" if index == selected_index else " "
-        label = _database_option_label(database)
-        if index == selected_index:
-            lines.append(f"\x1b[7m{marker} {label}\x1b[0m")
-        else:
-            lines.append(f"{marker} {label}")
-    return lines
+def _database_choices(databases: list[dict]) -> list[Choice]:
+    return [Choice(title=_database_option_label(database), value=index) for index, database in enumerate(databases)]
 
 
 def _database_option_label(database: dict) -> str:
@@ -473,84 +457,19 @@ def _database_option_label(database: dict) -> str:
     return f"{name}  [{kb_type}]  {kb_id}"
 
 
-def _run_extension_selector(
-    stdscr,
-    options: list[ExtensionOption],
-    selected_extensions: set[str],
-    unsupported_counts: Counter[str],
-) -> set[str] | None:
-    cursor = 0
-    selected = set(selected_extensions)
-    try:
-        curses.curs_set(0)
-    except curses.error:
-        pass
-    stdscr.keypad(True)
-
-    while True:
-        stdscr.erase()
-        height, width = stdscr.getmaxyx()
-        _draw_extension_selector(stdscr, options, selected, cursor, unsupported_counts, height, width)
-        key = stdscr.getch()
-        if key in {curses.KEY_UP, ord("k")}:
-            cursor = (cursor - 1) % len(options)
-        elif key in {curses.KEY_DOWN, ord("j")}:
-            cursor = (cursor + 1) % len(options)
-        elif key in {ord(" ")}:
-            extension = options[cursor].extension
-            if extension in selected:
-                selected.remove(extension)
-            else:
-                selected.add(extension)
-        elif key in {curses.KEY_ENTER, 10, 13}:
-            return selected
-        elif key in {27, ord("q"), ord("Q"), 3}:
-            return None
-
-
-def _draw_extension_selector(
-    stdscr,
-    options: list[ExtensionOption],
-    selected_extensions: set[str],
-    cursor: int,
-    unsupported_counts: Counter[str],
-    height: int,
-    width: int,
-) -> None:
-    lines = _render_extension_select_lines(options, selected_extensions, cursor, unsupported_counts)
-    max_lines = max(0, height - 1)
-    max_width = max(1, width - 1)
-    for row, line in enumerate(lines[:max_lines]):
-        clean_line = _strip_ansi(line)
-        attr = curses.A_REVERSE if row >= 3 and row - 3 == cursor else curses.A_NORMAL
-        stdscr.addnstr(row, 0, clean_line, max_width, attr)
-    stdscr.refresh()
-
-
-def _render_extension_select_lines(
-    options: list[ExtensionOption],
-    selected_extensions: set[str],
-    cursor: int,
-    unsupported_counts: Counter[str],
-) -> list[str]:
-    lines = [
-        "选择要上传的文件类型",
-        "↑/↓ 移动 · Space 选择/取消 · Enter 确认 · Esc/q 取消",
-        "",
+def _extension_choices(options: list[ExtensionOption], selected_extensions: set[str]) -> list[Choice]:
+    return [
+        Choice(
+            title=_extension_option_label(option),
+            value=option.extension,
+            checked=option.extension in selected_extensions,
+        )
+        for option in options
     ]
-    for index, option in enumerate(options):
-        marker = "›" if index == cursor else " "
-        checked = "x" if option.extension in selected_extensions else " "
-        label = option.extension.lstrip(".")
-        line = f"{marker} [{checked}] {label} ({option.count})"
-        if index == cursor:
-            lines.append(f"\x1b[7m{line}\x1b[0m")
-        else:
-            lines.append(line)
-    if unsupported_counts:
-        lines.append("")
-        lines.append(_format_unsupported_summary(unsupported_counts))
-    return lines
+
+
+def _extension_option_label(option: ExtensionOption) -> str:
+    return f"{option.extension.lstrip('.')} ({option.count})"
 
 
 def _format_unsupported_summary(unsupported_counts: Counter[str]) -> str:
@@ -559,11 +478,7 @@ def _format_unsupported_summary(unsupported_counts: Counter[str]) -> str:
     visible = extensions[:8]
     remaining = len(extensions) - len(visible)
     suffix = f", 等 {remaining} 类" if remaining else ""
-    return f"- 不支持 {total} ({', '.join(visible)}{suffix})"
-
-
-def _strip_ansi(value: str) -> str:
-    return value.replace("\x1b[7m", "").replace("\x1b[0m", "")
+    return f"不支持: {total} ({', '.join(visible)}{suffix})"
 
 
 def _list_uploadable_databases(client: YuxiClient, kb_types: dict) -> list[dict]:
@@ -635,38 +550,22 @@ def _is_retryable(exc: ClientError) -> bool:
 
 
 def _print_selection_summary(summary: KbUploadSummary, console: Console) -> None:
-    type_options = _upload_type_options_from_summary(summary)
+    selected_extensions = sorted({item.extension for item in summary.selected})
+    selected_extension_text = f" ({', '.join(selected_extensions)})" if selected_extensions else ""
     not_selected = sum(1 for item in summary.skipped if item.reason in {"not-selected", "not-included", "excluded"})
     unsupported_counts = _unsupported_counts_from_skipped(summary.skipped)
     unsupported_total = sum(unsupported_counts.values())
     other_skipped = len(summary.skipped) - not_selected - unsupported_total
 
     console.print("上传预览")
-    console.print(f"- 扫描文件: {summary.scanned}")
-    console.print(f"- 将上传: {len(summary.selected)}")
+    console.print(f"  扫描文件: {summary.scanned}")
+    console.print(f"  将上传: {len(summary.selected)}{selected_extension_text}")
     if not_selected:
-        console.print(f"- 未选择: {not_selected}")
+        console.print(f"  未选择: {not_selected}")
     if unsupported_counts:
-        console.print(_format_unsupported_summary(unsupported_counts), markup=False)
+        console.print(f"  {_format_unsupported_summary(unsupported_counts)}", markup=False)
     if other_skipped:
-        console.print(f"- 其他跳过: {other_skipped}")
-
-    if type_options:
-        console.print("文件类型:")
-        for extension, count, selected in type_options:
-            checked = "x" if selected else " "
-            console.print(f"  [{checked}] {extension.lstrip('.')} ({count})", markup=False)
-
-
-def _upload_type_options_from_summary(summary: KbUploadSummary) -> list[tuple[str, int, bool]]:
-    counts = Counter(item.extension for item in summary.selected)
-    selected_extensions = set(counts)
-    for item in summary.skipped:
-        if item.reason in {"not-selected", "not-included", "excluded"}:
-            extension = item.path.suffix.lower()
-            if extension:
-                counts[extension] += 1
-    return [(extension, counts[extension], extension in selected_extensions) for extension in sorted(counts)]
+        console.print(f"  其他跳过: {other_skipped}")
 
 
 def _unsupported_counts_from_skipped(skipped: list[SkippedFile]) -> Counter[str]:
@@ -684,10 +583,10 @@ def _print_final_summary(summary: KbUploadSummary, console: Console) -> None:
     add_failed = int((summary.add_response or {}).get("failed") or 0)
 
     console.print("上传结果")
-    console.print(f"- 上传成功: {len(summary.uploaded)}")
-    console.print(f"- 上传失败: {len(summary.upload_failed)}")
-    console.print(f"- 添加成功: {added}")
-    console.print(f"- 添加失败: {add_failed}")
+    console.print(f"  上传成功: {len(summary.uploaded)}")
+    console.print(f"  上传失败: {len(summary.upload_failed)}")
+    console.print(f"  添加成功: {added}")
+    console.print(f"  添加失败: {add_failed}")
 
     failed_items = (summary.add_response or {}).get("failed_items") or []
     if failed_items:

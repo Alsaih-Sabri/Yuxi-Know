@@ -15,11 +15,13 @@ from yuxi_cli.kb_upload import (
     KbUploadOptions,
     LocalFile,
     SkippedFile,
+    _database_choices,
     _format_unsupported_summary,
+    _extension_choices,
+    _extension_option_label,
     _print_selection_summary,
-    _render_database_select_lines,
-    _render_extension_select_lines,
     run_kb_upload,
+    upload_files,
 )
 
 
@@ -232,23 +234,76 @@ def test_kb_upload_limits_upload_concurrency(tmp_path):
     assert FakeKbClient.max_active_uploads > 1
 
 
-def test_database_select_lines_use_arrow_selection_without_numbering():
-    lines = _render_database_select_lines(
+def test_upload_files_uses_log_progress_for_non_tty_console(tmp_path):
+    FakeKbClient.reset()
+    files = []
+    for index in range(3):
+        path = tmp_path / f"{index}.md"
+        path.write_text("demo", encoding="utf-8")
+        files.append(LocalFile(path, path.name, ".md", path.stat().st_size))
+    buffer = io.StringIO()
+    console = Console(file=buffer, force_terminal=False)
+
+    uploaded, failed = upload_files(
+        Remote(name="local", url="http://localhost", api_key="yxkey_test"),
+        FakeKbClient,
+        "kb_1",
+        files,
+        concurrency=2,
+        console=console,
+    )
+
+    output = buffer.getvalue()
+    assert len(uploaded) == 3
+    assert failed == []
+    assert "上传进度: 3/3" in output
+    assert "✓" not in output
+
+
+def test_upload_files_uses_progress_bar_for_tty_console(tmp_path):
+    FakeKbClient.reset()
+    files = []
+    for index in range(3):
+        path = tmp_path / f"{index}.md"
+        path.write_text("demo", encoding="utf-8")
+        files.append(LocalFile(path, path.name, ".md", path.stat().st_size))
+    buffer = io.StringIO()
+    console = Console(file=buffer, force_terminal=True, color_system=None, width=100)
+
+    uploaded, failed = upload_files(
+        Remote(name="local", url="http://localhost", api_key="yxkey_test"),
+        FakeKbClient,
+        "kb_1",
+        files,
+        concurrency=2,
+        console=console,
+    )
+
+    output = buffer.getvalue()
+    assert len(uploaded) == 3
+    assert failed == []
+    assert "上传进度" in output
+    assert "上传进度:" not in output
+    assert "0.md" not in output
+
+
+def test_database_choices_use_labels_without_numbering():
+    choices = _database_choices(
         [
             {"kb_id": "kb_1", "name": "Alpha", "kb_type": "milvus"},
             {"kb_id": "kb_2", "name": "Beta", "kb_type": "milvus"},
-        ],
-        selected_index=1,
+        ]
     )
 
-    assert lines[0] == "选择知识库"
-    assert "↑/↓" in lines[1]
-    assert "1" not in lines[3].split("Alpha", 1)[0]
-    assert lines[4].startswith("\x1b[7m› Beta  [milvus]  kb_2")
+    assert choices[0].title == "Alpha  [milvus]  kb_1"
+    assert choices[0].value == 0
+    assert choices[1].title == "Beta  [milvus]  kb_2"
+    assert choices[1].value == 1
+    assert "1" not in str(choices[0].title).split("Alpha", 1)[0]
 
 
-def test_extension_select_lines_show_checkbox_counts_and_unsupported_summary():
-    lines = _render_extension_select_lines(
+def test_extension_choices_show_counts_and_default_selection():
+    choices = _extension_choices(
         [
             ExtensionOption(".html", 101),
             ExtensionOption(".md", 165),
@@ -256,16 +311,12 @@ def test_extension_select_lines_show_checkbox_counts_and_unsupported_summary():
             ExtensionOption(".json", 9),
         ],
         selected_extensions={".html", ".md", ".txt"},
-        cursor=0,
-        unsupported_counts=Counter({".py": 3831}),
     )
 
-    assert "Space 选择/取消" in lines[1]
-    assert "[x] html (101)" in lines[3]
-    assert "[x] md (165)" in lines[4]
-    assert "[x] txt (2)" in lines[5]
-    assert "[ ] json (9)" in lines[6]
-    assert lines[-1] == "- 不支持 3831 (.py)"
+    assert [choice.title for choice in choices] == ["html (101)", "md (165)", "txt (2)", "json (9)"]
+    assert [choice.value for choice in choices] == [".html", ".md", ".txt", ".json"]
+    assert [choice.checked for choice in choices] == [True, True, True, False]
+    assert _extension_option_label(ExtensionOption(".tar.gz", 3)) == "tar.gz (3)"
 
 
 def test_unsupported_summary_truncates_extensions_without_per_extension_counts():
@@ -286,12 +337,12 @@ def test_unsupported_summary_truncates_extensions_without_per_extension_counts()
         )
     )
 
-    assert summary == "- 不支持 550 (.py, .json, .js, .ts, .map, .css, .yaml, .lock, 等 2 类)"
+    assert summary == "不支持: 550 (.py, .json, .js, .ts, .map, .css, .yaml, .lock, 等 2 类)"
     assert ".py 100" not in summary
     assert ".json 90" not in summary
 
 
-def test_selection_summary_lists_selected_and_unselected_supported_types(tmp_path):
+def test_selection_summary_shows_compact_selected_type_summary(tmp_path):
     selected = [LocalFile(tmp_path / "a.md", "a.md", ".md", 4)]
     skipped = [
         SkippedFile(tmp_path / "b.json", "b.json", "not-included"),
@@ -303,7 +354,10 @@ def test_selection_summary_lists_selected_and_unselected_supported_types(tmp_pat
     _print_selection_summary(KbUploadSummary(scanned=3, selected=selected, skipped=skipped), console)
 
     output = buffer.getvalue()
-    assert "文件类型:" in output
-    assert "  [x] md (1)" in output
-    assert "  [ ] json (1)" in output
-    assert "- 不支持 1 (.py)" in output
+    assert "  扫描文件: 3" in output
+    assert "  将上传: 1 (.md)" in output
+    assert "  未选择: 1" in output
+    assert "  不支持: 1 (.py)" in output
+    assert "文件类型:" not in output
+    assert "[x]" not in output
+    assert "[ ]" not in output
