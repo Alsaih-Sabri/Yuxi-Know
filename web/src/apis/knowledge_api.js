@@ -135,6 +135,20 @@ export const documentApi = {
   },
 
   /**
+   * 将已上传文件添加为知识库文档记录（不解析、不入库）
+   * @param {string} kbId - 知识库ID
+   * @param {Array} items - 已上传文件的 MinIO URL 列表
+   * @param {Object} params - 添加参数
+   * @returns {Promise} - 添加结果
+   */
+  addUploadedDocuments: async (kbId, items, params = {}) => {
+    return apiAdminPost(`/api/knowledge/databases/${kbId}/documents/add`, {
+      items,
+      params
+    })
+  },
+
+  /**
    * 获取文档信息
    * @param {string} kbId - 知识库ID
    * @param {string} docId - 文档ID

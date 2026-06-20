@@ -1,5 +1,5 @@
-from io import BytesIO
 from inspect import signature
+from io import BytesIO
 from types import SimpleNamespace
 
 import pytest
@@ -43,6 +43,16 @@ async def test_upload_file_rejects_jsonl_uploads():
 
 async def test_upload_file_rejects_oversized_file(monkeypatch):
     monkeypatch.setattr(knowledge_router, "MAX_UPLOAD_SIZE_BYTES", 5)
+
+    async def fake_ensure_database_supports_documents(kb_id: str, operation: str) -> None:
+        return None
+
+    monkeypatch.setattr(
+        knowledge_router,
+        "_ensure_database_supports_documents",
+        fake_ensure_database_supports_documents,
+    )
+
     upload = UploadFile(filename="demo.txt", file=BytesIO(b"123456"))
 
     with pytest.raises(HTTPException) as exc_info:
@@ -50,6 +60,68 @@ async def test_upload_file_rejects_oversized_file(monkeypatch):
 
     assert exc_info.value.status_code == 400
     assert "100 MB" in exc_info.value.detail
+
+
+async def test_upload_file_invalid_kb_fails_before_read_or_minio(monkeypatch):
+    calls = {"read": 0, "upload": 0}
+
+    async def fake_ensure_database_supports_documents(kb_id: str, operation: str) -> None:
+        raise HTTPException(status_code=404, detail=f"知识库 {kb_id} 不存在")
+
+    async def fake_read_upload_with_limit(*_args, **_kwargs) -> bytes:
+        calls["read"] += 1
+        return b"demo"
+
+    async def fake_upload_to_minio(*_args, **_kwargs) -> str:
+        calls["upload"] += 1
+        return "minio://knowledgebases/kb_1/upload/demo.txt"
+
+    monkeypatch.setattr(
+        knowledge_router,
+        "_ensure_database_supports_documents",
+        fake_ensure_database_supports_documents,
+    )
+    monkeypatch.setattr(knowledge_router, "read_upload_with_limit", fake_read_upload_with_limit)
+    monkeypatch.setattr(knowledge_router, "aupload_file_to_minio", fake_upload_to_minio)
+
+    upload = UploadFile(filename="demo.txt", file=BytesIO(b"demo"))
+
+    with pytest.raises(HTTPException) as exc_info:
+        await knowledge_router.upload_file(upload, kb_id="missing", current_user=SimpleNamespace(uid="user_1"))
+
+    assert exc_info.value.status_code == 404
+    assert calls == {"read": 0, "upload": 0}
+
+
+async def test_upload_file_read_only_kb_fails_before_read_or_minio(monkeypatch):
+    calls = {"read": 0, "upload": 0}
+
+    async def fake_ensure_database_supports_documents(kb_id: str, operation: str) -> None:
+        raise HTTPException(status_code=400, detail="只支持检索，不支持文档上传")
+
+    async def fake_read_upload_with_limit(*_args, **_kwargs) -> bytes:
+        calls["read"] += 1
+        return b"demo"
+
+    async def fake_upload_to_minio(*_args, **_kwargs) -> str:
+        calls["upload"] += 1
+        return "minio://knowledgebases/kb_1/upload/demo.txt"
+
+    monkeypatch.setattr(
+        knowledge_router,
+        "_ensure_database_supports_documents",
+        fake_ensure_database_supports_documents,
+    )
+    monkeypatch.setattr(knowledge_router, "read_upload_with_limit", fake_read_upload_with_limit)
+    monkeypatch.setattr(knowledge_router, "aupload_file_to_minio", fake_upload_to_minio)
+
+    upload = UploadFile(filename="demo.txt", file=BytesIO(b"demo"))
+
+    with pytest.raises(HTTPException) as exc_info:
+        await knowledge_router.upload_file(upload, kb_id="readonly", current_user=SimpleNamespace(uid="user_1"))
+
+    assert exc_info.value.status_code == 400
+    assert calls == {"read": 0, "upload": 0}
 
 
 async def test_markdown_endpoint_rejects_oversized_file(monkeypatch):
@@ -141,7 +213,7 @@ async def test_add_documents_auto_index_returns_one_final_result_per_item(monkey
     result = await knowledge_router.add_documents(
         "kb_1",
         [item],
-        params={"content_type": "file", "auto_index": True},
+        params={"content_type": "file", "auto_index": True, "content_hashes": {item: "hash_1"}},
         current_user=SimpleNamespace(uid="uid-user"),
     )
 
@@ -149,3 +221,125 @@ async def test_add_documents_auto_index_returns_one_final_result_per_item(monkey
     assert context.result["submitted"] == 1
     assert context.result["failed"] == 0
     assert context.result["items"] == [{"file_id": "file_1", "status": "indexed"}]
+
+
+async def test_add_uploaded_documents_rejects_empty_items(monkeypatch):
+    async def fake_ensure_database_supports_documents(kb_id: str, operation: str) -> None:
+        return None
+
+    monkeypatch.setattr(
+        knowledge_router,
+        "_ensure_database_supports_documents",
+        fake_ensure_database_supports_documents,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await knowledge_router.add_uploaded_documents(
+            "kb_1",
+            knowledge_router.AddUploadedDocumentsRequest(items=[], params={}),
+            current_user=SimpleNamespace(uid="uid-user"),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "items must not be empty"
+
+
+async def test_add_uploaded_documents_rejects_non_minio_url(monkeypatch):
+    async def fake_ensure_database_supports_documents(kb_id: str, operation: str) -> None:
+        return None
+
+    monkeypatch.setattr(
+        knowledge_router,
+        "_ensure_database_supports_documents",
+        fake_ensure_database_supports_documents,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await knowledge_router.add_uploaded_documents(
+            "kb_1",
+            knowledge_router.AddUploadedDocumentsRequest(
+                items=["https://example.com/demo.txt"],
+                params={"content_hashes": {"https://example.com/demo.txt": "hash_1"}},
+            ),
+            current_user=SimpleNamespace(uid="uid-user"),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "File source must be a MinIO URL"
+
+
+async def test_add_uploaded_documents_rejects_missing_content_hash(monkeypatch):
+    item = "minio://knowledgebases/kb_1/upload/demo.txt"
+
+    async def fake_ensure_database_supports_documents(kb_id: str, operation: str) -> None:
+        return None
+
+    monkeypatch.setattr(
+        knowledge_router,
+        "_ensure_database_supports_documents",
+        fake_ensure_database_supports_documents,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        await knowledge_router.add_uploaded_documents(
+            "kb_1",
+            knowledge_router.AddUploadedDocumentsRequest(items=[item], params={}),
+            current_user=SimpleNamespace(uid="uid-user"),
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == f"Missing content_hash for file: {item}"
+
+
+async def test_add_uploaded_documents_creates_records_without_task(monkeypatch):
+    item = "minio://knowledgebases/kb_1/upload/demo.txt"
+    captured = {}
+
+    async def fake_ensure_database_supports_documents(kb_id: str, operation: str) -> None:
+        return None
+
+    async def fake_add_file_record(kb_id: str, item_path: str, params: dict, operator_id: str | None = None):
+        captured["kb_id"] = kb_id
+        captured["item"] = item_path
+        captured["params"] = params
+        captured["operator_id"] = operator_id
+        return {"file_id": "file_1", "status": "uploaded", "filename": "demo.txt"}
+
+    async def fail_enqueue(*_args, **_kwargs):
+        raise AssertionError("documents/add must not enqueue tasker work")
+
+    monkeypatch.setattr(
+        knowledge_router,
+        "_ensure_database_supports_documents",
+        fake_ensure_database_supports_documents,
+    )
+    monkeypatch.setattr(knowledge_router.knowledge_base, "add_file_record", fake_add_file_record)
+    monkeypatch.setattr(knowledge_router.tasker, "enqueue", fail_enqueue)
+
+    result = await knowledge_router.add_uploaded_documents(
+        "kb_1",
+        knowledge_router.AddUploadedDocumentsRequest(
+            items=[item],
+            params={
+                "content_hashes": {item: "hash_1"},
+                "file_sizes": {item: 4},
+                "source_paths": {item: "docs/demo.txt"},
+            },
+        ),
+        current_user=SimpleNamespace(uid="uid-user"),
+    )
+
+    assert result["status"] == "success"
+    assert result["added"] == 1
+    assert result["failed"] == 0
+    assert result["items"][0]["file_id"] == "file_1"
+    assert captured == {
+        "kb_id": "kb_1",
+        "item": item,
+        "params": {
+            "content_hashes": {item: "hash_1"},
+            "file_sizes": {item: 4},
+            "source_path": "docs/demo.txt",
+        },
+        "operator_id": "uid-user",
+    }

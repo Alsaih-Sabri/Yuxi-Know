@@ -1,14 +1,14 @@
 import os
-import aiofiles
 from pathlib import Path
 
+import aiofiles
 import yaml
 from fastapi import APIRouter, Body, Depends, HTTPException
-
-from yuxi.storage.postgres.models_business import User
-from server.utils.auth_middleware import get_admin_user
 from yuxi import config, get_version
+from yuxi.storage.postgres.models_business import User
 from yuxi.utils.logging_config import logger
+
+from server.utils.auth_middleware import get_admin_user
 
 system = APIRouter(prefix="/system", tags=["system"])
 
@@ -36,6 +36,7 @@ async def discovery():
                 "browser_login": True,
                 "api_key_auth": True,
                 "remote_config": True,
+                "kb_upload": True,
             }
         },
         "endpoints": {

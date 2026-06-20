@@ -246,30 +246,25 @@
         </span>
         <div v-else-if="column.key === 'status'" class="file-status-cell">
           <template v-if="!record.is_folder">
-            <span
-              v-if="text === 'done' || text === 'indexed'"
-              class="file-status-icon status-success"
-              ><CheckCircleFilled
-            /></span>
-            <span
-              v-else-if="text === 'failed' || text === 'error_parsing' || text === 'error_indexing'"
-              class="file-status-icon status-error"
-              ><CloseCircleFilled
-            /></span>
-            <span
-              v-else-if="text === 'processing' || text === 'parsing' || text === 'indexing'"
-              class="file-status-icon status-info"
-              ><HourglassFilled
-            /></span>
-            <span
-              v-else-if="text === 'waiting' || text === 'uploaded'"
-              class="file-status-icon status-warning"
-              ><ClockCircleFilled
-            /></span>
-            <span v-else-if="text === 'parsed'" class="file-status-icon status-primary"
-              ><FileTextFilled
-            /></span>
-            <span>{{ getStatusText(text) }}</span>
+            <button
+              v-if="hasStatusAction(record)"
+              type="button"
+              class="file-status-pill file-status-action"
+              :disabled="lock"
+              :title="getStatusActionTitle(record)"
+              @click.stop="handleStatusAction(record)"
+            >
+              <span v-if="getStatusIcon(text)" :class="['file-status-icon', getStatusTone(text)]">
+                <component :is="getStatusIcon(text)" />
+              </span>
+              <span>{{ getStatusText(text) }}</span>
+            </button>
+            <span v-else class="file-status-pill file-status-static">
+              <span v-if="getStatusIcon(text)" :class="['file-status-icon', getStatusTone(text)]">
+                <component :is="getStatusIcon(text)" />
+              </span>
+              <span>{{ getStatusText(text) }}</span>
+            </span>
           </template>
         </div>
 
@@ -408,19 +403,67 @@ const handleStatusMenuClick = (e) => {
 // Status text mapping
 const getStatusText = (status) => {
   const map = {
-    uploaded: '已上传',
+    uploaded: '待解析',
     parsing: '解析中',
-    parsed: '已解析',
-    error_parsing: '解析失败',
+    parsed: '待入库',
+    error_parsing: '重试解析',
     indexing: '入库中',
     indexed: '已入库',
-    error_indexing: '入库失败',
+    error_indexing: '重试入库',
     done: '已入库',
     failed: '入库失败',
     processing: '处理中',
     waiting: '等待中'
   }
   return map[status] || status
+}
+
+const statusActionMap = {
+  uploaded: 'parse',
+  error_parsing: 'parse',
+  parsed: 'index',
+  error_indexing: 'index'
+}
+
+const getStatusTone = (status) => {
+  if (status === 'done' || status === 'indexed') return 'status-success'
+  if (status === 'failed' || status === 'error_parsing' || status === 'error_indexing') {
+    return 'status-error'
+  }
+  if (status === 'processing' || status === 'parsing' || status === 'indexing') {
+    return 'status-info'
+  }
+  if (status === 'waiting' || status === 'uploaded') return 'status-warning'
+  if (status === 'parsed') return 'status-primary'
+  return ''
+}
+
+const getStatusIcon = (status) => {
+  if (status === 'done' || status === 'indexed') return CheckCircleFilled
+  if (status === 'failed' || status === 'error_parsing' || status === 'error_indexing') {
+    return CloseCircleFilled
+  }
+  if (status === 'processing' || status === 'parsing' || status === 'indexing') {
+    return HourglassFilled
+  }
+  if (status === 'waiting' || status === 'uploaded') return ClockCircleFilled
+  if (status === 'parsed') return FileTextFilled
+  return null
+}
+
+const hasStatusAction = (record) => {
+  return !record.is_folder && Boolean(statusActionMap[record.status])
+}
+
+const getStatusActionTitle = (record) => {
+  const action = statusActionMap[record.status]
+  if (action === 'parse') {
+    return record.status === 'error_parsing' ? '重试解析' : '解析文件'
+  }
+  if (action === 'index') {
+    return record.status === 'error_indexing' ? '重试入库' : '入库'
+  }
+  return getStatusText(record.status)
 }
 
 const files = computed(() => Object.values(store.database.files || {}))
@@ -690,13 +733,13 @@ const handleTableChange = (pagination) => {
 const filenameFilter = ref('')
 const statusFilter = ref('all')
 const statusOptions = [
-  { label: '已上传', value: 'uploaded' },
+  { label: '待解析', value: 'uploaded' },
   { label: '解析中', value: 'parsing' },
-  { label: '已解析', value: 'parsed' },
-  { label: '解析失败', value: 'error_parsing' },
+  { label: '待入库', value: 'parsed' },
+  { label: '重试解析', value: 'error_parsing' },
   { label: '入库中', value: 'indexing' },
   { label: '已入库', value: 'indexed' },
-  { label: '入库失败', value: 'error_indexing' }
+  { label: '重试入库', value: 'error_indexing' }
 ]
 
 // 紧凑表格列定义
@@ -718,7 +761,7 @@ const columnsCompact = [
     title: '状态',
     dataIndex: 'status',
     key: 'status',
-    width: 90,
+    width: 104,
     sorter: (a, b) => {
       const statusOrder = {
         done: 1,
@@ -1077,6 +1120,20 @@ const handleParseFile = async (record) => {
   await store.parseFiles([record.file_id])
 }
 
+const handleStatusAction = async (record) => {
+  if (lock.value || !hasStatusAction(record)) return
+
+  const action = statusActionMap[record.status]
+  if (action === 'parse') {
+    await handleParseFile(record)
+    return
+  }
+
+  if (action === 'index') {
+    await handleIndexFile(record)
+  }
+}
+
 const resetIndexParams = (processingParams = null) => {
   if (!processingParams) {
     indexParams.value = createDefaultIndexParams()
@@ -1342,9 +1399,42 @@ import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
 .file-status-cell {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
   color: var(--gray-700);
   white-space: nowrap;
+}
+
+.file-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  min-height: 24px;
+  max-width: 100%;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gray-700);
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  appearance: none;
+}
+
+.file-status-action {
+  cursor: pointer;
+}
+
+.file-status-action:hover:not(:disabled) {
+  background: var(--gray-100);
+  border-color: var(--gray-200);
+  color: var(--gray-900);
+}
+
+.file-status-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 
 .file-status-icon {

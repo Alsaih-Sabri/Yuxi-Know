@@ -1,21 +1,18 @@
 import asyncio
 import os
 import textwrap
-import traceback
 import time
+import traceback
 from urllib.parse import quote, unquote
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
-from pydantic import BaseModel
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from starlette.responses import StreamingResponse
-
-from yuxi.services.task_service import TaskContext, tasker
-from server.utils.auth_middleware import get_admin_user, get_required_user
 from yuxi import config, knowledge_base
 from yuxi.knowledge.factory import KnowledgeBaseFactory
 from yuxi.knowledge.graphs.milvus_graph_service import GRAPH_TASK_TYPE, MilvusGraphService
-from yuxi.knowledge.parser import Parser, SUPPORTED_FILE_EXTENSIONS, is_supported_file_extension
+from yuxi.knowledge.parser import SUPPORTED_FILE_EXTENSIONS, Parser, is_supported_file_extension
 from yuxi.knowledge.utils import calculate_content_hash, is_minio_url, parse_minio_url
 from yuxi.knowledge.utils.mindmap_utils import (
     generate_database_mindmap,
@@ -30,11 +27,14 @@ from yuxi.knowledge.utils.sample_question_utils import (
 )
 from yuxi.knowledge.utils.url_fetcher import fetch_url_content
 from yuxi.models.providers.cache import model_cache
-from yuxi.utils.upload_utils import MAX_UPLOAD_SIZE_BYTES, read_upload_with_limit, write_upload_to_path
+from yuxi.services.task_service import TaskContext, tasker
 from yuxi.services.workspace_service import MAX_WORKSPACE_UPLOAD_SIZE_BYTES, resolve_workspace_file_path
-from yuxi.storage.postgres.models_business import User
 from yuxi.storage.minio.client import MinIOClient, StorageError, aupload_file_to_minio, get_minio_client
+from yuxi.storage.postgres.models_business import User
 from yuxi.utils import logger
+from yuxi.utils.upload_utils import MAX_UPLOAD_SIZE_BYTES, read_upload_with_limit, write_upload_to_path
+
+from server.utils.auth_middleware import get_admin_user, get_required_user
 
 knowledge = APIRouter(prefix="/knowledge", tags=["knowledge"])
 
@@ -52,6 +52,11 @@ class UpdateDatabaseRequest(BaseModel):
 class WorkspaceImportRequest(BaseModel):
     kb_id: str
     paths: list[str]
+
+
+class AddUploadedDocumentsRequest(BaseModel):
+    items: list[str]
+    params: dict | None = None
 
 
 media_types = {
@@ -114,6 +119,52 @@ async def _ensure_database_supports_documents(kb_id: str, operation: str) -> Non
     kb_class = KnowledgeBaseFactory.get_kb_class(kb_type)
     if not kb_class.supports_documents:
         raise HTTPException(status_code=400, detail=f"{db_info.get('name') or kb_type} 只支持检索，不支持{operation}")
+
+
+def _ensure_document_params(params: dict | None) -> dict:
+    if params is None:
+        return {}
+    if not isinstance(params, dict):
+        raise HTTPException(status_code=400, detail="params must be an object")
+    return params
+
+
+def _validate_uploaded_document_items(items: list[str], params: dict) -> None:
+    if not items:
+        raise HTTPException(status_code=400, detail="items must not be empty")
+
+    content_hashes = params.get("content_hashes")
+    if content_hashes is not None and not isinstance(content_hashes, dict):
+        raise HTTPException(status_code=400, detail="params.content_hashes must be an object")
+
+    file_sizes = params.get("file_sizes")
+    if file_sizes is not None and not isinstance(file_sizes, dict):
+        raise HTTPException(status_code=400, detail="params.file_sizes must be an object")
+
+    preprocessed_map = params.get("_preprocessed_map")
+    if preprocessed_map is not None and not isinstance(preprocessed_map, dict):
+        raise HTTPException(status_code=400, detail="params._preprocessed_map must be an object")
+
+    for item in items:
+        if not isinstance(item, str) or not item.strip():
+            raise HTTPException(status_code=400, detail="items must only contain non-empty strings")
+        if not is_minio_url(item):
+            raise HTTPException(status_code=400, detail="File source must be a MinIO URL")
+
+        has_content_hash = isinstance(content_hashes, dict) and bool(content_hashes.get(item))
+        preprocessed = preprocessed_map.get(item) if isinstance(preprocessed_map, dict) else None
+        has_preprocessed_hash = isinstance(preprocessed, dict) and bool(preprocessed.get("content_hash"))
+        if not has_content_hash and not has_preprocessed_hash:
+            raise HTTPException(status_code=400, detail=f"Missing content_hash for file: {item}")
+
+
+def _params_for_uploaded_document_item(item: str, params: dict) -> dict:
+    source_paths = params.get("source_paths")
+    item_params = dict(params)
+    item_params.pop("source_paths", None)
+    if isinstance(source_paths, dict) and source_paths.get(item):
+        item_params["source_path"] = source_paths[item]
+    return item_params
 
 
 async def _has_running_graph_build_task(kb_id: str) -> bool:
@@ -543,6 +594,7 @@ async def add_documents(
     logger.debug(f"Add documents for kb_id {kb_id}: {items} {params=}")
     await _ensure_database_supports_documents(kb_id, "文档添加/解析/入库")
 
+    params = _ensure_document_params(params)
     content_type = params.get("content_type", "file")
     # 自动入库参数
     auto_index = params.get("auto_index", False)
@@ -560,9 +612,7 @@ async def add_documents(
     if content_type != "file":
         raise HTTPException(status_code=400, detail=f"Unsupported content_type: {content_type}")
 
-    for item in items:
-        if not is_minio_url(item):
-            raise HTTPException(status_code=400, detail="File source must be a MinIO URL")
+    _validate_uploaded_document_items(items, params)
 
     async def run_ingest(context: TaskContext):
         await context.set_message("任务初始化")
@@ -716,7 +766,79 @@ async def add_documents(
         }
     except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to enqueue {content_type}s: {e}, {traceback.format_exc()}")
-        return {"message": f"Failed to enqueue task: {e}", "status": "failed"}
+        raise HTTPException(status_code=500, detail=f"Failed to enqueue task: {e}")
+
+
+@knowledge.post("/databases/{kb_id}/documents/add")
+async def add_uploaded_documents(
+    kb_id: str,
+    payload: AddUploadedDocumentsRequest,
+    current_user: User = Depends(get_admin_user),
+):
+    """将已上传的 MinIO 文件同步添加为知识库文档记录，不解析、不入库。"""
+    logger.debug(f"Add uploaded documents for kb_id {kb_id}: {payload.items} params={payload.params}")
+    await _ensure_database_supports_documents(kb_id, "文档添加")
+
+    params = _ensure_document_params(payload.params)
+    content_type = params.get("content_type", "file")
+    if content_type == "url":
+        raise HTTPException(status_code=400, detail="URL 处理方式已变更，请使用 fetch-url 接口先获取内容")
+    if content_type != "file":
+        raise HTTPException(status_code=400, detail=f"Unsupported content_type: {content_type}")
+
+    _validate_uploaded_document_items(payload.items, params)
+
+    added_items: list[dict] = []
+    failed_items: list[dict] = []
+    for index, item in enumerate(payload.items):
+        try:
+            file_meta = await knowledge_base.add_file_record(
+                kb_id,
+                item,
+                params=_params_for_uploaded_document_item(item, params),
+                operator_id=current_user.uid,
+            )
+            added_items.append(
+                {
+                    "index": index,
+                    "item": item,
+                    "file_id": file_meta["file_id"],
+                    "status": file_meta.get("status"),
+                    "file_meta": file_meta,
+                }
+            )
+        except Exception as add_error:  # noqa: BLE001
+            logger.error(f"添加文件记录失败 {item}: {add_error}")
+            failed_items.append(
+                {
+                    "index": index,
+                    "item": item,
+                    "status": "failed",
+                    "error": f"添加记录失败: {str(add_error)}",
+                    "error_type": "add_failed",
+                }
+            )
+
+    failed_count = len(failed_items)
+    added_count = len(added_items)
+    if failed_count == 0:
+        status = "success"
+        message = f"已添加 {added_count} 个文件"
+    elif added_count == 0:
+        status = "failed"
+        message = f"文件添加失败，失败 {failed_count} 个"
+    else:
+        status = "partial_failed"
+        message = f"已添加 {added_count} 个文件，失败 {failed_count} 个"
+
+    return {
+        "message": message,
+        "status": status,
+        "items": added_items,
+        "failed_items": failed_items,
+        "added": added_count,
+        "failed": failed_count,
+    }
 
 
 @knowledge.post("/databases/{kb_id}/documents/parse")
@@ -1379,6 +1501,9 @@ async def upload_file(
     """上传文件"""
     if not file.filename:
         raise HTTPException(status_code=400, detail="No selected file")
+
+    if kb_id:
+        await _ensure_database_supports_documents(kb_id, "文档上传")
 
     logger.debug(f"Received upload file with filename: {file.filename}")
 
