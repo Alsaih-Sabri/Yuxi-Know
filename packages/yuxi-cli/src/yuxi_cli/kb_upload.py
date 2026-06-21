@@ -19,10 +19,12 @@ from yuxi_cli.client import ClientError, YuxiClient
 from yuxi_cli.config import ConfigStore, Remote
 from yuxi_cli.discovery import ServerCompatibilityError, ensure_server_compatible
 
+ALREADY_UPLOADED_MESSAGE = "File with the same content already exists in this database"
 DEFAULT_INCLUDE_EXTENSIONS = {".docx", ".html", ".htm", ".md", ".txt"}
 DEFAULT_EXCLUDE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".pdf", ".png", ".tif", ".tiff"}
 MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024
-MAX_CONCURRENCY = 10
+MAX_CONCURRENCY = 300
+DEFAULT_CONCURRENCY = 10
 UPLOAD_RETRY_ATTEMPTS = 2
 PROMPT_STYLE = questionary.Style(
     [
@@ -46,7 +48,7 @@ class KbUploadOptions:
     path: Path
     kb_id: str | None = None
     yes: bool = False
-    concurrency: int = 3
+    concurrency: int = DEFAULT_CONCURRENCY
     include_ext: str | None = None
     exclude_ext: str | None = None
 
@@ -79,6 +81,7 @@ class UploadResult:
     content_hash: str | None = None
     size: int | None = None
     error: str | None = None
+    already_uploaded: bool = False
 
     @property
     def success(self) -> bool:
@@ -99,6 +102,14 @@ class KbUploadSummary:
         if not self.add_response:
             return 0
         return int(self.add_response.get("failed") or 0)
+
+    @property
+    def already_uploaded_count(self) -> int:
+        return sum(1 for result in self.upload_failed if result.already_uploaded)
+
+    @property
+    def real_upload_failed_count(self) -> int:
+        return len(self.upload_failed) - self.already_uploaded_count
 
 
 def run_kb_upload(
@@ -168,12 +179,12 @@ def run_kb_upload(
     summary.upload_failed = failed
     summary.add_response = add_response
 
-    if not uploaded:
+    if not uploaded and not summary.already_uploaded_count:
         _print_final_summary(summary, console)
         raise KbUploadError("所有文件上传失败，未添加文档记录")
 
     _print_final_summary(summary, console)
-    if failed or summary.add_failed_count:
+    if any(not result.already_uploaded for result in failed) or summary.add_failed_count:
         raise KbUploadError("部分文件处理失败，请查看摘要")
     return summary
 
@@ -329,6 +340,11 @@ def upload_files(
                 add_response = _merge_add_response(add_response, response)
             return
         failed.append(result)
+        if result.already_uploaded:
+            console.print(
+                f"[yellow]-[/yellow] {result.local_file.relative_path} ({completed}/{len(files)}): 已上传过，跳过"
+            )
+            return
         console.print(f"[red]✗[/red] {result.local_file.relative_path} ({completed}/{len(files)}): {result.error}")
 
     console.print(f"开始上传并添加: {len(files)} 个文件，并发 {concurrency}")
@@ -419,7 +435,13 @@ def _local_file_from_path(path: Path, relative_path: str) -> tuple[list[LocalFil
     extension = path.suffix.lower()
     if not extension:
         return [], [SkippedFile(path, relative_path, "no-extension")]
-    return [LocalFile(path=path, relative_path=relative_path.replace("\\", "/"), extension=extension, size=stat.st_size)], []
+    local_file = LocalFile(
+        path=path,
+        relative_path=relative_path.replace("\\", "/"),
+        extension=extension,
+        size=stat.st_size,
+    )
+    return [local_file], []
 
 
 def _ensure_kb_upload_supported(client: YuxiClient) -> None:
@@ -568,6 +590,8 @@ def _upload_one_with_retry(remote: Remote, client_factory, kb_id: str, item: Loc
             return UploadResult(item, file_path=file_path, content_hash=content_hash, size=size)
         except ClientError as exc:
             last_error = exc
+            if _is_already_uploaded(exc):
+                return UploadResult(item, error=ALREADY_UPLOADED_MESSAGE, already_uploaded=True)
             if not _is_retryable(exc) or attempt >= UPLOAD_RETRY_ATTEMPTS:
                 break
         except Exception as exc:  # noqa: BLE001
@@ -579,6 +603,10 @@ def _upload_one_with_retry(remote: Remote, client_factory, kb_id: str, item: Loc
 
 def _is_retryable(exc: ClientError) -> bool:
     return exc.status_code is None or exc.status_code == 429 or exc.status_code >= 500
+
+
+def _is_already_uploaded(exc: ClientError) -> bool:
+    return ALREADY_UPLOADED_MESSAGE in str(exc)
 
 
 def _print_selection_summary(summary: KbUploadSummary, console: Console) -> None:
@@ -616,7 +644,9 @@ def _print_final_summary(summary: KbUploadSummary, console: Console) -> None:
 
     console.print("上传结果")
     console.print(f"  上传成功: {len(summary.uploaded)}")
-    console.print(f"  上传失败: {len(summary.upload_failed)}")
+    if summary.already_uploaded_count:
+        console.print(f"  已上传过: {summary.already_uploaded_count}")
+    console.print(f"  上传失败: {summary.real_upload_failed_count}")
     console.print(f"  添加成功: {added}")
     console.print(f"  添加失败: {add_failed}")
 

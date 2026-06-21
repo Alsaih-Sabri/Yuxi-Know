@@ -22,7 +22,7 @@ from yuxi_cli.commands import (
     whoami as whoami_command,
 )
 from yuxi_cli.config import ConfigError, ConfigStore
-from yuxi_cli.kb_upload import KbUploadError, KbUploadOptions, run_kb_upload
+from yuxi_cli.kb_upload import DEFAULT_CONCURRENCY, MAX_CONCURRENCY, KbUploadError, KbUploadOptions, run_kb_upload
 
 console = Console()
 app = typer.Typer(help="Yuxi command line client.", invoke_without_command=True)
@@ -36,6 +36,12 @@ app.add_typer(kb_app, name="kb")
 
 def _store() -> ConfigStore:
     return ConfigStore()
+
+
+def _print_remote_context(store: ConfigStore, remote_name: str | None) -> None:
+    remote = store.load().get_remote(remote_name)
+    console.print(f"Yuxi CLI {__version__}")
+    console.print(f"Remote: {remote.name} {remote.url}")
 
 
 def _handle_error(exc: Exception) -> None:
@@ -80,8 +86,10 @@ def list_remotes():
 
 @remote_app.command("ping")
 def ping_remote(name: str | None = typer.Argument(None)):
+    store = _store()
     try:
-        remote_ping(_store(), name, console)
+        _print_remote_context(store, name)
+        remote_ping(store, name, console)
     except (ConfigError, ClientError) as exc:
         _handle_error(exc)
 
@@ -95,36 +103,42 @@ def login(
 ):
     if browser and api_key:
         _handle_error(CommandError("--browser 和 --api-key 不能同时使用"))
+    store = _store()
     try:
+        _print_remote_context(store, remote)
         if api_key:
-            login_with_api_key(_store(), remote, api_key, console)
+            login_with_api_key(store, remote, api_key, console)
             return
         if browser:
-            login_with_browser(_store(), remote, no_open, console)
+            login_with_browser(store, remote, no_open, console)
             return
 
         mode = select_login_mode(console)
         if mode == "api_key":
             typed_key = typer.prompt("API Key", hide_input=True)
-            login_with_api_key(_store(), remote, typed_key, console)
+            login_with_api_key(store, remote, typed_key, console)
         else:
-            login_with_browser(_store(), remote, no_open, console)
+            login_with_browser(store, remote, no_open, console)
     except (ConfigError, ClientError, CommandError) as exc:
         _handle_error(exc)
 
 
 @app.command()
 def whoami(remote: str | None = typer.Option(None, "--remote", help="Remote name.")):
+    store = _store()
     try:
-        whoami_command(_store(), remote, console)
+        _print_remote_context(store, remote)
+        whoami_command(store, remote, console)
     except (ConfigError, ClientError, CommandError) as exc:
         _handle_error(exc)
 
 
 @app.command()
 def status(remote: str | None = typer.Option(None, "--remote", help="Remote name.")):
+    store = _store()
     try:
-        status_command(_store(), remote, console)
+        _print_remote_context(store, remote)
+        status_command(store, remote, console)
     except (ConfigError, ClientError) as exc:
         _handle_error(exc)
 
@@ -134,8 +148,10 @@ def logout(
     remote: str | None = typer.Option(None, "--remote", help="Remote name."),
     local_only: bool = typer.Option(False, "--local-only", help="Only remove local credentials."),
 ):
+    store = _store()
     try:
-        logout_command(_store(), remote, local_only, console)
+        _print_remote_context(store, remote)
+        logout_command(store, remote, local_only, console)
     except (ConfigError, ClientError) as exc:
         _handle_error(exc)
 
@@ -146,7 +162,11 @@ def upload_knowledge_base_files(
     kb_id: str | None = typer.Option(None, "--kb-id", help="Knowledge base ID. Prompt when omitted."),
     remote: str | None = typer.Option(None, "--remote", help="Remote name."),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation."),
-    concurrency: int = typer.Option(3, "--concurrency", help="Concurrent upload count, 1-10."),
+    concurrency: int = typer.Option(
+        DEFAULT_CONCURRENCY,
+        "--concurrency",
+        help=f"Concurrent upload count, 1-{MAX_CONCURRENCY}.",
+    ),
     include_ext: str | None = typer.Option(None, "--include-ext", help="Comma separated extension allowlist."),
     exclude_ext: str | None = typer.Option(None, "--exclude-ext", help="Comma separated extension denylist."),
 ):
@@ -158,8 +178,10 @@ def upload_knowledge_base_files(
         include_ext=include_ext,
         exclude_ext=exclude_ext,
     )
+    store = _store()
     try:
-        run_kb_upload(_store(), remote, options, console)
+        _print_remote_context(store, remote)
+        run_kb_upload(store, remote, options, console)
     except (ConfigError, ClientError, KbUploadError) as exc:
         _handle_error(exc)
 
@@ -180,7 +202,9 @@ def eval_agent(
         max_concurrency=max_concurrency,
         timeout_seconds=timeout_seconds,
     )
+    store = _store()
     try:
-        run_langfuse_agent_experiment(_store(), remote, options, console)
+        _print_remote_context(store, remote)
+        run_langfuse_agent_experiment(store, remote, options, console)
     except (ConfigError, ClientError, AgentEvalError) as exc:
         _handle_error(exc)

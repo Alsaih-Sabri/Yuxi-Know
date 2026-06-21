@@ -6,14 +6,20 @@ import time
 from collections import Counter
 from pathlib import Path
 
+import pytest
 from rich.console import Console
 
+from yuxi_cli.client import ClientError
 from yuxi_cli.config import ConfigStore, Remote
 from yuxi_cli.kb_upload import (
+    ALREADY_UPLOADED_MESSAGE,
+    DEFAULT_CONCURRENCY,
     ExtensionOption,
-    KbUploadSummary,
     KbUploadOptions,
+    KbUploadError,
+    KbUploadSummary,
     LocalFile,
+    MAX_CONCURRENCY,
     SkippedFile,
     _database_choices,
     _format_unsupported_summary,
@@ -186,6 +192,38 @@ def test_kb_upload_default_include_excludes_structured_and_presentation_files(tm
     assert len(FakeKbClient.add_payload["items"]) == 5
 
 
+def test_kb_upload_default_concurrency_is_10():
+    assert KbUploadOptions(path=Path(".")).concurrency == DEFAULT_CONCURRENCY == 10
+
+
+def test_kb_upload_allows_concurrency_300(tmp_path):
+    FakeKbClient.reset()
+    (tmp_path / "note.md").write_text("demo", encoding="utf-8")
+
+    run_kb_upload(
+        _store(tmp_path),
+        None,
+        KbUploadOptions(path=tmp_path, kb_id="kb_1", yes=True, concurrency=MAX_CONCURRENCY),
+        _console(),
+        client_factory=FakeKbClient,
+    )
+
+    assert FakeKbClient.uploaded == ["note.md"]
+
+
+def test_kb_upload_rejects_concurrency_above_300(tmp_path):
+    (tmp_path / "note.md").write_text("demo", encoding="utf-8")
+
+    with pytest.raises(KbUploadError, match="1 到 300"):
+        run_kb_upload(
+            _store(tmp_path),
+            None,
+            KbUploadOptions(path=tmp_path, kb_id="kb_1", yes=True, concurrency=MAX_CONCURRENCY + 1),
+            _console(),
+            client_factory=FakeKbClient,
+        )
+
+
 def test_kb_upload_preserves_relative_source_paths(tmp_path):
     FakeKbClient.reset()
     docs_dir = tmp_path / "docs" / "guide"
@@ -258,6 +296,33 @@ def test_kb_upload_limits_upload_concurrency(tmp_path):
 
     assert FakeKbClient.max_active_uploads <= 2
     assert FakeKbClient.max_active_uploads > 1
+
+
+def test_kb_upload_treats_duplicate_content_as_already_uploaded(tmp_path):
+    class DuplicateContentClient(FakeKbClient):
+        def upload_knowledge_file(self, kb_id: str, path: Path):
+            raise ClientError(ALREADY_UPLOADED_MESSAGE, status_code=400)
+
+    FakeKbClient.reset()
+    (tmp_path / "note.md").write_text("demo", encoding="utf-8")
+    buffer = io.StringIO()
+    console = Console(file=buffer, force_terminal=False)
+
+    summary = run_kb_upload(
+        _store(tmp_path),
+        None,
+        KbUploadOptions(path=tmp_path, kb_id="kb_1", yes=True, concurrency=2),
+        console,
+        client_factory=DuplicateContentClient,
+    )
+
+    assert summary.uploaded == []
+    assert summary.already_uploaded_count == 1
+    assert summary.real_upload_failed_count == 0
+    assert summary.add_failed_count == 0
+    output = buffer.getvalue()
+    assert "已上传过: 1" in output
+    assert "上传失败: 0" in output
 
 
 def test_kb_upload_adds_each_document_after_its_upload(tmp_path):

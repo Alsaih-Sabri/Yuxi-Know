@@ -9,8 +9,5 @@ First-stage scope:
 - API Key import through `--api-key`
 - `whoami`, `status`, and `logout`
 - server discovery and compatibility check for Yuxi `>=0.7.1`
+- `yuxi kb upload` for knowledge base file uploads
 - `yuxi agent eval` for running existing Langfuse dataset experiments with a logged-in remote
-
-## Next
-
-- yuxi kb upload <dir>
