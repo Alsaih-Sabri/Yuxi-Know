@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
 from typing import Any
 
 from sqlalchemy import delete, func, select, update
@@ -28,7 +29,7 @@ class KnowledgeChunkRepository:
     }
 
     @staticmethod
-    def _iter_batches(items: list[str], batch_size: int = SQL_IN_BATCH_SIZE):
+    def _iter_batches(items: list[str], batch_size: int = SQL_IN_BATCH_SIZE) -> Iterator[list[str]]:
         for index in range(0, len(items), batch_size):
             yield items[index : index + batch_size]
 
@@ -59,7 +60,7 @@ class KnowledgeChunkRepository:
                     .order_by(KnowledgeChunk.file_id.asc(), KnowledgeChunk.chunk_index.asc())
                 )
                 chunks.extend(result.scalars().all())
-        return chunks
+        return sorted(chunks, key=lambda chunk: (chunk.file_id, chunk.chunk_index))
 
     async def count_by_file_ids(self, file_ids: list[str]) -> dict[str, int]:
         if not file_ids:
