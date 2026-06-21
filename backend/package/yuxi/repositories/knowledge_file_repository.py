@@ -3,7 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any
 
-from sqlalchemy import DateTime, String, case, cast, func, literal, select, union_all
+from sqlalchemy import DateTime, String, case, cast, func, literal, or_, select, union_all
 
 from yuxi.storage.postgres.manager import pg_manager
 from yuxi.storage.postgres.models_knowledge import KnowledgeFile
@@ -25,6 +25,20 @@ class KnowledgeFileRepository:
         async with pg_manager.get_async_session_context() as session:
             result = await session.execute(select(KnowledgeFile).where(KnowledgeFile.kb_id == kb_id))
             return list(result.scalars().all())
+
+    async def exists_by_filename(self, *, kb_id: str, filename: str) -> bool:
+        async with pg_manager.get_async_session_context() as session:
+            result = await session.execute(
+                select(KnowledgeFile.file_id)
+                .where(
+                    KnowledgeFile.kb_id == kb_id,
+                    KnowledgeFile.filename == filename,
+                    KnowledgeFile.is_folder.is_not(True),
+                    or_(KnowledgeFile.status.is_(None), KnowledgeFile.status != "failed"),
+                )
+                .limit(1)
+            )
+            return result.scalar_one_or_none() is not None
 
     @staticmethod
     def _status_condition(status: str | None):
@@ -107,34 +121,28 @@ class KnowledgeFileRepository:
         segment = func.split_part(remainder, "/", 1)
         virtual_path_prefix = (literal(path_prefix) + segment + literal("/")).label("path_prefix")
         virtual_file_id = (
-            literal("__virtual_folder__:")
-            + literal(parent_id or "root")
-            + literal(":")
-            + virtual_path_prefix
+            literal("__virtual_folder__:") + literal(parent_id or "root") + literal(":") + virtual_path_prefix
         ).label(
             "file_id",
         )
 
-        real_select = (
-            select(
-                KnowledgeFile.file_id.label("file_id"),
-                immediate_name,
-                KnowledgeFile.file_type.label("file_type"),
-                KnowledgeFile.status.label("status"),
-                KnowledgeFile.created_at.label("created_at"),
-                KnowledgeFile.updated_at.label("updated_at"),
-                KnowledgeFile.file_size.label("file_size"),
-                KnowledgeFile.is_folder.label("is_folder"),
-                KnowledgeFile.parent_id.label("parent_id"),
-                KnowledgeFile.path.label("path"),
-                KnowledgeFile.minio_url.label("minio_url"),
-                KnowledgeFile.markdown_file.label("markdown_file"),
-                literal(False).label("is_virtual_folder"),
-                cast(literal(None), String).label("path_prefix"),
-                literal(0).label("virtual_children_count"),
-            )
-            .where(*base_filters, remainder != "", func.strpos(remainder, "/") == 0)
-        )
+        real_select = select(
+            KnowledgeFile.file_id.label("file_id"),
+            immediate_name,
+            KnowledgeFile.file_type.label("file_type"),
+            KnowledgeFile.status.label("status"),
+            KnowledgeFile.created_at.label("created_at"),
+            KnowledgeFile.updated_at.label("updated_at"),
+            KnowledgeFile.file_size.label("file_size"),
+            KnowledgeFile.is_folder.label("is_folder"),
+            KnowledgeFile.parent_id.label("parent_id"),
+            KnowledgeFile.path.label("path"),
+            KnowledgeFile.minio_url.label("minio_url"),
+            KnowledgeFile.markdown_file.label("markdown_file"),
+            literal(False).label("is_virtual_folder"),
+            cast(literal(None), String).label("path_prefix"),
+            literal(0).label("virtual_children_count"),
+        ).where(*base_filters, remainder != "", func.strpos(remainder, "/") == 0)
 
         virtual_select = (
             select(
@@ -271,8 +279,7 @@ class KnowledgeFileRepository:
                     func.sum(
                         case(
                             (
-                                non_folder
-                                & KnowledgeFile.status.in_(["processing", "waiting", "parsing", "indexing"]),
+                                non_folder & KnowledgeFile.status.in_(["processing", "waiting", "parsing", "indexing"]),
                                 1,
                             ),
                             else_=0,

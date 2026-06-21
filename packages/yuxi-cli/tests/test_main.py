@@ -27,6 +27,7 @@ def test_kb_upload_help_is_registered():
     assert result.exit_code == 0
     assert "--kb-id" in result.output
     assert "--concurrency" in result.output
+    assert "--force-upload-file" in result.output
     assert "1-300" in result.output
 
 

@@ -499,9 +499,7 @@ class KnowledgeBaseManager:
             KnowledgeBaseFactory.get_kb_class(kb_type) if KnowledgeBaseFactory.is_type_supported(kb_type) else None
         )
         normalized_additional_params = (
-            kb_class.normalize_additional_params(kb.additional_params)
-            if kb_class
-            else (kb.additional_params or {})
+            kb_class.normalize_additional_params(kb.additional_params) if kb_class else (kb.additional_params or {})
         )
         if include_files:
             try:
@@ -607,6 +605,15 @@ class KnowledgeBaseManager:
         if stats is not None:
             result["stats"] = stats
         return result
+
+    async def document_file_exists(self, kb_id: str, filename: str) -> bool:
+        """检查指定知识库中是否存在给定展示文件名或相对路径的文件。"""
+        from yuxi.repositories.knowledge_file_repository import KnowledgeFileRepository
+
+        normalized_filename = filename.strip()
+        if not normalized_filename:
+            raise ValueError("filename is required")
+        return await KnowledgeFileRepository().exists_by_filename(kb_id=kb_id, filename=normalized_filename)
 
     async def delete_folder(self, kb_id: str, folder_id: str) -> None:
         """递归删除文件夹"""

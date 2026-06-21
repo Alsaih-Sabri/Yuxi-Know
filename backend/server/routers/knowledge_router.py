@@ -626,6 +626,24 @@ async def list_documents(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@knowledge.get("/databases/{kb_id}/documents/exists")
+async def document_file_exists(
+    kb_id: str,
+    filename: str = Query(..., min_length=1, description="知识库文件展示名或相对路径"),
+    current_user: User = Depends(get_admin_user),
+):
+    """检查知识库中是否已存在指定文件名或相对路径的文件。"""
+    await _ensure_database_supports_documents(kb_id, "文档存在性检查")
+    normalized_filename = filename.strip()
+    if not normalized_filename:
+        raise HTTPException(status_code=400, detail="filename is required")
+    try:
+        exists = await knowledge_base.document_file_exists(kb_id, normalized_filename)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"kb_id": kb_id, "filename": normalized_filename, "exists": exists}
+
+
 @knowledge.post("/databases/{kb_id}/documents")
 async def add_documents(
     kb_id: str, items: list[str] = Body(...), params: dict = Body(...), current_user: User = Depends(get_admin_user)

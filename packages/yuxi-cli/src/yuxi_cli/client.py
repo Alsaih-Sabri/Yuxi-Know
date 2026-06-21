@@ -83,6 +83,14 @@ class YuxiClient:
     def get_supported_file_types(self) -> dict:
         return self._request("GET", "/knowledge/files/supported-types")
 
+    def knowledge_document_exists(self, kb_id: str, filename: str) -> bool:
+        data = self._request(
+            "GET",
+            f"/knowledge/databases/{kb_id}/documents/exists",
+            params={"filename": filename},
+        )
+        return bool(data.get("exists"))
+
     def upload_knowledge_file(self, kb_id: str, path: Path, *, timeout_seconds: float = 300) -> dict:
         with path.open("rb") as fp:
             return self._request(

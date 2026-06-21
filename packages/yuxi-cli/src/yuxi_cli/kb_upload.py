@@ -20,6 +20,7 @@ from yuxi_cli.config import ConfigStore, Remote
 from yuxi_cli.discovery import ServerCompatibilityError, ensure_server_compatible
 
 ALREADY_UPLOADED_MESSAGE = "File with the same content already exists in this database"
+ALREADY_EXISTS_MESSAGE = "File with the same filename already exists in this database"
 DEFAULT_INCLUDE_EXTENSIONS = {".docx", ".html", ".htm", ".md", ".txt"}
 DEFAULT_EXCLUDE_EXTENSIONS = {".bmp", ".jpeg", ".jpg", ".pdf", ".png", ".tif", ".tiff"}
 MAX_UPLOAD_SIZE_BYTES = 100 * 1024 * 1024
@@ -51,6 +52,7 @@ class KbUploadOptions:
     concurrency: int = DEFAULT_CONCURRENCY
     include_ext: str | None = None
     exclude_ext: str | None = None
+    force_upload_file: bool = False
 
 
 @dataclass(frozen=True)
@@ -174,6 +176,7 @@ def run_kb_upload(
         selected,
         concurrency=options.concurrency,
         console=console,
+        force_upload_file=options.force_upload_file,
     )
     summary.uploaded = uploaded
     summary.upload_failed = failed
@@ -227,8 +230,10 @@ def select_upload_files(
 ) -> tuple[list[LocalFile], list[SkippedFile]]:
     if selected_extensions is None:
         include_extensions = parse_extension_list(include_ext) if include_ext else set(DEFAULT_INCLUDE_EXTENSIONS)
-        exclude_extensions = parse_extension_list(exclude_ext) if exclude_ext else (
-            set() if include_ext else set(DEFAULT_EXCLUDE_EXTENSIONS)
+        exclude_extensions = (
+            parse_extension_list(exclude_ext)
+            if exclude_ext
+            else (set() if include_ext else set(DEFAULT_EXCLUDE_EXTENSIONS))
         )
     else:
         include_extensions = selected_extensions
@@ -319,12 +324,16 @@ def upload_files(
     *,
     concurrency: int,
     console: Console,
+    force_upload_file: bool = False,
 ) -> tuple[list[UploadResult], list[UploadResult], dict | None]:
     uploaded: list[UploadResult] = []
     failed: list[UploadResult] = []
     add_response: dict | None = None
 
     def upload_and_add_one(item: LocalFile) -> tuple[UploadResult, dict | None]:
+        if not force_upload_file and _remote_document_exists(remote, client_factory, kb_id, item):
+            return UploadResult(item, error=ALREADY_EXISTS_MESSAGE, already_uploaded=True), None
+
         result = _upload_one_with_retry(remote, client_factory, kb_id, item)
         if not result.success:
             return result, None
@@ -402,6 +411,15 @@ def upload_files(
     uploaded.sort(key=lambda item: item.local_file.relative_path)
     failed.sort(key=lambda item: item.local_file.relative_path)
     return uploaded, failed, add_response
+
+
+def _remote_document_exists(remote: Remote, client_factory, kb_id: str, item: LocalFile) -> bool:
+    try:
+        with client_factory(remote) as client:
+            return client.knowledge_document_exists(kb_id, item.relative_path)
+    except Exception:
+        # 存在性检查只是上传前优化；失败时保留原上传路径的行为。
+        return False
 
 
 def add_uploaded_documents(client: YuxiClient, kb_id: str, uploaded: list[UploadResult]) -> dict:

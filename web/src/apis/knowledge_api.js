@@ -115,6 +115,17 @@ export const documentApi = {
   },
 
   /**
+   * 检查知识库中是否存在指定文件名或相对路径
+   * @param {string} kbId - 知识库ID
+   * @param {string} filename - 文件名或相对路径
+   * @returns {Promise} - 存在性检查结果
+   */
+  documentExists: async (kbId, filename) => {
+    const query = buildQuery({ filename })
+    return apiAdminGet(`/api/knowledge/databases/${kbId}/documents/exists?${query}`)
+  },
+
+  /**
    * 创建文件夹
    * @param {string} kbId - 知识库ID
    * @param {string} folderName - 文件夹名称

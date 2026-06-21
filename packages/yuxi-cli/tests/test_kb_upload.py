@@ -14,6 +14,7 @@ import yuxi_cli.kb_upload as kb_upload_module
 from yuxi_cli.client import ClientError
 from yuxi_cli.config import ConfigStore, Remote
 from yuxi_cli.kb_upload import (
+    ALREADY_EXISTS_MESSAGE,
     ALREADY_UPLOADED_MESSAGE,
     DEFAULT_CONCURRENCY,
     ExtensionOption,
@@ -38,6 +39,8 @@ class FakeKbClient:
     add_payload: dict | None = None
     add_payloads: list[dict] = []
     events: list[tuple[str, str | list[str]]] = []
+    exists_checks: list[str] = []
+    existing_files: set[str] = set()
     active_uploads = 0
     max_active_uploads = 0
     lock = threading.Lock()
@@ -57,6 +60,8 @@ class FakeKbClient:
         cls.add_payload = None
         cls.add_payloads = []
         cls.events = []
+        cls.exists_checks = []
+        cls.existing_files = set()
         cls.active_uploads = 0
         cls.max_active_uploads = 0
 
@@ -107,6 +112,12 @@ class FakeKbClient:
                 ".xlsx",
             ]
         }
+
+    def knowledge_document_exists(self, kb_id: str, filename: str) -> bool:
+        with self.lock:
+            type(self).exists_checks.append(filename)
+            type(self).events.append(("exists", filename))
+        return filename in type(self).existing_files
 
     def upload_knowledge_file(self, kb_id: str, path: Path):
         with self.lock:
@@ -376,6 +387,79 @@ def test_kb_upload_treats_duplicate_content_as_already_uploaded(tmp_path):
     output = buffer.getvalue()
     assert "已上传过: 1" in output
     assert "上传失败: 0" in output
+
+
+def test_kb_upload_skips_existing_relative_path_before_upload(tmp_path):
+    FakeKbClient.reset()
+    docs_dir = tmp_path / "docs"
+    docs_dir.mkdir()
+    (docs_dir / "existing.md").write_text("existing", encoding="utf-8")
+    (docs_dir / "new.md").write_text("new", encoding="utf-8")
+    FakeKbClient.existing_files = {"docs/existing.md"}
+
+    summary = run_kb_upload(
+        _store(tmp_path),
+        None,
+        KbUploadOptions(path=tmp_path, kb_id="kb_1", yes=True, concurrency=2),
+        _console(),
+        client_factory=FakeKbClient,
+    )
+
+    assert sorted(FakeKbClient.exists_checks) == ["docs/existing.md", "docs/new.md"]
+    assert FakeKbClient.uploaded == ["new.md"]
+    assert FakeKbClient.add_payload is not None
+    assert FakeKbClient.add_payload["params"]["source_paths"] == {
+        "minio://knowledgebases/kb_1/upload/new.md": "docs/new.md"
+    }
+    assert summary.already_uploaded_count == 1
+    assert summary.upload_failed[0].error == ALREADY_EXISTS_MESSAGE
+    assert ("upload", "existing.md") not in FakeKbClient.events
+
+
+def test_kb_upload_falls_back_to_upload_when_exists_check_fails(tmp_path):
+    class ExistsCheckFailedClient(FakeKbClient):
+        def knowledge_document_exists(self, kb_id: str, filename: str) -> bool:
+            with self.lock:
+                type(self).exists_checks.append(filename)
+                type(self).events.append(("exists-error", filename))
+            raise ClientError("exists endpoint unavailable", status_code=404)
+
+    FakeKbClient.reset()
+    (tmp_path / "note.md").write_text("demo", encoding="utf-8")
+
+    summary = run_kb_upload(
+        _store(tmp_path),
+        None,
+        KbUploadOptions(path=tmp_path, kb_id="kb_1", yes=True, concurrency=2),
+        _console(),
+        client_factory=ExistsCheckFailedClient,
+    )
+
+    assert FakeKbClient.exists_checks == ["note.md"]
+    assert FakeKbClient.uploaded == ["note.md"]
+    assert summary.already_uploaded_count == 0
+    assert summary.add_response is not None
+    assert summary.add_response["added"] == 1
+
+
+def test_kb_upload_force_upload_file_skips_exists_check(tmp_path):
+    FakeKbClient.reset()
+    (tmp_path / "note.md").write_text("demo", encoding="utf-8")
+    FakeKbClient.existing_files = {"note.md"}
+
+    summary = run_kb_upload(
+        _store(tmp_path),
+        None,
+        KbUploadOptions(path=tmp_path, kb_id="kb_1", yes=True, concurrency=2, force_upload_file=True),
+        _console(),
+        client_factory=FakeKbClient,
+    )
+
+    assert FakeKbClient.exists_checks == []
+    assert FakeKbClient.uploaded == ["note.md"]
+    assert summary.already_uploaded_count == 0
+    assert summary.add_response is not None
+    assert summary.add_response["added"] == 1
 
 
 def test_kb_upload_adds_each_document_after_its_upload(tmp_path):

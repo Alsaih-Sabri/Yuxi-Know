@@ -35,6 +35,7 @@ class FakeKnowledgeBaseRepository:
 
 class FakeKnowledgeFileRepository:
     list_calls = []
+    exists_calls = []
 
     def __init__(self):
         self.records = [
@@ -90,6 +91,10 @@ class FakeKnowledgeFileRepository:
         self.__class__.list_calls.append(kwargs)
         return self.records, 2
 
+    async def exists_by_filename(self, *, kb_id, filename):
+        self.__class__.exists_calls.append({"kb_id": kb_id, "filename": filename})
+        return filename == "docs/Guide.md"
+
     async def count_children_by_parent_ids(self, *, kb_id, parent_ids):
         return {"folder_1": 1}
 
@@ -97,6 +102,7 @@ class FakeKnowledgeFileRepository:
 @pytest.fixture(autouse=True)
 def patch_repositories(monkeypatch):
     FakeKnowledgeFileRepository.list_calls = []
+    FakeKnowledgeFileRepository.exists_calls = []
     monkeypatch.setattr(
         "yuxi.repositories.knowledge_base_repository.KnowledgeBaseRepository",
         FakeKnowledgeBaseRepository,
@@ -232,4 +238,15 @@ async def test_list_document_files_ignores_recursive_without_status_filter():
             "recursive": False,
             "files_only": False,
         }
+    ]
+
+
+async def test_document_file_exists_delegates_exact_filename_to_repository():
+    manager = KnowledgeBaseManager("/tmp/yuxi-test")
+
+    assert await manager.document_file_exists("kb_1", " docs/Guide.md ") is True
+    assert await manager.document_file_exists("kb_1", "docs/guide.md") is False
+    assert FakeKnowledgeFileRepository.exists_calls == [
+        {"kb_id": "kb_1", "filename": "docs/Guide.md"},
+        {"kb_id": "kb_1", "filename": "docs/guide.md"},
     ]

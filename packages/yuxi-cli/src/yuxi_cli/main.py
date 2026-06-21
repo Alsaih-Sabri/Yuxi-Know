@@ -169,6 +169,11 @@ def upload_knowledge_base_files(
     ),
     include_ext: str | None = typer.Option(None, "--include-ext", help="Comma separated extension allowlist."),
     exclude_ext: str | None = typer.Option(None, "--exclude-ext", help="Comma separated extension denylist."),
+    force_upload_file: bool = typer.Option(
+        False,
+        "--force-upload-file",
+        help="Skip remote filename existence check before upload.",
+    ),
 ):
     options = KbUploadOptions(
         path=path,
@@ -177,6 +182,7 @@ def upload_knowledge_base_files(
         concurrency=concurrency,
         include_ext=include_ext,
         exclude_ext=exclude_ext,
+        force_upload_file=force_upload_file,
     )
     store = _store()
     try:
