@@ -345,6 +345,7 @@ import {
   canDeleteFile,
   canDownloadFile,
   canIndexFile,
+  canOpenFileDetail,
   canParseFile,
   canReindexFile,
   canSelectFile,
@@ -752,8 +753,11 @@ const handleBatchIndex = async () => {
 }
 
 const openFileDetail = (record) => {
-  console.log('openFileDetail', record)
-  store.openFileDetail(record)
+  if (!canOpenFileDetail(record)) {
+    message.error('文件未处理完成，请稍后再试')
+    return
+  }
+  store.openFileDetail(record.file_id)
 }
 
 const handleDownloadFile = async (record) => {

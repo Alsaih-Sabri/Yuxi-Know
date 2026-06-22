@@ -1,6 +1,11 @@
 <template>
   <div class="database-info-container extension-detail-page">
-    <FileDetailModal />
+    <FileDetailModal
+      v-model:open="store.state.fileDetailModalVisible"
+      :kb-id="kbId"
+      :file-id="store.fileDetailFileId"
+      @closed="store.closeFileDetail"
+    />
 
     <FileUploadModal
       v-model:visible="addFilesModalVisible"
@@ -584,8 +589,7 @@ const onFileUploadSuccess = () => {
 
 const resetFileSelectionState = () => {
   store.selectedRowKeys = []
-  store.selectedFile = null
-  store.state.fileDetailModalVisible = false
+  store.closeFileDetail()
   store.resetFileBrowser()
 }
 

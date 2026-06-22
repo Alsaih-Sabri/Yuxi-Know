@@ -6,12 +6,7 @@ import { useTaskerStore } from '@/stores/tasker'
 import { useUserStore } from '@/stores/user'
 import { useRouter } from 'vue-router'
 import { parseToShanghai } from '@/utils/time'
-import {
-  canOpenFileDetail,
-  canPreviewParsed,
-  canSelectFile,
-  isProcessingFile
-} from '@/utils/knowledge_file_policy'
+import { canSelectFile, isProcessingFile } from '@/utils/knowledge_file_policy'
 
 export const useDatabaseStore = defineStore('database', () => {
   const router = useRouter()
@@ -22,7 +17,7 @@ export const useDatabaseStore = defineStore('database', () => {
   const databases = ref([])
   const database = ref({})
   const kbId = ref(null)
-  const selectedFile = ref(null)
+  const fileDetailFileId = ref(null)
   const documentFiles = ref([])
   const folderBreadcrumbs = ref([{ file_id: null, filename: '全部文件', path_prefix: '' }])
 
@@ -47,7 +42,6 @@ export const useDatabaseStore = defineStore('database', () => {
     databaseLoading: false,
     lock: false,
     fileDetailModalVisible: false,
-    fileDetailLoading: false,
     batchDeleting: false,
     chunkLoading: false,
     autoRefresh: false,
@@ -551,38 +545,19 @@ export const useDatabaseStore = defineStore('database', () => {
     }
   }
 
-  async function openFileDetail(record) {
-    if (!canOpenFileDetail(record)) {
-      message.error('文件未处理完成，请稍后再试')
+  function openFileDetail(fileId) {
+    const nextFileId = typeof fileId === 'object' ? fileId?.file_id : fileId
+    if (!nextFileId) {
+      message.error('文件信息不完整')
       return
     }
+    fileDetailFileId.value = nextFileId
     state.fileDetailModalVisible = true
-    selectedFile.value = { ...record, lines: [], content: '' }
-    if (!canPreviewParsed(record)) {
-      state.fileDetailLoading = false
-      state.lock = false
-      return
-    }
+  }
 
-    state.fileDetailLoading = true
-    state.lock = true
-
-    try {
-      const data = await documentApi.getDocumentInfo(kbId.value, record.file_id)
-      if (data.status == 'failed') {
-        message.error(data.message)
-        state.fileDetailModalVisible = false
-        return
-      }
-      selectedFile.value = { ...record, lines: data.lines || [], content: data.content }
-    } catch (error) {
-      console.error(error)
-      message.error(error.message)
-      state.fileDetailModalVisible = false
-    } finally {
-      state.fileDetailLoading = false
-      state.lock = false
-    }
+  function closeFileDetail() {
+    state.fileDetailModalVisible = false
+    fileDetailFileId.value = null
   }
 
   async function loadQueryParams(id) {
@@ -689,7 +664,7 @@ export const useDatabaseStore = defineStore('database', () => {
     databases,
     database,
     kbId,
-    selectedFile,
+    fileDetailFileId,
     documentFiles,
     folderBreadcrumbs,
     queryParams,
@@ -709,6 +684,7 @@ export const useDatabaseStore = defineStore('database', () => {
     parseFiles,
     indexFiles,
     openFileDetail,
+    closeFileDetail,
     loadQueryParams,
     loadDocumentFiles,
     enterFolder,

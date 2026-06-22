@@ -178,6 +178,26 @@ export const documentApi = {
   },
 
   /**
+   * 获取文档基本信息
+   * @param {string} kbId - 知识库ID
+   * @param {string} docId - 文档ID
+   * @returns {Promise} - 文档基本信息
+   */
+  getDocumentBasicInfo: async (kbId, docId) => {
+    return apiAdminGet(`/api/knowledge/databases/${kbId}/documents/${docId}/basic`)
+  },
+
+  /**
+   * 获取文档解析内容和分块
+   * @param {string} kbId - 知识库ID
+   * @param {string} docId - 文档ID
+   * @returns {Promise} - 文档内容信息
+   */
+  getDocumentContent: async (kbId, docId) => {
+    return apiAdminGet(`/api/knowledge/databases/${kbId}/documents/${docId}/content`)
+  },
+
+  /**
    * 删除文档
    * @param {string} kbId - 知识库ID
    * @param {string} docId - 文档ID
