@@ -95,9 +95,11 @@
               </div>
             </div>
             <div class="file-panel-status">
-              <div
+              <button
                 v-if="pendingParseCount > 0"
+                type="button"
                 class="file-stat-card file-stat-action file-stat-summary"
+                :disabled="store.state.chunkLoading"
                 @click="confirmBatchParse"
               >
                 <FileText :size="16" />
@@ -105,10 +107,12 @@
                   <strong>{{ pendingParseCount }}</strong>
                   <span>待解析</span>
                 </div>
-              </div>
-              <div
+              </button>
+              <button
                 v-if="pendingIndexCount > 0"
+                type="button"
                 class="file-stat-card file-stat-action file-stat-summary"
+                :disabled="store.state.chunkLoading"
                 @click="confirmBatchIndex"
               >
                 <DatabaseIcon :size="16" />
@@ -116,7 +120,7 @@
                   <strong>{{ pendingIndexCount }}</strong>
                   <span>待入库</span>
                 </div>
-              </div>
+              </button>
               <div class="file-stat-card file-stat-summary">
                 <FileText :size="16" />
                 <div class="file-stat-inline">
@@ -375,7 +379,7 @@ import {
   Trash2
 } from 'lucide-vue-next'
 import { QuestionCircleOutlined } from '@ant-design/icons-vue'
-import { message } from 'ant-design-vue'
+import { message, Modal } from 'ant-design-vue'
 import FileTable from '@/components/FileTable.vue'
 import FileDetailModal from '@/components/FileDetailModal.vue'
 import FileUploadModal from '@/components/FileUploadModal.vue'
@@ -522,11 +526,32 @@ const pendingIndexCount = computed(() => {
 })
 
 const confirmBatchParse = () => {
-  fileTableRef.value?.applyStatusFilter?.('uploaded')
+  const count = pendingParseCount.value
+  if (count <= 0) {
+    message.info('没有待解析文档')
+    return
+  }
+
+  Modal.confirm({
+    title: '解析待解析文件',
+    content: `将提交 ${formatStatNumber(count)} 个待解析文件，任务会在后台按批处理，可在任务中心查看进度。`,
+    okText: '提交解析',
+    cancelText: '取消',
+    onOk: () => store.parsePendingFiles(count)
+  })
 }
 
 const confirmBatchIndex = () => {
-  fileTableRef.value?.applyStatusFilter?.('parsed')
+  const count = pendingIndexCount.value
+  if (count <= 0) {
+    message.info('没有待入库文档')
+    return
+  }
+
+  const opened = fileTableRef.value?.startPendingIndex?.(count)
+  if (!opened) {
+    message.error('文件列表尚未加载完成，请稍后再试')
+  }
 }
 
 const mindmapSectionRef = ref(null)
@@ -1148,6 +1173,11 @@ onMounted(() => {
 
   &:hover {
     border-color: var(--color-warning-700);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
   }
 }
 

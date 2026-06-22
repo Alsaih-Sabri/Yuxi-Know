@@ -249,6 +249,15 @@ export const documentApi = {
   },
 
   /**
+   * 手动触发全部待解析文档解析
+   * @param {string} kbId - 知识库ID
+   * @returns {Promise} - 解析任务结果
+   */
+  parsePendingDocuments: async (kbId) => {
+    return apiAdminPost(`/api/knowledge/databases/${kbId}/documents/parse-pending`, {})
+  },
+
+  /**
    * 手动触发文档入库
    * @param {string} kbId - 知识库ID
    * @param {Array} fileIds - 文件ID列表
@@ -258,6 +267,18 @@ export const documentApi = {
   indexDocuments: async (kbId, fileIds, params = {}) => {
     return apiAdminPost(`/api/knowledge/databases/${kbId}/documents/index`, {
       file_ids: fileIds,
+      params
+    })
+  },
+
+  /**
+   * 手动触发全部待入库文档入库
+   * @param {string} kbId - 知识库ID
+   * @param {Object} params - 处理参数
+   * @returns {Promise} - 入库任务结果
+   */
+  indexPendingDocuments: async (kbId, params = {}) => {
+    return apiAdminPost(`/api/knowledge/databases/${kbId}/documents/index-pending`, {
       params
     })
   }

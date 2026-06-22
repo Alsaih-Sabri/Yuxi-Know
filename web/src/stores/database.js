@@ -513,6 +513,37 @@ export const useDatabaseStore = defineStore('database', () => {
     }
   }
 
+  async function parsePendingFiles(count = 0) {
+    state.chunkLoading = true
+    try {
+      const data = await documentApi.parsePendingDocuments(kbId.value)
+      if (data.status === 'success' || data.status === 'queued') {
+        enableAutoRefresh('auto')
+        message.success(data.message || '解析任务已提交')
+        if (data.task_id) {
+          taskerStore.registerQueuedTask({
+            task_id: data.task_id,
+            name: `文档解析 (${kbId.value})`,
+            task_type: 'knowledge_parse',
+            message: data.message,
+            payload: { kb_id: kbId.value, count: data.queued_count || count, scope: 'pending' }
+          })
+        }
+        await delayedRefresh()
+        return true
+      } else {
+        message.error(data.message || '提交失败')
+        return false
+      }
+    } catch (error) {
+      console.error(error)
+      message.error(error.message || '请求失败')
+      return false
+    } finally {
+      state.chunkLoading = false
+    }
+  }
+
   async function indexFiles(fileIds, params = {}) {
     if (fileIds.length === 0) return
     state.chunkLoading = true
@@ -531,6 +562,37 @@ export const useDatabaseStore = defineStore('database', () => {
           })
         }
         await delayedRefresh() // 延迟1秒后刷新
+        return true
+      } else {
+        message.error(data.message || '提交失败')
+        return false
+      }
+    } catch (error) {
+      console.error(error)
+      message.error(error.message || '请求失败')
+      return false
+    } finally {
+      state.chunkLoading = false
+    }
+  }
+
+  async function indexPendingFiles(params = {}, count = 0) {
+    state.chunkLoading = true
+    try {
+      const data = await documentApi.indexPendingDocuments(kbId.value, params)
+      if (data.status === 'success' || data.status === 'queued') {
+        enableAutoRefresh('auto')
+        message.success(data.message || '入库任务已提交')
+        if (data.task_id) {
+          taskerStore.registerQueuedTask({
+            task_id: data.task_id,
+            name: `文档入库 (${kbId.value})`,
+            task_type: 'knowledge_index',
+            message: data.message,
+            payload: { kb_id: kbId.value, count: data.queued_count || count, scope: 'pending' }
+          })
+        }
+        await delayedRefresh()
         return true
       } else {
         message.error(data.message || '提交失败')
@@ -682,7 +744,9 @@ export const useDatabaseStore = defineStore('database', () => {
     handleBatchDelete,
     addFiles,
     parseFiles,
+    parsePendingFiles,
     indexFiles,
+    indexPendingFiles,
     openFileDetail,
     closeFileDetail,
     loadQueryParams,
