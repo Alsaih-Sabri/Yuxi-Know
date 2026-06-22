@@ -560,7 +560,8 @@ const showAddFilesModal = (options = {}) => {
   isFolderUploadMode.value = isFolder
   addFilesMode.value = mode
   addFilesModalVisible.value = true
-  currentFolderId.value = fileTableRef.value?.getCurrentFolderId?.() || store.fileBrowser.parentId || null
+  currentFolderId.value =
+    fileTableRef.value?.getCurrentFolderId?.() || store.fileBrowser.parentId || null
 }
 
 const showCreateFolderModal = () => {
@@ -570,7 +571,9 @@ const showCreateFolderModal = () => {
 const folderTree = computed(() => {
   const roots = []
   let currentLevel = roots
-  for (const item of (store.folderBreadcrumbs || []).slice(1).filter((node) => !node.is_virtual_folder)) {
+  for (const item of (store.folderBreadcrumbs || [])
+    .slice(1)
+    .filter((node) => !node.is_virtual_folder)) {
     const node = {
       file_id: item.file_id,
       filename: item.filename,
@@ -699,9 +702,7 @@ const rules = {
 const chunkPresetOptions = CHUNK_PRESET_OPTIONS.map(({ label, value }) => ({ label, value }))
 const editPresetDescription = computed(() => getChunkPresetDescription(editForm.chunk_preset_id))
 const fileList = computed(() => {
-  return (store.documentFiles || [])
-    .map((f) => f.filename)
-    .filter(Boolean)
+  return (store.documentFiles || []).map((f) => f.filename).filter(Boolean)
 })
 
 const canEditShareConfig = computed(() => userStore.isSuperAdmin || userStore.isAdmin)

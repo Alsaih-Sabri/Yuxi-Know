@@ -37,10 +37,7 @@
                   <template #icon><Download :size="16" /></template>
                   下载原文
                 </a-menu-item>
-                <a-menu-item
-                  key="markdown"
-                  :disabled="contentState.loading || !mergedContent"
-                >
+                <a-menu-item key="markdown" :disabled="contentState.loading || !mergedContent">
                   <template #icon><FileText :size="16" /></template>
                   下载 Markdown
                 </a-menu-item>
@@ -85,7 +82,11 @@
         <div v-if="contentState.loading" class="loading-container">
           <a-spin tip="正在加载解析内容..." />
         </div>
-        <MarkdownPreview v-else-if="mergedContent" :content="mergedContent" class="markdown-content" />
+        <MarkdownPreview
+          v-else-if="mergedContent"
+          :content="mergedContent"
+          class="markdown-content"
+        />
         <div v-else class="empty-content">
           <p>{{ contentState.error || '暂无文件内容' }}</p>
         </div>
@@ -233,7 +234,9 @@ const normalizeFileMeta = (meta = {}) => ({
   filename: meta.filename || meta.original_filename || String(props.fileId || ''),
   file_size: meta.file_size ?? meta.size ?? 0,
   has_original_file:
-    'has_original_file' in meta ? Boolean(meta.has_original_file) : Boolean(meta.minio_url || meta.path),
+    'has_original_file' in meta
+      ? Boolean(meta.has_original_file)
+      : Boolean(meta.minio_url || meta.path),
   has_parsed_markdown:
     'has_parsed_markdown' in meta ? Boolean(meta.has_parsed_markdown) : Boolean(meta.markdown_file)
 })
@@ -247,10 +250,13 @@ const ensureApiSuccess = (data, fallbackMessage) => {
 // 视图模式
 const viewMode = ref('markdown')
 const hasContent = computed(
-  () => (contentState.value.lines && contentState.value.lines.length > 0) || contentState.value.content
+  () =>
+    (contentState.value.lines && contentState.value.lines.length > 0) || contentState.value.content
 )
 const sourcePreviewCandidateType = computed(() => getPreviewTypeByPath(file.value?.filename || ''))
-const sourcePreviewDisplayType = computed(() => sourcePreview.value.type || sourcePreviewCandidateType.value)
+const sourcePreviewDisplayType = computed(
+  () => sourcePreview.value.type || sourcePreviewCandidateType.value
+)
 const sourceContentLength = computed(() =>
   typeof sourcePreview.value.content === 'string' ? sourcePreview.value.content.length : 0
 )
@@ -339,7 +345,8 @@ const loadBasicInfo = async () => {
 }
 
 const loadParsedContent = async () => {
-  if (!props.kbId || !props.fileId || contentState.value.loading || contentState.value.loaded) return
+  if (!props.kbId || !props.fileId || contentState.value.loading || contentState.value.loaded)
+    return
 
   const requestId = ++contentRequestSeq
   contentState.value = {
@@ -430,7 +437,9 @@ const mergeResult = computed(() => mergeChunks(contentState.value.lines || []))
 const mappedChunks = computed(() => mergeResult.value.chunks)
 const mergedContent = computed(() => contentState.value.content || mergeResult.value.content || '')
 const charCount = computed(() => mergedContent.value.length)
-const chunkCount = computed(() => mappedChunks.value.length || contentState.value.lines?.length || 0)
+const chunkCount = computed(
+  () => mappedChunks.value.length || contentState.value.lines?.length || 0
+)
 const viewInfoText = computed(() => {
   if (viewMode.value === 'chunks') {
     if (contentState.value.loading) return ''

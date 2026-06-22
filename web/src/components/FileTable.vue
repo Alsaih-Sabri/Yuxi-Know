@@ -380,7 +380,9 @@ const applyFilters = async (overrides = {}) => {
   const recursive = nextStatus !== 'all'
   const currentFolder = folderBreadcrumbs.value[folderBreadcrumbs.value.length - 1]
   const isVirtualFolder = Boolean(currentFolder?.is_virtual_folder)
-  const parentId = isVirtualFolder ? currentFolder?.parent_id || null : currentFolder?.file_id || null
+  const parentId = isVirtualFolder
+    ? currentFolder?.parent_id || null
+    : currentFolder?.file_id || null
   const pathPrefix = isVirtualFolder ? currentFolder?.path_prefix || '' : ''
   await store.loadDocumentFiles({
     page: 1,
@@ -452,7 +454,9 @@ const currentStatusLabel = computed(() => {
   return opt ? opt.label : ''
 })
 
-const allSelectableFiles = computed(() => files.value.filter((file) => canSelectFile(file, lock.value)))
+const allSelectableFiles = computed(() =>
+  files.value.filter((file) => canSelectFile(file, lock.value))
+)
 
 const isAllSelected = computed(() => {
   const selectableIds = allSelectableFiles.value.map((f) => f.file_id)
