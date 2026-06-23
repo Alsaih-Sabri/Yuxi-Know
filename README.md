@@ -25,14 +25,15 @@
 导航：[项目介绍](https://xerrors.github.io/Yuxi/) ｜ [快速开始](https://xerrors.github.io/Yuxi/intro/quick-start) ｜ [开发路线图](https://xerrors.github.io/Yuxi/develop-guides/roadmap) | [0.7 版本特性](http://xhslink.com/o/5Y6QWnmjF2d)；最新开发动态，详见 [changelog](https://xerrors.github.io/Yuxi/develop-guides/changelog)。
 
 🩷 赞助商
+
 <table>
   <tr>
     <td style="width: 220px; padding: 8px 12px 8px 8px; vertical-align: middle;">
-      < img 
+      <img 
         width="220" 
         height="64" 
         alt="7fb163d0fb02740948521dbcaf6191ea" 
-        src="https://github.com/user-attachments/assets/cc998135-0852-404c-8455-bd3f4f844f4d"
+        src="https://xerrors.oss-cn-shanghai.aliyuncs.com/github/image-20260623195812766.png"
       />
     </td>
     <td style="padding: 8px 8px 8px 0; vertical-align: middle;">
