@@ -17,7 +17,6 @@ from yuxi.agents.middlewares import (
     create_summary_middleware,
     save_attachments_to_fs,
 )
-from yuxi.agents.middlewares.knowledge_base import KnowledgeBaseMiddleware
 from yuxi.agents.middlewares.skills import SkillsMiddleware
 from yuxi.agents.middlewares.subagent_task import create_subagent_task_middleware
 from yuxi.agents.toolkits.service import resolve_configured_runtime_tools
@@ -55,7 +54,6 @@ async def _build_middlewares(context):
             context=context,
         ),
         save_attachments_to_fs,
-        KnowledgeBaseMiddleware(),
         SkillsMiddleware(),
     ]
     subagent_middleware = await create_subagent_task_middleware(context)

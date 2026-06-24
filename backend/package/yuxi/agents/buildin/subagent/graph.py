@@ -18,7 +18,6 @@ from yuxi.agents.context import (
     prepare_agent_runtime_context,
 )
 from yuxi.agents.middlewares import TokenUsageMiddleware, create_summary_middleware, save_attachments_to_fs
-from yuxi.agents.middlewares.knowledge_base import KnowledgeBaseMiddleware
 from yuxi.agents.middlewares.skills import SkillsMiddleware
 from yuxi.agents.toolkits.service import resolve_configured_runtime_tools
 
@@ -70,7 +69,6 @@ async def _build_middlewares(context):
             context=context,
         ),
         save_attachments_to_fs,
-        KnowledgeBaseMiddleware(),
         SkillsMiddleware(),
         summary_middleware,
         TodoListMiddleware(system_prompt=TODO_MID_PROMPT),

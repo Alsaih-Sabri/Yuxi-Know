@@ -142,6 +142,56 @@ async def test_awrap_model_call_mounts_dependencies_only_for_readable_activated_
     assert captured["tools"] == ["tool-a"]
 
 
+@pytest.mark.asyncio
+async def test_awrap_model_call_mounts_knowledge_base_skill_tools():
+    class FakeRequest:
+        def __init__(self, tools=None):
+            self.runtime = SimpleNamespace(
+                context=SimpleNamespace(
+                    _readable_skills=["knowledge-base"],
+                    _runtime_skill_dependency_map={
+                        "knowledge-base": {
+                            "tools": [
+                                "list_kbs",
+                                "query_kb",
+                                "find_kb_document",
+                                "open_kb_document",
+                                "get_mindmap",
+                            ],
+                            "mcps": [],
+                            "skills": [],
+                        }
+                    },
+                    mcps=[],
+                )
+            )
+            self.state = {"activated_skills": ["knowledge-base"]}
+            self.tools = tools or []
+
+        def override(self, *, tools):
+            new_request = FakeRequest(tools=tools)
+            new_request.runtime = self.runtime
+            new_request.state = self.state
+            return new_request
+
+    captured = {}
+
+    async def handler(request):
+        captured["tools"] = {tool.name for tool in request.tools}
+        return "ok"
+
+    result = await SkillsMiddleware().awrap_model_call(FakeRequest(), handler)
+
+    assert result == "ok"
+    assert captured["tools"] == {
+        "list_kbs",
+        "query_kb",
+        "find_kb_document",
+        "open_kb_document",
+        "get_mindmap",
+    }
+
+
 def test_read_file_activates_only_readable_skill() -> None:
     middleware = SkillsMiddleware()
     result = ToolMessage(content="ok", tool_call_id="tool-1", name="read_file")
