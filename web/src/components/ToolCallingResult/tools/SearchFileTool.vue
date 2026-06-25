@@ -11,16 +11,24 @@
     </template>
 
     <template #result="{ resultContent }">
-      <div v-if="isError(resultContent)" class="plain-result">{{ stringifyResult(resultContent) }}</div>
+      <div v-if="isError(resultContent)" class="plain-result">
+        {{ stringifyResult(resultContent) }}
+      </div>
       <div v-else class="search-file-result">
         <div class="result-count">
           共 {{ resultData(resultContent).total }} 个文件<span
             v-if="resultData(resultContent).has_more"
             class="more-hint"
-          >（仅展示前 {{ resultData(resultContent).files.length }} 个）</span>
+            >（仅展示前 {{ resultData(resultContent).files.length }} 个）</span
+          >
         </div>
         <div v-if="resultData(resultContent).files.length" class="file-list">
-          <div v-for="file in resultData(resultContent).files" :key="file.file_id" class="file-item" @click="openFileDetail(file)">
+          <div
+            v-for="file in resultData(resultContent).files"
+            :key="file.file_id"
+            class="file-item"
+            @click="openFileDetail(file)"
+          >
             <FileText class="file-icon" :size="12" />
             <span class="file-name" :title="file.filename">{{ file.filename }}</span>
           </div>

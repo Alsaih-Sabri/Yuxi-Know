@@ -576,7 +576,9 @@ const currentIndexFileIds = ref([])
 const isBatchIndexOperation = ref(false)
 const isPendingIndexOperation = ref(false)
 const pendingIndexTotal = ref(0)
-const pendingIndexTotalText = computed(() => Number(pendingIndexTotal.value || 0).toLocaleString('zh-CN'))
+const pendingIndexTotalText = computed(() =>
+  Number(pendingIndexTotal.value || 0).toLocaleString('zh-CN')
+)
 
 const pageSizeOptions = ['100', '300', '500']
 

@@ -17,11 +17,7 @@
               :size="14"
               class="expand-icon"
             />
-            <ChevronDown
-              v-else
-              :size="14"
-              class="expand-icon"
-            />
+            <ChevronDown v-else :size="14" class="expand-icon" />
             <FileText :size="14" color="var(--gray-600)" />
             <span class="file-name">{{ fileGroup.filename }}</span>
             <span class="chunk-count">{{ fileGroup.chunks.length }} chunks</span>
