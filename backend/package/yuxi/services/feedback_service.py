@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from yuxi.services.langfuse_service import submit_user_feedback_score
 from yuxi.storage.postgres.models_business import Conversation, Message, MessageFeedback
 from yuxi.utils.logging_config import logger
 
@@ -44,6 +45,18 @@ async def submit_message_feedback_view(
         db.add(new_feedback)
         await db.commit()
         await db.refresh(new_feedback)
+
+        trace_id = (message.extra_metadata or {}).get("langfuse_trace_id")
+        if trace_id:
+            submit_user_feedback_score(
+                trace_id=trace_id,
+                feedback_id=new_feedback.id,
+                message_id=new_feedback.message_id,
+                conversation_id=message.conversation_id,
+                uid=str(current_uid),
+                rating=rating,
+                reason=reason,
+            )
 
         logger.info(f"User {current_uid} submitted {rating} feedback for message {message_id}")
 
