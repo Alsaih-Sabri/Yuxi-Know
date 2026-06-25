@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -48,7 +50,10 @@ async def submit_message_feedback_view(
 
         trace_id = (message.extra_metadata or {}).get("langfuse_trace_id")
         if trace_id:
-            submit_user_feedback_score(
+            # submit_user_feedback_score 内部会同步调用 client.flush() 发起阻塞网络请求，
+            # 放到线程池执行避免阻塞事件循环；本地反馈已落库，上传失败不影响主流程。
+            await asyncio.to_thread(
+                submit_user_feedback_score,
                 trace_id=trace_id,
                 feedback_id=new_feedback.id,
                 message_id=new_feedback.message_id,

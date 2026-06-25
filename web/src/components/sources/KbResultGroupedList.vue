@@ -12,15 +12,28 @@
           @click="toggleFile(fileGroup.filename)"
         >
           <div class="file-info">
+            <ChevronRight
+              v-if="!expandedFiles.has(fileGroup.filename)"
+              :size="14"
+              class="expand-icon"
+            />
+            <ChevronDown
+              v-else
+              :size="14"
+              class="expand-icon"
+            />
             <FileText :size="14" color="var(--gray-600)" />
             <span class="file-name">{{ fileGroup.filename }}</span>
             <span class="chunk-count">{{ fileGroup.chunks.length }} chunks</span>
           </div>
-          <ChevronDown
-            :size="14"
-            class="expand-icon"
-            :class="{ rotated: expandedFiles.has(fileGroup.filename) }"
-          />
+          <button
+            v-if="fileGroup.kb_id && fileGroup.file_id"
+            class="view-file-btn"
+            @click.stop="openFileDetail(fileGroup)"
+            title="查看文件"
+          >
+            <Eye :size="14" />
+          </button>
         </div>
 
         <div v-if="expandedFiles.has(fileGroup.filename)" class="chunks-container">
@@ -59,13 +72,20 @@
       :chunk="selectedChunk"
       :title-prefix="`文档片段 #${selectedChunkIndex || '-'} `"
     />
+
+    <FileDetailModal
+      v-model:open="fileDetailOpen"
+      :kb-id="fileDetailKbId"
+      :file-id="fileDetailFileId"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { FileText, ChevronDown, Eye } from 'lucide-vue-next'
+import { FileText, ChevronRight, ChevronDown, Eye } from 'lucide-vue-next'
 import KbChunkDetailModal from './KbChunkDetailModal.vue'
+import FileDetailModal from '@/components/FileDetailModal.vue'
 
 const props = defineProps({
   chunks: {
@@ -86,6 +106,9 @@ const expandedFiles = ref(new Set())
 const modalVisible = ref(false)
 const selectedChunk = ref(null)
 const selectedChunkIndex = ref(null)
+const fileDetailOpen = ref(false)
+const fileDetailKbId = ref('')
+const fileDetailFileId = ref('')
 
 const resolveChunks = (input) => {
   if (Array.isArray(input)) return input
@@ -132,6 +155,8 @@ const fileGroupList = computed(() => {
     if (!groups.has(filename)) {
       groups.set(filename, {
         filename,
+        kb_id: item?.kb_id || '',
+        file_id: item?.file_id || '',
         chunks: []
       })
     }
@@ -183,19 +208,25 @@ const openChunkDetail = (chunk, index) => {
   selectedChunkIndex.value = index
   modalVisible.value = true
 }
+
+const openFileDetail = (fileGroup) => {
+  fileDetailKbId.value = fileGroup.kb_id || ''
+  fileDetailFileId.value = fileGroup.file_id || ''
+  fileDetailOpen.value = Boolean(fileDetailKbId.value && fileDetailFileId.value)
+}
 </script>
 
 <style scoped lang="less">
 .kb-result-grouped-list {
   padding: 4px;
   .result-summary {
-    padding: 10px 12px;
+    padding: 6px 10px;
     background: var(--gray-25);
     font-size: 12px;
     color: var(--gray-700);
     border: 1px solid var(--gray-150);
     border-radius: 8px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
   .kb-results {
@@ -211,7 +242,7 @@ const openChunkDetail = (chunk, index) => {
     overflow: hidden;
 
     .file-header {
-      padding: 8px 12px;
+      padding: 5px 10px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -234,9 +265,15 @@ const openChunkDetail = (chunk, index) => {
         flex: 1;
         min-width: 0;
 
+        .expand-icon {
+          flex-shrink: 0;
+          color: var(--gray-500);
+        }
+
         .file-name {
           font-size: 13px;
           color: var(--gray-700);
+          font-weight: 400;
           flex: 1;
           min-width: 0;
           white-space: nowrap;
@@ -251,18 +288,29 @@ const openChunkDetail = (chunk, index) => {
         }
       }
 
-      .expand-icon {
-        color: var(--gray-700);
-        transition: transform 0.2s ease;
+      .view-file-btn {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border: none;
+        background: transparent;
+        border-radius: 4px;
+        cursor: pointer;
+        color: var(--gray-500);
+        transition: all 0.15s;
 
-        &.rotated {
-          transform: rotate(180deg);
+        &:hover {
+          background: var(--gray-100);
+          color: var(--gray-700);
         }
       }
     }
 
     .chunk-item {
-      padding: 10px 12px;
+      padding: 6px 10px;
       border-bottom: 1px solid var(--gray-100);
       cursor: pointer;
 
@@ -329,7 +377,7 @@ const openChunkDetail = (chunk, index) => {
   .no-results {
     text-align: center;
     color: var(--gray-700);
-    padding: 14px;
+    padding: 10px;
     font-size: 12px;
     border: 1px dashed var(--gray-200);
     border-radius: 8px;

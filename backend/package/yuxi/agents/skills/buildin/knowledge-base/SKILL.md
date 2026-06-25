@@ -15,6 +15,7 @@ description: "使用 Yuxi 知识库进行检索、打开文档、文档内定位
 - `open_kb_document`：按 `kb_id` 和 `file_id` 打开文档原文窗口，适合查看更完整上下文。
 - `find_kb_document`：在已知文档内用关键词或正则定位段落。
 - `get_mindmap`：查看知识库思维导图结构。
+- `search_file`：按文件名关键词搜索知识库中的文件，支持指定知识库或跨知识库，返回文件列表与分页信息。
 
 ## 操作流程
 

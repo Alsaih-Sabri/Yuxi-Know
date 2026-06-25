@@ -33,6 +33,7 @@ import WriteFileTool from './tools/WriteFileTool.vue'
 import ReadFileTool from './tools/ReadFileTool.vue'
 import ListDirectoryTool from './tools/ListDirectoryTool.vue'
 import SearchFileContentTool from './tools/SearchFileContentTool.vue'
+import SearchFileTool from './tools/SearchFileTool.vue'
 import GrepTool from './tools/GrepTool.vue'
 import GlobTool from './tools/GlobTool.vue'
 import EditFileTool from './tools/EditFileTool.vue'
@@ -82,6 +83,7 @@ const TOOL_RENDERERS = {
   read_file: ReadFileTool,
   replace: EditFileTool,
   run_shell_command: ExecuteTool,
+  search_file: SearchFileTool,
   search_file_content: SearchFileContentTool,
   task: TaskTool,
   tavily_search: WebSearchTool,

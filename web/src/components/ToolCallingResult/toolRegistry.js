@@ -40,6 +40,7 @@ export const TOOL_ICON_MAP = {
   read_file: FileText,
   replace: FilePen,
   run_shell_command: SquareTerminal,
+  search_file: FolderSearch,
   search_file_content: FolderSearch,
   task: Bot,
   tavily_search: Globe,
