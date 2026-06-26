@@ -12,7 +12,7 @@
 
 <a href="https://trendshift.io/repositories/24335" target="_blank"><img src="https://trendshift.io/api/badge/repositories/24335" alt="xerrors%2FYuxi | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
-[[项目文档]](https://xerrors.github.io/Yuxi) · [[版本特性]](http://xhslink.com/o/5Y6QWnmjF2d) · [[English]](README.en.md)
+[[项目文档]](https://xerrors.github.io/Yuxi) · [[版本特性]](http://xhslink.com/o/5Y6QWnmjF2d) · [[🇬🇧 English README]](README.en.md)
 
 </div>
 
