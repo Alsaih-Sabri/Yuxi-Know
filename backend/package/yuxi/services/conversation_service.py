@@ -14,7 +14,7 @@ from yuxi.agents.buildin import agent_manager
 from yuxi.config import config as app_config
 from yuxi.knowledge.parser import Parser
 from yuxi.repositories.agent_repository import AgentRepository
-from yuxi.repositories.conversation_repository import ConversationRepository
+from yuxi.repositories.conversation_repository import ConversationRepository, INVOCATION_CONVERSATION_SOURCES
 from yuxi.services.mention_search_service import invalidate_mention_cache
 from yuxi.storage.minio import StorageError, get_minio_client
 from yuxi.storage.postgres.models_business import User
@@ -460,6 +460,7 @@ async def list_threads_view(
         status="active",
         limit=limit,
         offset=offset,
+        exclude_sources=INVOCATION_CONVERSATION_SOURCES,
     )
 
     return [
@@ -497,6 +498,7 @@ async def search_threads_view(
         query=normalized_query,
         limit=limit,
         offset=offset,
+        exclude_sources=INVOCATION_CONVERSATION_SOURCES,
     )
 
     items = []

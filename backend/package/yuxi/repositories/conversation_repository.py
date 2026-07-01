@@ -19,6 +19,7 @@ MESSAGE_SEARCH_SNIPPET_MAX_LENGTH = 180
 MESSAGE_SEARCH_SNIPPETS_PER_THREAD = 2
 MESSAGE_SEARCH_ROLES = ("user", "assistant")
 MESSAGE_SEARCH_EXCLUDED_TYPES = ("tool_call", "tool_result")
+INVOCATION_CONVERSATION_SOURCES = ("agent_call", "agent_evaluation")
 
 
 class ConversationRepository:
@@ -47,6 +48,18 @@ class ConversationRepository:
             Message.role.in_(MESSAGE_SEARCH_ROLES),
             or_(Message.message_type.is_(None), Message.message_type.notin_(MESSAGE_SEARCH_EXCLUDED_TYPES)),
             Message.content.ilike(pattern, escape="\\"),
+        ]
+
+    def _exclude_source_conditions(self, sources: tuple[str, ...]):
+        if not sources:
+            return []
+        source = Conversation.extra_metadata["source"].as_string()
+        return [
+            or_(
+                Conversation.extra_metadata.is_(None),
+                source.is_(None),
+                source.notin_(sources),
+            )
         ]
 
     def _build_message_search_snippet(self, content: str, query: str) -> str:
@@ -281,6 +294,7 @@ class ConversationRepository:
         status: str = "active",
         limit: int | None = None,
         offset: int = 0,
+        exclude_sources: tuple[str, ...] = (),
     ) -> list[Conversation]:
         """List conversations with pinned conversations always included first.
 
@@ -293,6 +307,7 @@ class ConversationRepository:
             base_conditions.append(Conversation.uid == str(uid))
         if agent_id:
             base_conditions.append(Conversation.agent_id == agent_id)
+        base_conditions.extend(self._exclude_source_conditions(exclude_sources))
 
         # First, get all pinned conversations (no limit)
         pinned_query = (
@@ -340,6 +355,7 @@ class ConversationRepository:
         agent_id: str | None = None,
         limit: int = 20,
         offset: int = 0,
+        exclude_sources: tuple[str, ...] = (),
     ) -> tuple[list[dict], bool]:
         normalized_query = str(query or "").strip()
         if not normalized_query:
@@ -351,6 +367,7 @@ class ConversationRepository:
         ]
         if agent_id:
             conversation_conditions.append(Conversation.agent_id == agent_id)
+        conversation_conditions.extend(self._exclude_source_conditions(exclude_sources))
 
         message_conditions = self._message_search_conditions(normalized_query)
         summary = (
