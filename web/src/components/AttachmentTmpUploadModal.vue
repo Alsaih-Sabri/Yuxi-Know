@@ -158,6 +158,7 @@ import { message } from 'ant-design-vue'
 import { ChevronDown, ChevronUp, X } from 'lucide-vue-next'
 import { threadApi } from '@/apis'
 import { ocrApi } from '@/apis/system_api'
+import { useConfigStore } from '@/stores/config'
 import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
 
 const props = defineProps({
@@ -168,6 +169,8 @@ const props = defineProps({
 
 const emit = defineEmits(['update:open', 'added'])
 
+const configStore = useConfigStore()
+const DEFAULT_OCR_ENGINE = 'rapid_ocr'
 const fileItems = ref([])
 const confirming = ref(false)
 let localIdSeed = 0
@@ -233,7 +236,19 @@ const getErrorMessage = (error, fallback = '操作失败') => {
   return error?.response?.data?.detail || error?.message || fallback
 }
 
-const getDefaultParseMethod = () => null
+const getDefaultParseMethod = (parseMethods) => {
+  if (!Array.isArray(parseMethods) || parseMethods.length === 0) {
+    return null
+  }
+  const configuredEngine = String(configStore.config?.default_ocr_engine || DEFAULT_OCR_ENGINE).trim()
+  if (parseMethods.includes(configuredEngine)) {
+    return configuredEngine
+  }
+  if (parseMethods.includes(DEFAULT_OCR_ENGINE)) {
+    return DEFAULT_OCR_ENGINE
+  }
+  return parseMethods[0]
+}
 
 const normalizeTmpUpload = (response) => ({
   tmpFileId: response.tmp_file_id,
@@ -245,8 +260,21 @@ const normalizeTmpUpload = (response) => ({
   minioUrl: response.minio_url,
   parseSupported: response.parse_supported,
   parseMethods: response.parse_methods || [],
-  selectedParseMethod: getDefaultParseMethod(response.parse_methods || [])
+  selectedParseMethod: getDefaultParseMethod(response.parse_methods || []),
+  parseMethodTouched: false
 })
+
+watch(
+  () => configStore.config?.default_ocr_engine,
+  () => {
+    fileItems.value = fileItems.value.map((item) => {
+      if (!item.parseSupported || item.parseMethodTouched || item.status === 'parsed') {
+        return item
+      }
+      return { ...item, selectedParseMethod: getDefaultParseMethod(item.parseMethods || []) }
+    })
+  }
+)
 
 const updateItem = (localId, patch) => {
   fileItems.value = fileItems.value.map((item) =>
@@ -361,6 +389,7 @@ const handleParseMethodChange = (localId, selectedParseMethod) => {
   updateItem(localId, {
     ...clearParsedState,
     selectedParseMethod,
+    parseMethodTouched: true,
     parseError: null,
     status: item?.status === 'parsed' ? 'uploaded' : item?.status
   })

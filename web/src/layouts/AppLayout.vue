@@ -68,7 +68,6 @@ const handleDebugModalClose = () => {
 }
 
 const getRemoteConfig = async () => {
-  if (!userStore.isAdmin) return
   try {
     await configStore.refreshConfig()
   } catch (error) {
@@ -103,9 +102,9 @@ onMounted(async () => {
   // 加载信息配置与知识库数据无依赖，可并行
   await Promise.all([infoStore.loadInfoConfig(), getRemoteDatabase()])
   await initAgentNavigation()
-  // 仅管理员加载系统配置和任务中心数据
+  await getRemoteConfig()
+  // 仅管理员加载任务中心数据
   if (userStore.isAdmin) {
-    await getRemoteConfig()
     taskerStore.loadTasks()
     fetchGithubStars() // Fetch GitHub stars on mount
   }
