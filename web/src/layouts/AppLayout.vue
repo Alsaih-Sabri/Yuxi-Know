@@ -314,7 +314,9 @@ provide('settingsModal', {
             <template #title>{{ primaryNavItem.name }}</template>
             <component
               class="icon"
-              :is="isNavItemActive(primaryNavItem) ? primaryNavItem.activeIcon : primaryNavItem.icon"
+              :is="
+                isNavItemActive(primaryNavItem) ? primaryNavItem.activeIcon : primaryNavItem.icon
+              "
               size="18"
             />
           </a-tooltip>
@@ -451,10 +453,26 @@ provide('settingsModal', {
 // Less 变量定义
 @sidebar-width: 230px;
 @sidebar-collapsed-width: 56px;
-@sidebar-padding: 6px 8px;
+@sidebar-padding-y: 6px;
+@sidebar-padding-x: 8px;
+@sidebar-padding: @sidebar-padding-y @sidebar-padding-x;
+@sidebar-border-width: 1px;
 @sidebar-item-height: 32px;
 @sidebar-item-padding-x: 10px;
 @sidebar-icon-size: 16px;
+@brand-avatar-size: 28px;
+@sidebar-collapsed-content-width: @sidebar-collapsed-width - (2 * @sidebar-padding-x) -
+  @sidebar-border-width;
+@sidebar-collapsed-icon-padding-x: (
+  (@sidebar-collapsed-content-width - @sidebar-icon-size - (2 * @sidebar-border-width)) / 2
+);
+@sidebar-collapsed-avatar-padding-x: (
+  (@sidebar-collapsed-content-width - @sidebar-item-height - (2 * @sidebar-border-width)) / 2
+);
+@sidebar-collapsed-brand-padding-x: ((@sidebar-collapsed-content-width - @brand-avatar-size) / 2);
+@sidebar-collapsed-brand-icon-padding-x: (
+  (@sidebar-collapsed-content-width - @sidebar-icon-size) / 2
+);
 
 .app-layout {
   display: flex;
@@ -544,9 +562,9 @@ div.header,
   }
 
   .brand-avatar {
-    flex: 0 0 28px;
-    width: 28px;
-    height: 28px;
+    flex: 0 0 @brand-avatar-size;
+    width: @brand-avatar-size;
+    height: @brand-avatar-size;
     border-radius: 6px;
     object-fit: cover;
   }
@@ -814,14 +832,19 @@ div.header,
     }
 
     .brand-expand-button {
-      flex: 0 0 @sidebar-item-height;
-      justify-content: center;
-      width: @sidebar-item-height;
-      padding: 0 6px;
+      flex: 0 0 100%;
+      justify-content: flex-start;
+      width: 100%;
+      padding: 0;
       border-radius: 8px;
+
+      .brand-avatar-image {
+        margin-left: @sidebar-collapsed-brand-padding-x;
+      }
 
       .brand-expand-icon {
         display: none;
+        margin-left: @sidebar-collapsed-brand-icon-padding-x;
         width: @sidebar-icon-size;
         height: @sidebar-icon-size;
         color: var(--main-color);
@@ -849,8 +872,8 @@ div.header,
 
     .nav-item {
       justify-content: flex-start;
-      width: @sidebar-item-height;
-      padding: 0 10px;
+      width: 100%;
+      padding: 0 @sidebar-collapsed-icon-padding-x;
 
       .nav-text,
       .github-stars {
@@ -867,7 +890,13 @@ div.header,
       }
 
       &.user-info {
-        padding: 0;
+        padding: 0 @sidebar-collapsed-avatar-padding-x;
+
+        :deep(.user-info-component),
+        :deep(.user-info-dropdown) {
+          justify-content: flex-start;
+        }
+
         :deep(.user-info-actions) {
           display: none;
         }
