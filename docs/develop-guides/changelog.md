@@ -4,10 +4,11 @@
 
 同一版本的多次功能更新时，应以功能为单位进行更新，比如之前添加了 A 功能的更新，在后续的更新中修复了因 A 功能引入的 bug，那么这个修复说明应该和 A 功能描述放在一起，而不是新增一条修复记录，功能更新同理。
 
-## v0.7.1 (current)
+## v0.7.2 (current)
 
 ### 开发记录
 
+- 修复 API/Worker Docker 镜像构建路径：`docker/api.Dockerfile` 的 `COPY` 源路径改为相对仓库根目录的 `backend/...`，与 `docker-compose` 中 `build.context: .` 保持一致，避免构建时因 `../backend/...` 越出 build context 导致 `COPY failed: forbidden path outside the build context`。
 - 修复 API/Worker Docker 镜像构建失败：后端项目要求 Python `>=3.12,<3.14`，Dockerfile 基础镜像与 `.python-version` 同步到 `python:3.13-slim`，避免 uv 在 `UV_PROJECT_ENVIRONMENT=/usr/local` 下尝试用不兼容的 Python 3.14 系统环境执行依赖同步。
 - 新增 PaddleOCR 云端 API OCR 解析器：支持 `paddleocr_vl_1_6` 调用 `PaddleOCR-VL-1.6` 输出版面 Markdown，支持 `paddleocr_pp_ocrv6` 调用 `PP-OCRv6` 输出纯 OCR 文本；解析器复用 PaddleOCR jobs 提交、轮询与 JSONL 下载逻辑，健康检查仅校验 `PADDLEOCR_API_TOKEN` 配置状态，不创建真实 OCR 任务；知识库上传与临时附件解析弹窗同步增加两个 OCR 选项。
 - 优化对话消息代码块交互：助手消息中的 Markdown 代码块右上角新增简约复制按钮，支持点击快速复制代码内容并显示短暂“已复制”反馈。
