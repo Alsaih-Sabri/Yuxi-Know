@@ -91,3 +91,24 @@ async def test_ensure_business_schema_cleans_duplicate_active_agent_runs_before_
     assert statements.index("WITH duplicated_active_runs AS") < statements.index(
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_runs_one_active_per_thread"
     )
+
+
+@pytest.mark.asyncio
+async def test_ensure_business_schema_creates_user_config_table():
+    manager = PostgresManager()
+    original_initialized = manager._initialized
+    original_engine = manager.async_engine
+    connection = _RecordingConnection()
+
+    manager._initialized = True
+    manager.async_engine = _RecordingEngine(connection)
+    try:
+        await manager.ensure_business_schema()
+    finally:
+        manager._initialized = original_initialized
+        manager.async_engine = original_engine
+
+    statements = "\n".join(connection.statements)
+
+    assert "CREATE TABLE IF NOT EXISTS user_config" in statements
+    assert "enable_memory BOOLEAN NOT NULL DEFAULT FALSE" in statements
