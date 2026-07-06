@@ -6,6 +6,13 @@
 
 ## v0.7.1 (current)
 
+### 破坏性变更
+
+- API Key 收紧到具体用户：`api_keys.user_id` 收紧为非空，启动 schema 演进会先清理 `cli_auth_sessions` 中对未绑定 API Key 的引用，再 `DELETE FROM api_keys WHERE user_id IS NULL`，最后 `ALTER COLUMN user_id SET NOT NULL`。**升级前请在 0.7.0 库执行 `SELECT id, name, department_id FROM api_keys WHERE user_id IS NULL;`**，决定每个未绑定 Key 的归属用户并手动 `UPDATE`，未绑定的 Key 升级后会被静默删除且无法恢复；清理前后端日志会输出 `Schema migration will delete N unbound API key(s)` 告警以便回溯。
+- Dashboard 收紧到 superadmin：所有 `/api/dashboard/*` 端点从 `get_admin_user` 收紧为 `get_superadmin_user`，前端路由同步收紧。0.7.0 中创建过 `role='admin'`（非 superadmin）的运维用户升级后将失去 Dashboard 访问权限，且应用内无自助提权路径；升级前请在数据库中将需要继续访问 Dashboard 的 admin 用户 `UPDATE users SET role='superadmin' WHERE uid=...`。首装场景的首个管理员始终是 superadmin，新部署不受影响。
+- CORS 生产环境默认拒绝跨域：CORS 改为通过 `YUXI_CORS_ORIGINS` 显式配置允许来源；`YUXI_ENV=production` 且未设置该变量时返回空列表（拒绝所有跨域），显式设为 `*` 时会自动关闭 credentials。**前后端跨域部署的运维请在升级前设置 `YUXI_CORS_ORIGINS=https://your-frontend.example.com`**，否则浏览器跨域请求将被拒绝；同源部署（前端与 API 同源）不需要额外配置。
+- 系统配置接口权限下放：`GET /api/system/config` 由 admin 收紧到任意登录用户可读，便于普通用户读取 `default_ocr_engine` 等运行时配置；接口会暴露 `sandbox_provisioner_url`、`sandbox_virtual_path_prefix`、默认模型 ID 等基础设施信息（不包含任何密钥/Token），如有更高保密要求请通过反向代理限制该路径。
+
 ### 开发记录
 
 - 知识库详情页新增整页内容加载态：切换或首次进入详情时，在知识库信息返回前仅展示居中 loading，避免标题、标签页和文件区域先渲染旧数据或空状态。
