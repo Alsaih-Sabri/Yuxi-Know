@@ -3,6 +3,9 @@
 本页用于记录各版本发布说明（新增、修复与破坏性变更）。
 
 同一版本的多次功能更新时，应以功能为单位进行更新，比如之前添加了 A 功能的更新，在后续的更新中修复了因 A 功能引入的 bug，那么这个修复说明应该和 A 功能描述放在一起，而不是新增一条修复记录，功能更新同理。
+## v0.7.2 (current)
+
+- 新增知识库 external API 与 `yuxi kb` 查询类命令：后端在 `/api/knowledge/databases/external/*` 下暴露列库、文件搜索、检索、打开和文件内查找接口，统一走认证身份校验；CLI 新增 `yuxi kb list/files/query/open/find`，补充后端 external API 集成测试与 CLI client/命令测试。
 
 ## v0.7.1 (2026-07-17)
 
@@ -12,6 +15,7 @@
 - 修复沙箱执行边界：每个动态 Docker 沙箱使用只与 provisioner 相连的独立网络，沙箱之间不能互访，也不再加入业务 `app-network` 或发布随机宿主机端口；provisioner 重启后会重新接入已有沙箱网络，清理时只删除自身创建且标签匹配的网络。API/worker 使用至少 32 字符的 `SANDBOX_PROVISIONER_TOKEN` 调用 provisioner，并通过认证代理访问沙箱文件与命令接口，代理在应用生命周期内复用 HTTP 连接池。生产 Compose 同时移除 PostgreSQL 和解析服务的宿主机端口，阻断沙箱对其他租户、业务数据库、对象存储和无鉴权 provisioner 的横向访问。
 - 公开头像和 Agent 图片改用同源 `/minio/public/...` 地址，由开发 Vite 和生产 Nginx 只读代理 `public` bucket；MinIO `9000` 对象 API 与 `9001` 管理控制台无需对外开放，私有 bucket 不进入前端代理。
 - Markdown 渲染兼容历史 PDF 解析结果中的 `http(s)://<host>:9000/public/...` 图片链接，在展示时转换为同源 `/minio/public/...`，无需批量重写 MinIO 中已有的 `.md` 文件或重新解析文档。
+
 
 ### 破坏性变更
 

@@ -15,6 +15,16 @@ async def test_health_endpoint_is_public(test_client):
     assert response.json()["status"] == "ok"
 
 
+async def test_discovery_declares_cli_knowledge_capabilities(test_client):
+    response = await test_client.get("/api/system/discovery")
+    assert response.status_code == 200
+    cli_capabilities = response.json()["capabilities"]["cli"]
+    for capability in ("kb_list", "kb_files", "kb_query", "kb_open", "kb_find"):
+        assert cli_capabilities.get(capability) is True, capability
+    assert "kb_parse" not in cli_capabilities
+    assert "kb_index" not in cli_capabilities
+
+
 async def test_info_endpoint_is_public(test_client):
     response = await test_client.get("/api/system/info")
     assert response.status_code == 200

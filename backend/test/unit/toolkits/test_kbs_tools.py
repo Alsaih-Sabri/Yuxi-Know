@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import inspect
-from types import SimpleNamespace
+from types import MethodType, SimpleNamespace
 
 import pytest
 
 from yuxi.agents.toolkits.kbs import tools
+from yuxi.knowledge.base import KnowledgeBase
+from yuxi.knowledge.manager import KnowledgeBaseManager
 
 
 def _tool_callable(tool):
@@ -85,6 +87,15 @@ def _patch_retrievers(monkeypatch, *, kb_type: str = "milvus", retriever=None):
         find_file_content=_not_configured,
         open_file_content=_not_configured,
     )
+    # 复用真实 manager 的 retrieve/open_document/find_in_document，使其内部走上面的 mock。
+    for name in (
+        "retrieve",
+        "open_document",
+        "find_in_document",
+        "_require_kb_supports_documents",
+        "database_type_supports_documents",
+    ):
+        setattr(manager, name, MethodType(getattr(KnowledgeBaseManager, name), manager))
     monkeypatch.setattr(tools, "_get_knowledge_base", lambda: manager)
     monkeypatch.setattr(tools, "knowledge_base", manager, raising=False)
     return manager
@@ -100,16 +111,19 @@ async def test_query_kb_returns_search_schema_without_sandbox_paths(monkeypatch)
     async def _fake_retriever(query_text: str, **kwargs):
         assert query_text == "auth"
         assert kwargs == {}
-        return [
-            {
-                "content": "auth guide",
-                "metadata": {
-                    "file_id": "file-1",
-                    "source": "auth-guide.pdf",
-                    "filepath": "/tmp/sandbox/auth-guide.pdf",
-                },
-            }
-        ]
+        return KnowledgeBase.build_search_output(
+            "db-1",
+            [
+                {
+                    "content": "auth guide",
+                    "metadata": {
+                        "file_id": "file-1",
+                        "source": "auth-guide.pdf",
+                        "filepath": "/tmp/sandbox/auth-guide.pdf",
+                    },
+                }
+            ],
+        )
 
     _patch_retrievers(monkeypatch, retriever=_fake_retriever)
     monkeypatch.setattr(tools, "_resolve_visible_knowledge_bases_for_query", _fake_visible_kbs)
@@ -131,17 +145,20 @@ async def test_query_kb_returns_search_schema_without_sandbox_paths(monkeypatch)
 async def test_query_kb_allows_dify_knowledge_base(monkeypatch) -> None:
     async def _fake_retriever(query_text: str, **kwargs):
         assert query_text == "auth"
-        return [
-            {
-                "content": "auth guide",
-                "score": 0.98,
-                "metadata": {
-                    "file_id": "dify-doc-1",
-                    "chunk_id": "dify-segment-1",
-                    "source": "Dify Doc",
-                },
-            }
-        ]
+        return KnowledgeBase.build_search_output(
+            "db-1",
+            [
+                {
+                    "content": "auth guide",
+                    "score": 0.98,
+                    "metadata": {
+                        "file_id": "dify-doc-1",
+                        "chunk_id": "dify-segment-1",
+                        "source": "Dify Doc",
+                    },
+                }
+            ],
+        )
 
     _patch_retrievers(monkeypatch, kb_type="dify", retriever=_fake_retriever)
     monkeypatch.setattr(tools, "_resolve_visible_knowledge_bases_for_query", _fake_visible_kbs)
@@ -187,14 +204,17 @@ async def test_query_kb_returns_plain_result_without_path_injection(monkeypatch)
 async def test_query_kb_maps_full_doc_id_and_chunk_metadata(monkeypatch) -> None:
     async def _fake_retriever(query_text: str, **kwargs):
         assert query_text == "auth"
-        return [
-            {
-                "content": "auth guide",
-                "full_doc_id": "file-1",
-                "chunk_id": "chunk-1",
-                "chunk_index": 3,
-            }
-        ]
+        return KnowledgeBase.build_search_output(
+            "db-1",
+            [
+                {
+                    "content": "auth guide",
+                    "full_doc_id": "file-1",
+                    "chunk_id": "chunk-1",
+                    "chunk_index": 3,
+                }
+            ],
+        )
 
     _patch_retrievers(monkeypatch, retriever=_fake_retriever)
     monkeypatch.setattr(tools, "_resolve_visible_knowledge_bases_for_query", _fake_visible_kbs)
@@ -287,7 +307,7 @@ async def test_find_kb_document_rejects_dify(monkeypatch) -> None:
         runtime=runtime,
     )
 
-    assert "Dify 知识库" in result
+    assert "只支持检索" in result
 
 
 @pytest.mark.asyncio
