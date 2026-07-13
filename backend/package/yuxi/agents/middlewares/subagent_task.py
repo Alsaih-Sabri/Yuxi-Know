@@ -5,7 +5,6 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Annotated, Any
 
-from deepagents import SubagentTransformer as DeepAgentsSubagentTransformer
 from deepagents.middleware._utils import append_to_system_message
 from langchain.agents.middleware.types import AgentMiddleware, ContextT, ModelRequest, ModelResponse, ResponseT
 from langchain_core.messages import ToolMessage
@@ -20,8 +19,6 @@ from yuxi.services.input_message_service import build_chat_input_message
 from yuxi.storage.postgres.manager import pg_manager
 from yuxi.storage.postgres.models_business import Agent
 
-YUXI_SUBAGENTS_STREAM_KEY = "yuxi_subagents"
-
 
 def _subagent_run_service_module():
     from yuxi.services import subagent_run_service
@@ -32,11 +29,6 @@ def _subagent_run_service_module():
 def _async_only_tool(*, name: str, coroutine: Callable[..., Awaitable[Any]], description: str) -> StructuredTool:
     """后台子智能体工具只在异步链路执行；仅声明 coroutine，同步调用由 LangChain 直接报错。"""
     return StructuredTool.from_function(name=name, coroutine=coroutine, description=description, infer_schema=True)
-
-
-class YuxiSubagentTransformer(DeepAgentsSubagentTransformer):
-    def init(self) -> dict[str, Any]:
-        return {YUXI_SUBAGENTS_STREAM_KEY: self._log}
 
 
 TASK_SYSTEM_PROMPT = """## `task`（子智能体任务工具）
@@ -141,8 +133,6 @@ class YuxiSubAgentMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
         available_agents = "\n".join(f"- {agent.slug}: {agent.description or agent.name}" for agent in subagents)
         self.system_prompt = TASK_SYSTEM_PROMPT.format(available_agents=available_agents)
         self.tools = [self._build_task_tool(available_agents), *self._build_async_subagent_tools(available_agents)]
-        self.subagent_names = frozenset(self.subagents)
-        self.transformers = [lambda scope: YuxiSubagentTransformer(scope, subagent_names=self.subagent_names)]
 
     def wrap_model_call(
         self,
