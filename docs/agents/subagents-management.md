@@ -98,7 +98,6 @@ class TaskToolSchema(BaseModel):
 |------|------|----------|
 | `subagent_start` | 异步启动子智能体 run，立即返回 `run_id` 和 `thread_id` | `description`、`subagent_slug`、可选 `thread_id` |
 | `subagent_status` | 按 `run_id` 查询状态，附带最近 3 条可读进度摘要；run 终态时返回最终结果 | `run_id` |
-| `subagent_events` | 按运行 Redis 流游标读取增量事件 | `run_id`、可选 `after_seq`（默认 `0-0`）、`limit`（1-50） |
 | `subagent_cancel` | 取消运行中的子智能体 run | `run_id` |
 | `subagent_await` | 阻塞等待子智能体 run 终态并返回最终结果；超时返回当前快照和 `wait_timed_out` 标志 | `run_id` |
 
@@ -106,10 +105,11 @@ class TaskToolSchema(BaseModel):
 
 - 长任务或多个可并行任务优先使用 `subagent_start`，让父智能体继续推进主流程；短任务需要立即拿到结果时继续使用 `task`。
 - `thread_id` 是子智能体的长期上下文 ID，同一个 `thread_id` 终态后可以再创建新的 run 续跑。若同线程已有运行中的 run，`subagent_start` 会返回 busy 结构，不会隐藏排队。
-- `subagent_status`、`subagent_events`、`subagent_cancel`、`subagent_await` 都按 `run_id` 操作，并校验该 run 是否归属当前父 run 创建的子智能体，避免越权访问其它子任务。
+- `subagent_status`、`subagent_cancel`、`subagent_await` 都按 `run_id` 操作，并校验该 run 是否归属当前父 run 创建的子智能体，避免越权访问其它子任务。
+- Redis 原始事件流只供运行基础设施和前端 SSE 订阅使用，不作为模型工具结果返回；父智能体通过 `subagent_status` 获取轻量进度，通过 `subagent_await` 获取最终结果。
 - 父智能体不应通过 shell、curl 或 HTTP API 间接调用子智能体，所有调用必须走上述工具。
 
-异步子智能体在状态面板的「子智能体」分组中按 `run_id` 展示运行身份；状态/事件轮询工具不会渲染成独立 Agent 卡片，弹窗会随子智能体条目补齐 `run_id` 后订阅对应 SSE，已完成的子智能体改为直接读取持久化 Message 历史。
+异步子智能体在状态面板的「子智能体」分组中按 `run_id` 展示运行身份；状态查询工具不会渲染成独立 Agent 卡片，弹窗会随子智能体条目补齐 `run_id` 后订阅对应 SSE，已完成的子智能体改为直接读取持久化 Message 历史。
 
 ### 文件系统与沙盒作用域
 

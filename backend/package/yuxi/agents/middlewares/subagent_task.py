@@ -47,8 +47,8 @@ TASK_SYSTEM_PROMPT = """## `task`（子智能体任务工具）
 
 后台子智能体：
 - 长任务或多个可并行任务优先使用 `subagent_start`，它会立即返回 `run_id` 和 `thread_id`，父智能体可以继续工作。
-- 后续用 `subagent_status` 查询状态，`subagent_events` 读取增量事件，
-  `subagent_cancel` 取消，`subagent_await` 在明确需要结果时等待。
+- 后续用 `subagent_status` 查询状态和最近进度，`subagent_cancel` 取消，
+  `subagent_await` 在明确需要结果时等待。
 - `thread_id` 是子智能体长期上下文 ID；同一个 `thread_id` 完成后可以继续创建新的 run。
   若同线程已有运行中 run，会返回 busy，不会隐藏排队。
 - 短任务且父智能体必须立刻依赖结果时继续使用 `task`。
@@ -69,7 +69,7 @@ Do not call subagents through shell, curl, HTTP APIs, or command-line indirectio
 
 SUBAGENT_START_DESCRIPTION = """Start a configured Yuxi subagent asynchronously.
 
-Returns a child thread ID for future continuation and a run ID for status/events/cancel/result checks.
+Returns a child thread ID for future continuation and a run ID for status/cancel/result checks.
 Use this for long-running or parallelizable subagent work. If `thread_id` is provided, it continues that subagent
 thread when no active run is currently writing to it."""
 
@@ -77,8 +77,6 @@ SUBAGENT_STATUS_DESCRIPTION = """Check a subagent run status by run_id.
 
 Returns the current run status, a compact progress summary with the latest 3 readable messages, and the final result
 when the run has reached a terminal status."""
-
-SUBAGENT_EVENTS_DESCRIPTION = """Read recent events for a subagent run by run_id and Redis stream cursor."""
 
 SUBAGENT_CANCEL_DESCRIPTION = """Cancel a running subagent run by run_id."""
 
@@ -89,8 +87,6 @@ SUBAGENT_SLUG_ARG = "要调用的子智能体 slug，必须是工具描述中列
 TASK_THREAD_ID_ARG = "可选。要继续的既有子智能体线程 ID，通常来自之前 task 工具结果；新任务不要填写。"
 ASYNC_THREAD_ID_ARG = "可选。要继续的后台子智能体线程 ID，来自之前 subagent_start 返回的 thread_id；新任务不要填写。"
 SUBAGENT_RUN_ID_ARG = "子智能体运行 ID，由 subagent_start 返回。"
-SUBAGENT_AFTER_SEQ_ARG = "可选。事件流游标，首次读取传 0-0；后续传上次返回的 last_seq。"
-SUBAGENT_EVENT_LIMIT_ARG = "可选。读取事件数量，范围 1-50。"
 
 
 async def create_subagent_task_middleware(parent_context) -> YuxiSubAgentMiddleware | None:
@@ -282,38 +278,6 @@ class YuxiSubAgentMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
             subagent_run = subagent_service.serialize_subagent_run_state(run)
             return _json_tool_command(payload, runtime.tool_call_id, subagent_run=subagent_run)
 
-        async def asubagent_events(
-            run_id: Annotated[str, SUBAGENT_RUN_ID_ARG],
-            runtime: ToolRuntime,
-            after_seq: Annotated[str, SUBAGENT_AFTER_SEQ_ARG] = "0-0",
-            limit: Annotated[int, SUBAGENT_EVENT_LIMIT_ARG] = 20,
-        ) -> str | Command:
-            from yuxi.services.run_queue_service import list_run_stream_events, normalize_after_seq
-
-            parent_runtime, runtime_error = self._require_async_parent_runtime("无法读取子智能体事件")
-            if runtime_error:
-                return runtime_error
-            try:
-                await self._get_verified_subagent_run(
-                    run_id=run_id,
-                    uid=parent_runtime.uid,
-                    created_by_run_id=parent_runtime.created_by_run_id,
-                )  # 校验子智能体归属
-            except ValueError as exc:
-                return str(exc)
-
-            normalized_after_seq = normalize_after_seq(after_seq)
-            event_limit = min(50, max(1, int(limit or 20)))
-            events = await list_run_stream_events(run_id, after_seq=normalized_after_seq, limit=event_limit)
-            payload = {
-                "status": "ok",
-                "run_id": run_id,
-                "after_seq": normalized_after_seq,
-                "last_seq": str(events[-1]["seq"]) if events else normalized_after_seq,
-                "events": events,
-            }
-            return _json_tool_command(payload, runtime.tool_call_id)
-
         async def asubagent_cancel(
             run_id: Annotated[str, SUBAGENT_RUN_ID_ARG],
             runtime: ToolRuntime,
@@ -408,11 +372,6 @@ class YuxiSubAgentMiddleware(AgentMiddleware[Any, ContextT, ResponseT]):
                 name="subagent_status",
                 coroutine=asubagent_status,
                 description=SUBAGENT_STATUS_DESCRIPTION,
-            ),
-            _async_only_tool(
-                name="subagent_events",
-                coroutine=asubagent_events,
-                description=SUBAGENT_EVENTS_DESCRIPTION,
             ),
             _async_only_tool(
                 name="subagent_cancel",

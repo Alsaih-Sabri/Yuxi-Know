@@ -6,7 +6,6 @@ from types import SimpleNamespace
 import pytest
 import yuxi.agents.middlewares.subagent_task as subagent_task_middleware
 import yuxi.services.agent_run_service as agent_run_service
-import yuxi.services.run_queue_service as run_queue_service
 import yuxi.services.subagent_run_service as subagent_run_service
 from langgraph.prebuilt.tool_node import ToolRuntime
 from langgraph.types import Command
@@ -208,7 +207,13 @@ async def test_create_task_middleware_loads_all_visible_subagents_when_empty(mon
     )
 
     assert isinstance(middleware, YuxiSubAgentMiddleware)
-    assert {tool.name for tool in middleware.tools} >= {"task", "subagent_start"}
+    assert {tool.name for tool in middleware.tools} == {
+        "task",
+        "subagent_start",
+        "subagent_status",
+        "subagent_cancel",
+        "subagent_await",
+    }
 
 
 @pytest.mark.asyncio
@@ -605,7 +610,7 @@ async def test_subagent_status_returns_progress_for_running_run(monkeypatch) -> 
 
 
 @pytest.mark.asyncio
-async def test_subagent_events_cancel_and_await_use_parent_run_scope(monkeypatch) -> None:
+async def test_subagent_cancel_and_await_use_parent_run_scope(monkeypatch) -> None:
     captured: dict[str, object] = {"loads": []}
 
     async def fake_get_verified_subagent_run(self, *, run_id: str, uid: str, created_by_run_id: str):
@@ -619,10 +624,6 @@ async def test_subagent_events_cancel_and_await_use_parent_run_scope(monkeypatch
         )
         return _subagent_run(status="completed")
 
-    async def fake_list_run_stream_events(run_id: str, *, after_seq: str, limit: int):
-        captured["events"] = {"run_id": run_id, "after_seq": after_seq, "limit": limit}
-        return [{"seq": "2-0", "event_type": "messages", "payload": {"chunk": {"status": "loading"}}}]
-
     async def fake_request_cancel_agent_run(*, run_id: str, current_uid: str, db):
         captured["cancel"] = {"run_id": run_id, "current_uid": current_uid, "db": db}
         return _subagent_run(status="cancelling")
@@ -633,21 +634,10 @@ async def test_subagent_events_cancel_and_await_use_parent_run_scope(monkeypatch
 
     _patch_session(monkeypatch)
     monkeypatch.setattr(YuxiSubAgentMiddleware, "_get_verified_subagent_run", fake_get_verified_subagent_run)
-    monkeypatch.setattr(run_queue_service, "list_run_stream_events", fake_list_run_stream_events)
     monkeypatch.setattr(agent_run_service, "request_cancel_agent_run", fake_request_cancel_agent_run)
     monkeypatch.setattr(agent_run_service, "await_agent_run_result", fake_await_agent_run_result)
 
     tools = {item.name: item for item in _async_tool_middleware().tools}
-
-    events_result = await tools["subagent_events"].coroutine(
-        run_id="child-run",
-        after_seq="1-0",
-        limit=99,
-        runtime=SimpleNamespace(tool_call_id="events-call"),
-    )
-    events_payload = json.loads(events_result.update["messages"][0].content)
-    assert events_payload["last_seq"] == "2-0"
-    assert captured["events"] == {"run_id": "child-run", "after_seq": "1-0", "limit": 50}
 
     cancel_result = await tools["subagent_cancel"].coroutine(
         run_id="child-run",
