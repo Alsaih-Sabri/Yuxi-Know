@@ -112,7 +112,7 @@ docker logs api-dev -f
 docker logs web-dev -f
 ```
 
-### 常见问题
+### 部署故障排查
 
 <details>
 <summary><strong>Docker 镜像拉取失败</strong></summary>
