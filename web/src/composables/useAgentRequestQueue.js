@@ -1,5 +1,6 @@
 import { agentApi } from '@/apis'
 import { processRunSseResponse } from '@/composables/useAgentRunStream'
+import { IDLE_QUEUE_SNAPSHOT } from '@/composables/useAgentThreadState'
 import { handleChatError } from '@/utils/errorHandler'
 
 export function useAgentRequestQueue({ getThreadState, startRunStream, onStreamError }) {
@@ -49,6 +50,7 @@ export function useAgentRequestQueue({ getThreadState, startRunStream, onStreamE
     try {
       const resp = await agentApi.listThreadQueuedRequests(threadId, agentSlug)
       ts.queuedRequests = resp?.requests || []
+      ts.queueSnapshot = resp?.queue || { ...IDLE_QUEUE_SNAPSHOT }
     } catch (e) {
       console.warn('Failed to sync queued requests:', e)
     }
@@ -119,10 +121,31 @@ export function useAgentRequestQueue({ getThreadState, startRunStream, onStreamE
     }
   }
 
+  const continueQueue = async (threadId, agentSlug) => {
+    const ts = getThreadState(threadId)
+    if (!ts || !threadId || !agentSlug || ts.continueQueueInFlight) return false
+
+    ts.continueQueueInFlight = true
+    try {
+      const response = await agentApi.continueThreadQueue(threadId, agentSlug)
+      await syncQueuedRequests(threadId, agentSlug)
+      if (response?.request_id) {
+        void startRequestStream(threadId, response.request_id)
+      }
+      return true
+    } catch (error) {
+      handleChatError(error, 'continue_queue')
+      return false
+    } finally {
+      ts.continueQueueInFlight = false
+    }
+  }
+
   return {
     startRequestStream,
     stopAllRequestStreams,
     cancelRequest,
-    syncQueuedRequests
+    syncQueuedRequests,
+    continueQueue
   }
 }

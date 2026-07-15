@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   buildToolApprovalDecisions,
   hasPendingInterruptPayload,
+  isThreadWaitingForUserAction,
   isToolApprovalMode
 } from '../toolApproval.js'
 
@@ -17,5 +18,22 @@ assert.deepEqual(buildToolApprovalDecisions({ 0: 'approve', 1: 'reject' }, 2), [
 assert.equal(hasPendingInterruptPayload({ kind: 'question', questions: [{}] }), true)
 assert.equal(hasPendingInterruptPayload({ kind: 'tool_approval', actionRequests: [{}] }), true)
 assert.equal(hasPendingInterruptPayload({ kind: 'tool_approval', actionRequests: [] }), false)
+assert.equal(
+  isThreadWaitingForUserAction({
+    pendingInterrupt: { kind: 'question', questions: [{ id: 'q-1' }] }
+  }),
+  true
+)
+assert.equal(
+  isThreadWaitingForUserAction({ queueSnapshot: { status: 'interrupted' } }),
+  true
+)
+assert.equal(
+  isThreadWaitingForUserAction({
+    pendingInterrupt: null,
+    queueSnapshot: { status: 'paused' }
+  }),
+  false
+)
 
 console.log('toolApproval: all assertions passed')

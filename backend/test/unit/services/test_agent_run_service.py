@@ -243,6 +243,7 @@ class _CreateRunDb:
         existing_run: SimpleNamespace | None = None,
         existing_run_after_rollback: SimpleNamespace | None = None,
         runs_by_id: dict[str, SimpleNamespace] | None = None,
+        latest_run: SimpleNamespace | None = None,
         raise_create_integrity_error: bool = False,
     ):
         self.added = []
@@ -259,6 +260,7 @@ class _CreateRunDb:
         self.existing_run = existing_run
         self.existing_run_after_rollback = existing_run_after_rollback
         self.runs_by_id = runs_by_id or {}
+        self.latest_run = latest_run
         self.raise_create_integrity_error = raise_create_integrity_error
         self._message_id = message_id
 
@@ -327,6 +329,12 @@ class _CreateRunRepo:
     async def get_run_for_user(self, run_id: str, uid: str):
         assert uid == "user-1"
         return self.db.runs_by_id.get(run_id)
+
+    async def get_latest_chat_or_resume_run(self, *, uid: str, agent_slug: str, conversation_thread_id: str):
+        assert uid == "user-1"
+        assert agent_slug == "default"
+        assert conversation_thread_id == "thread-1"
+        return self.db.latest_run or self.db.runs_by_id.get("parent-run")
 
     async def create_run(self, **kwargs):
         self.db.created_run_kwargs = kwargs
@@ -1017,6 +1025,33 @@ async def test_create_resume_run_rejects_non_interrupted_parent(monkeypatch: pyt
 
 
 @pytest.mark.asyncio
+async def test_create_resume_run_rejects_superseded_interrupt(monkeypatch: pytest.MonkeyPatch):
+    parent_run = SimpleNamespace(
+        id="parent-run",
+        conversation_thread_id="thread-1",
+        status="interrupted",
+        input_payload={"model_spec": "parent-model", "tool_approval_mode": "default"},
+    )
+    newer_run = SimpleNamespace(id="newer-run", status="failed")
+    db = _patch_agent_run_creation(monkeypatch, parent_run=parent_run, latest_run=newer_run)
+
+    with pytest.raises(agent_run_service.HTTPException) as exc:
+        await agent_run_service.create_agent_run_view(
+            input_message=None,
+            agent_slug="default",
+            thread_id="thread-1",
+            meta={"request_id": "resume-req"},
+            current_uid="user-1",
+            db=db,
+            resume={"language": "python"},
+            created_by_run_id="parent-run",
+        )
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "resume_superseded"
+
+
+@pytest.mark.asyncio
 async def test_create_resume_run_rejects_parent_without_model_snapshot(monkeypatch: pytest.MonkeyPatch):
     db = _patch_agent_run_creation(
         monkeypatch,
@@ -1292,6 +1327,7 @@ def _patch_agent_run_creation(
     existing_run: SimpleNamespace | None = None,
     existing_run_after_rollback: SimpleNamespace | None = None,
     parent_run: SimpleNamespace | None = None,
+    latest_run: SimpleNamespace | None = None,
     raise_create_integrity_error: bool = False,
 ):
     runs_by_id = {
@@ -1302,6 +1338,7 @@ def _patch_agent_run_creation(
         )
     }
     if parent_run:
+        parent_run.agent_slug = getattr(parent_run, "agent_slug", "default")
         runs_by_id["parent-run"] = parent_run
     db = _CreateRunDb(
         message_id=message_id,
@@ -1310,6 +1347,7 @@ def _patch_agent_run_creation(
         existing_run=existing_run,
         existing_run_after_rollback=existing_run_after_rollback,
         runs_by_id=runs_by_id,
+        latest_run=latest_run,
         raise_create_integrity_error=raise_create_integrity_error,
     )
 
@@ -1508,17 +1546,12 @@ def test_resolve_tool_approval_mode_uses_request_then_agent_config_then_default(
     default_agent = SimpleNamespace(config_json={})
 
     assert (
-        agent_run_service.resolve_agent_run_tool_approval_mode("default", configured_agent, _FakeBackend())
-        == "default"
+        agent_run_service.resolve_agent_run_tool_approval_mode("default", configured_agent, _FakeBackend()) == "default"
     )
     assert (
-        agent_run_service.resolve_agent_run_tool_approval_mode(None, configured_agent, _FakeBackend())
-        == "always_trust"
+        agent_run_service.resolve_agent_run_tool_approval_mode(None, configured_agent, _FakeBackend()) == "always_trust"
     )
-    assert (
-        agent_run_service.resolve_agent_run_tool_approval_mode(None, default_agent, _FakeBackend())
-        == "default"
-    )
+    assert agent_run_service.resolve_agent_run_tool_approval_mode(None, default_agent, _FakeBackend()) == "default"
 
 
 def test_resolve_tool_approval_mode_rejects_unknown_value():
@@ -1531,9 +1564,7 @@ def test_resolve_tool_approval_mode_rejects_unknown_value():
 
 
 def test_validate_resume_input_accepts_only_approve_and_reject_decisions():
-    agent_run_service._validate_resume_input(
-        {"decisions": [{"type": "approve"}, {"type": "reject", "message": "no"}]}
-    )
+    agent_run_service._validate_resume_input({"decisions": [{"type": "approve"}, {"type": "reject", "message": "no"}]})
 
     with pytest.raises(agent_run_service.HTTPException) as exc:
         agent_run_service._validate_resume_input({"decisions": [{"type": "edit"}]})
@@ -1560,9 +1591,7 @@ def test_compact_stream_chunk_retains_compression_field():
 def test_compact_stream_chunk_retains_tool_approval_payload():
     approval = {
         "action_requests": [{"name": "execute", "args": {"command": "pytest -q"}}],
-        "review_configs": [
-            {"action_name": "execute", "allowed_decisions": ["approve", "reject"]}
-        ],
+        "review_configs": [{"action_name": "execute", "allowed_decisions": ["approve", "reject"]}],
     }
 
     compact = agent_run_service._compact_stream_chunk(

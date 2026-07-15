@@ -5,6 +5,13 @@ const createOnGoingConvState = () => ({
   toolCallBuffers: {}
 })
 
+const IDLE_QUEUE_SNAPSHOT = Object.freeze({
+  status: 'idle',
+  paused_reason: null,
+  blocking_run_id: null,
+  can_continue: false
+})
+
 export function useAgentThreadState({
   chatState,
   getCurrentThreadId,
@@ -34,6 +41,8 @@ export function useAgentThreadState({
         agentState: null,
         contextCompressing: false,
         queuedRequests: [],
+        queueSnapshot: { ...IDLE_QUEUE_SNAPSHOT },
+        continueQueueInFlight: false,
         requestStreams: {}
       }
     }
@@ -111,3 +120,5 @@ export function useAgentThreadState({
     stopThreadStream
   }
 }
+
+export { IDLE_QUEUE_SNAPSHOT }

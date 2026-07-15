@@ -151,6 +151,27 @@
                 aria-label="排队请求"
               >
                 <div class="queued-request-title">要求后续变更</div>
+                <div
+                  v-if="currentQueueSnapshot.status === 'paused'"
+                  class="queued-request-notice is-paused"
+                >
+                  <span>{{ queuePausedMessage }}</span>
+                  <button
+                    type="button"
+                    class="queued-request-continue"
+                    :disabled="currentThreadState?.continueQueueInFlight"
+                    @click="handleContinueQueue"
+                  >
+                    <Play :size="14" fill="currentColor" />
+                    继续队列
+                  </button>
+                </div>
+                <div
+                  v-else-if="currentQueueSnapshot.status === 'interrupted'"
+                  class="queued-request-notice"
+                >
+                  当前任务正在等待回答或审批，完成后将继续处理后续请求。
+                </div>
                 <div class="queued-request-list">
                   <div
                     v-for="request in currentQueuedRequests"
@@ -619,6 +640,7 @@ import {
   CornerDownRight,
   FolderKanban,
   LayoutList,
+  Play,
   RefreshCw,
   Trash2
 } from 'lucide-vue-next'
@@ -664,7 +686,7 @@ import FallbackAvatar from '@/components/common/FallbackAvatar.vue'
 import { enrichTaskToolCalls, parseToolCallArgs } from '@/components/ToolCallingResult/toolRegistry'
 import { getConversationDisplayItems } from '@/utils/messageGrouping'
 import { makeChildThreadId } from '@/utils/subagentThread'
-import { isToolApprovalMode } from '@/utils/toolApproval'
+import { isThreadWaitingForUserAction, isToolApprovalMode } from '@/utils/toolApproval'
 
 // ==================== PROPS & EMITS ====================
 const props = defineProps({
@@ -1832,18 +1854,38 @@ const isStreaming = computed(() => {
   return threadState ? threadState.isStreaming : false
 })
 const currentQueuedRequests = computed(() => currentThreadState.value?.queuedRequests || [])
+const currentQueueSnapshot = computed(
+  () =>
+    currentThreadState.value?.queueSnapshot || {
+      status: 'idle',
+      paused_reason: null,
+      blocking_run_id: null,
+      can_continue: false
+    }
+)
 const queuedRequestCount = computed(() => currentQueuedRequests.value.length)
 const hasQueuedRequests = computed(() => queuedRequestCount.value > 0)
+const isWaitingForUserAction = computed(() =>
+  isThreadWaitingForUserAction(currentThreadState.value)
+)
+const queuePausedMessage = computed(() =>
+  currentQueueSnapshot.value.paused_reason === 'cancelled'
+    ? '当前任务已停止，后续队列已暂停。'
+    : '上一个任务失败，后续队列已暂停。'
+)
 const shouldShowStopButton = computed(
   () => isStreaming.value && !String(userInput.value || '').trim()
 )
 const shouldRefreshStateWhileStreaming = computed(
   () => Boolean(currentChatId.value) && isStreaming.value && statePanelOpen.value
 )
-const isProcessing = computed(() => isStreaming.value || hasQueuedRequests.value)
+const isProcessing = computed(
+  () =>
+    isStreaming.value || (hasQueuedRequests.value && currentQueueSnapshot.value.status !== 'paused')
+)
 const isReplyLoading = computed(() => {
   const threadState = currentThreadState.value
-  return Boolean(threadState?.replyLoadingVisible)
+  return Boolean(threadState?.replyLoadingVisible) && currentQueueSnapshot.value.status !== 'paused'
 })
 const replyLoadingText = computed(() => {
   const threadState = currentThreadState.value
@@ -1855,6 +1897,7 @@ const isSendButtonDisabled = computed(() => {
   return (
     sendCooldownActive.value ||
     props.sendDisabled ||
+    isWaitingForUserAction.value ||
     (!userInput.value && !isProcessing.value) ||
     !currentAgent.value
   )
@@ -2397,6 +2440,7 @@ const { startRunStream, resumeActiveRunForThread, stopRunStreamSubscription } = 
   streamSmoother,
   onInterruptDetected: ({ threadId }) => {
     restorePendingInterruptForThread(threadId)
+    void resumeQueuedRequestsForThread(threadId)
   },
   onTerminalDetected: ({ threadId, touchedThreadIds = [] }) => {
     if (approvalState.threadId === threadId || touchedThreadIds.includes(approvalState.threadId)) {
@@ -2416,12 +2460,17 @@ const startDispatchedRequestRun = async (threadId, runId, requestId) => {
   await startRunStream(threadId, runId, '0-0')
 }
 
-const { startRequestStream, stopAllRequestStreams, cancelRequest, syncQueuedRequests } =
-  useAgentRequestQueue({
-    getThreadState,
-    startRunStream: startDispatchedRequestRun,
-    onStreamError: () => {}
-  })
+const {
+  startRequestStream,
+  stopAllRequestStreams,
+  cancelRequest,
+  syncQueuedRequests,
+  continueQueue
+} = useAgentRequestQueue({
+  getThreadState,
+  startRunStream: startDispatchedRequestRun,
+  onStreamError: () => {}
+})
 
 const handleCancelQueuedRequest = async (requestId) => {
   const threadId = currentChatId.value
@@ -2433,6 +2482,17 @@ const handleCancelQueuedRequest = async (requestId) => {
   if (cancelled) {
     await resumeQueuedRequestsForThread(threadId)
     message.success('已删除排队请求')
+  }
+}
+
+const handleContinueQueue = async () => {
+  const threadId = currentChatId.value
+  const agentSlug =
+    threads.value.find((thread) => thread.id === threadId)?.agent_id || currentAgentId.value
+  if (!threadId || !agentSlug || currentThreadState.value?.continueQueueInFlight) return
+
+  if (await continueQueue(threadId, agentSlug)) {
+    message.success('队列已继续')
   }
 }
 
@@ -2577,7 +2637,13 @@ const selectThreadFromRoute = async (threadId) => {
 const handleSendMessage = async ({ image } = {}) => {
   const text = userInput.value.trim()
   const imageContent = image?.imageContent || null
-  if ((!text && !image) || !currentAgent.value || sendCooldownActive.value || props.sendDisabled)
+  if (
+    (!text && !image) ||
+    !currentAgent.value ||
+    sendCooldownActive.value ||
+    props.sendDisabled ||
+    isWaitingForUserAction.value
+  )
     return
 
   // 发送后进入短暂冷却，防止连续触发停止
@@ -3520,6 +3586,44 @@ watch(currentChatId, (threadId, oldThreadId) => {
       color: var(--color-text-tertiary);
       font-size: 12px;
       font-weight: 500;
+    }
+
+    .queued-request-notice {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 10px;
+      padding: 8px 10px;
+      color: var(--color-text-tertiary);
+      background: var(--gray-50);
+      border-radius: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+
+      &.is-paused {
+        color: var(--color-warning-700);
+        background: var(--color-warning-50);
+      }
+    }
+
+    .queued-request-continue {
+      display: inline-flex;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 4px;
+      padding: 5px 8px;
+      color: var(--color-warning-700);
+      background: transparent;
+      border: 1px solid currentColor;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+
+      &:disabled {
+        opacity: 0.55;
+        cursor: wait;
+      }
     }
 
     .queued-request-list {

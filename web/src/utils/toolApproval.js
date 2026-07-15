@@ -16,3 +16,7 @@ export const hasPendingInterruptPayload = (pendingInterrupt) => {
   }
   return Array.isArray(pendingInterrupt.questions) && pendingInterrupt.questions.length > 0
 }
+
+export const isThreadWaitingForUserAction = (threadState) =>
+  hasPendingInterruptPayload(threadState?.pendingInterrupt) ||
+  threadState?.queueSnapshot?.status === 'interrupted'

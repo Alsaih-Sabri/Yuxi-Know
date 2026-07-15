@@ -279,6 +279,12 @@ async def process_agent_run(ctx, run_id: str):
         return
 
     if run.status in TERMINAL_RUN_STATUSES:
+        if run.status == "completed":
+            await dispatch_next_request(
+                uid=run.uid,
+                agent_slug=run.agent_slug,
+                thread_id=run.conversation_thread_id,
+            )
         logger.info(f"Run already terminal, skip: {run_id}, status={run.status}")
         return
 

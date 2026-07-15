@@ -106,7 +106,23 @@ async def test_list_thread_requests_returns_list(test_client, admin_headers):
         headers=admin_headers,
     )
     assert resp.status_code == 200, resp.text
-    assert "requests" in resp.json()
+    snapshot = resp.json()
+    assert "requests" in snapshot
+    assert snapshot["queue"]["status"] == "idle"
+
+
+async def test_continue_empty_queue_returns_stable_conflict(test_client, admin_headers):
+    agent_slug = await _get_default_agent_slug(test_client, admin_headers)
+    thread_id = await _create_thread(test_client, admin_headers, agent_slug)
+
+    resp = await test_client.post(
+        f"/api/agent/thread/{thread_id}/requests/continue",
+        params={"agent_slug": agent_slug},
+        headers=admin_headers,
+    )
+
+    assert resp.status_code == 409, resp.text
+    assert resp.json()["detail"]["code"] == "queue_empty"
 
 
 async def test_cancel_missing_request_returns_404(test_client, admin_headers):

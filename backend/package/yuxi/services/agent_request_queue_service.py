@@ -79,6 +79,14 @@ class IntakeResult:
     queue_position: int | None = None
 
 
+@dataclass(frozen=True)
+class DispatchResult:
+    """一次已提交前的 FIFO 队头派发结果。"""
+
+    request_id: str
+    run_id: str
+
+
 def validate_queue_policy(queue_policy: str) -> str:
     """校验 queue_policy，对未实现策略返回 422。"""
     if queue_policy in NOT_IMPLEMENTED_QUEUE_POLICIES:
@@ -89,24 +97,6 @@ def validate_queue_policy(queue_policy: str) -> str:
     if queue_policy not in SUPPORTED_QUEUE_POLICIES:
         raise HTTPException(status_code=422, detail=f"不支持的 queue_policy: {queue_policy}")
     return queue_policy
-
-
-def _build_message_metadata(
-    *, request_id: str, source: str, input_message: AgentRunInputMessage, meta: dict
-) -> dict[str, Any]:
-    """构建 Message.extra_metadata：request_id + source + raw_message + 附加上下文。"""
-    metadata: dict[str, Any] = {"request_id": request_id}
-    if source:
-        metadata["source"] = source
-    if raw_message := input_message.raw_message():
-        metadata["raw_message"] = raw_message
-    if attachment_file_ids := meta.get("attachment_file_ids"):
-        metadata["attachment_file_ids"] = attachment_file_ids
-    if isinstance(meta.get("agent_invocation_meta"), dict):
-        metadata["agent_invocation_meta"] = meta["agent_invocation_meta"]
-    if meta.get("tool_approval_mode") is not None:
-        metadata["tool_approval_mode"] = meta["tool_approval_mode"]
-    return metadata
 
 
 async def intake_request(
@@ -134,7 +124,6 @@ async def intake_request(
     meta = meta or {}
     uid_str = str(uid)
     repo = AgentRunRequestRepository(db)
-    conv_repo = ConversationRepository(db)
 
     # 幂等：相同 request_id 已存在时直接返回既有 request/run 视图
     existing_request = await repo.get_by_request_id(request_id)
@@ -149,17 +138,34 @@ async def intake_request(
             run_id=existing_request.dispatched_run_id,
         )
 
-    conv = await conv_repo.get_conversation_by_thread_id(thread_id)
-    if conv is None:
-        raise HTTPException(status_code=404, detail="对话线程不存在")
-
-    active_run = await AgentRunRepository(db).get_active_run_by_thread_for_user(
-        agent_slug=agent_slug, conversation_thread_id=thread_id, uid=uid_str
+    conversation = await _get_thread_conversation(
+        db=db,
+        uid=uid_str,
+        agent_slug=agent_slug,
+        thread_id=thread_id,
     )
+    existing_requests = await repo.list_queued(
+        uid=uid_str,
+        agent_slug=agent_slug,
+        conversation_thread_id=thread_id,
+    )
+    existing_head = existing_requests[0] if existing_requests else None
+    active_run = await AgentRunRepository(db).get_active_run_by_thread_for_user(
+        agent_slug=agent_slug,
+        conversation_thread_id=thread_id,
+        uid=uid_str,
+    )
+    latest_run = await AgentRunRepository(db).get_latest_chat_or_resume_run(
+        uid=uid_str,
+        agent_slug=agent_slug,
+        conversation_thread_id=thread_id,
+    )
+    if latest_run is not None and latest_run.status == "interrupted":
+        raise _queue_conflict("run_interrupted", "线程正在等待用户回答或审批")
 
-    # reject 策略 + 线程忙 → 写 rejected request + rejected message；其他情况走 queued 分支
-    rejected_by_active_run = policy == "reject" and active_run is not None
-    if rejected_by_active_run:
+    # reject 表示“不能立即成为并派发 FIFO 队头就拒绝”。
+    reject_without_immediate_dispatch = policy == "reject" and (active_run is not None or existing_head is not None)
+    if reject_without_immediate_dispatch:
         request_status = REQUEST_STATUS_REJECTED
         delivery_status = DELIVERY_STATUS_REJECTED
         input_payload = {}
@@ -179,12 +185,12 @@ async def intake_request(
     )
     persisted_message = await create_agent_run_input_message(
         db=db,
-        conversation_id=conv.id,
+        conversation_id=conversation.id,
         request_id=request_id,
         input_message=run_input_message,
         delivery_status=delivery_status,
     )
-    await repo.create(
+    persisted_request = await repo.create(
         request_id=request_id,
         uid=uid_str,
         agent_slug=agent_slug,
@@ -196,25 +202,38 @@ async def intake_request(
         status=request_status,
     )
 
-    # 线程空闲且不是 reject 策略时尝试立即派发
-    if not rejected_by_active_run and active_run is None:
-        run_id = await _try_dispatch_head(
-            db,
+    if not reject_without_immediate_dispatch:
+        dispatched = await _dispatch_ready_head(
+            db=db,
             uid=uid_str,
             agent_slug=agent_slug,
             thread_id=thread_id,
-            conversation_id=conv.id,
+            conversation_id=conversation.id,
+            expected_request_id=request_id if policy == "reject" else None,
         )
-        if run_id:
+        if dispatched and dispatched.request_id == request_id:
             return IntakeResult(
                 request_id=request_id,
                 status=REQUEST_STATUS_DISPATCHED,
                 queue_policy=policy,
                 message_id=persisted_message.id,
-                run_id=run_id,
+                run_id=dispatched.run_id,
             )
 
-    if rejected_by_active_run:
+        if policy == "reject":
+            persisted_request.status = REQUEST_STATUS_REJECTED
+            persisted_request.input_payload = {}
+            persisted_request.updated_at = utc_now_naive()
+            persisted_message.delivery_status = DELIVERY_STATUS_REJECTED
+            await db.flush()
+            return IntakeResult(
+                request_id=request_id,
+                status=REQUEST_STATUS_REJECTED,
+                queue_policy=policy,
+                message_id=persisted_message.id,
+            )
+
+    if reject_without_immediate_dispatch:
         return IntakeResult(
             request_id=request_id,
             status=REQUEST_STATUS_REJECTED,
@@ -233,57 +252,19 @@ async def intake_request(
 
 async def finalize_intake(*, db: AsyncSession, intake: IntakeResult) -> None:
     """调用方在 intake_request 后提交事务，并条件性将派发的 run 投入 ARQ。"""
+    dispatch = (
+        DispatchResult(request_id=intake.request_id, run_id=intake.run_id)
+        if intake.status == REQUEST_STATUS_DISPATCHED and intake.run_id
+        else None
+    )
+    await finalize_dispatch(db=db, dispatch=dispatch)
+
+
+async def finalize_dispatch(*, db: AsyncSession, dispatch: DispatchResult | None) -> None:
+    """提交当前事务；提交成功后才把已创建的 run 投递给 ARQ。"""
     await db.commit()
-    if intake.status == REQUEST_STATUS_DISPATCHED and intake.run_id:
-        await enqueue_agent_run(intake.run_id)
-
-
-async def _try_dispatch_head(
-    db: AsyncSession,
-    *,
-    uid: str,
-    agent_slug: str,
-    thread_id: str,
-    conversation_id: int,
-) -> str | None:
-    """锁定 FIFO 队头，创建 AgentRun，标记 dispatched。不 commit。
-
-    返回 run_id 或 None（队列空/约束冲突）。
-    线程忙的场景由 ``uq_agent_runs_one_active_per_thread`` 唯一约束兜底。
-    """
-    repo = AgentRunRequestRepository(db)
-    run_repo = AgentRunRepository(db)
-
-    head = await repo.get_queue_head(uid=uid, agent_slug=agent_slug, conversation_thread_id=thread_id)
-    if not head:
-        return None
-
-    run_id = str(uuid.uuid4())
-    try:
-        async with db.begin_nested():
-            await run_repo.create_run(
-                run_id=run_id,
-                conversation_thread_id=thread_id,
-                agent_slug=agent_slug,
-                uid=uid,
-                request_id=head.request_id,
-                input_payload=head.input_payload or {},
-                conversation_id=conversation_id,
-                run_type="chat",
-                input_message_id=head.input_message_id,
-            )
-            msg = await db.get(Message, head.input_message_id)
-            if msg:
-                msg.run_id = run_id
-                msg.delivery_status = DELIVERY_STATUS_DISPATCHED
-            await db.flush()
-            await repo.mark_dispatched(head.request_id, run_id=run_id)
-    except IntegrityError:
-        # active-run 唯一约束冲突 → 保持请求为 queued
-        logger.info(f"Dispatch conflict for request {head.request_id}, keeping queued")
-        return None
-
-    return run_id
+    if dispatch:
+        await enqueue_agent_run(dispatch.run_id)
 
 
 async def dispatch_next_request(
@@ -296,31 +277,29 @@ async def dispatch_next_request(
 
     供 run 完成后的下一个请求派发和恢复扫描调用。
     """
-    run_id = None
+    dispatch = None
     async with pg_manager.get_async_session_context() as db:
-        conv = await ConversationRepository(db).get_conversation_by_thread_id(thread_id)
-        if not conv:
+        conversation = await ConversationRepository(db).get_conversation_by_thread_id(thread_id)
+        if not _conversation_matches(conversation, uid=uid, agent_slug=agent_slug):
             return None
-        run_id = await _try_dispatch_head(
-            db,
+        dispatch = await _dispatch_ready_head(
+            db=db,
             uid=str(uid),
             agent_slug=agent_slug,
             thread_id=thread_id,
-            conversation_id=conv.id,
+            conversation_id=conversation.id,
         )
-        if run_id:
+        if dispatch:
             await db.commit()
 
-    if run_id:
-        await enqueue_agent_run(run_id)
-    return run_id
+    if dispatch:
+        await enqueue_agent_run(dispatch.run_id)
+        return dispatch.run_id
+    return None
 
 
 async def recover_pending_dispatches() -> None:
-    """恢复扫描：找出 dispatched 但 run 仍 pending 的请求，重新投递 ARQ。
-
-    覆盖"提交成功但进程在 enqueue 前退出"的窗口。
-    """
+    """恢复 pending 投递及 completed hook 留下的 ready 队列。"""
     async with pg_manager.get_async_session_context() as db:
         result = await db.execute(
             select(AgentRun.id)
@@ -331,11 +310,24 @@ async def recover_pending_dispatches() -> None:
             )
         )
         recovered = [row[0] for row in result.all()]
+        scopes_result = await db.execute(
+            select(
+                AgentRunRequest.uid,
+                AgentRunRequest.agent_slug,
+                AgentRunRequest.conversation_thread_id,
+            )
+            .where(AgentRunRequest.status == REQUEST_STATUS_QUEUED)
+            .distinct()
+        )
+        queued_scopes = [tuple(row) for row in scopes_result.all()]
 
-    if not recovered:
-        return
-
-    await asyncio.gather(*(enqueue_agent_run(run_id) for run_id in recovered))
+    await asyncio.gather(
+        *(enqueue_agent_run(run_id) for run_id in recovered),
+        *(
+            dispatch_next_request(uid=uid, agent_slug=agent_slug, thread_id=thread_id)
+            for uid, agent_slug, thread_id in queued_scopes
+        ),
+    )
     for run_id in recovered:
         logger.info(f"Recovered pending run: {run_id}")
 
@@ -382,12 +374,11 @@ async def get_request(*, db: AsyncSession, request_id: str, uid: str) -> dict | 
     return request.to_dict()
 
 
-async def list_queued_requests(*, db: AsyncSession, uid: str, agent_slug: str, thread_id: str) -> list[dict]:
-    """列出线程内所有 queued 请求。"""
+async def get_thread_queue_snapshot(*, db: AsyncSession, uid: str, agent_slug: str, thread_id: str) -> dict:
+    """读取队列请求与最小状态投影。"""
+    await _get_thread_conversation(db=db, uid=uid, agent_slug=agent_slug, thread_id=thread_id)
     repo = AgentRunRequestRepository(db)
     items = await repo.list_queued(uid=str(uid), agent_slug=agent_slug, conversation_thread_id=thread_id)
-    if not items:
-        return []
 
     message_ids = [request.input_message_id for request in items if request.input_message_id is not None]
     contents: dict[int, str] = {}
@@ -402,7 +393,72 @@ async def list_queued_requests(*, db: AsyncSession, uid: str, agent_slug: str, t
             data["content"] = contents.get(request.input_message_id, "")
         data["queue_position"] = position
         requests.append(data)
-    return requests
+    status, metadata = await _get_queue_state(
+        db=db,
+        uid=str(uid),
+        agent_slug=agent_slug,
+        thread_id=thread_id,
+        head=items[0] if items else None,
+    )
+    return {"requests": requests, "queue": {"status": status, **metadata}}
+
+
+async def continue_thread_queue(
+    *,
+    db: AsyncSession,
+    uid: str,
+    agent_slug: str,
+    thread_id: str,
+) -> DispatchResult:
+    """在同一事务内确认 paused 状态并派发 FIFO 队头。"""
+    conversation = await _get_thread_conversation(
+        db=db,
+        uid=uid,
+        agent_slug=agent_slug,
+        thread_id=thread_id,
+    )
+    repo = AgentRunRequestRepository(db)
+    head = await repo.get_queue_head(
+        uid=str(uid),
+        agent_slug=agent_slug,
+        conversation_thread_id=thread_id,
+    )
+    if not head:
+        raise _queue_conflict("queue_empty", "队列为空")
+
+    status, _ = await _get_queue_state(
+        db=db,
+        uid=str(uid),
+        agent_slug=agent_slug,
+        thread_id=thread_id,
+        head=head,
+    )
+    if status == "running":
+        raise _queue_conflict("run_active", "线程已有正在执行的运行")
+    if status == "interrupted":
+        raise _queue_conflict("run_interrupted", "线程正在等待用户回答或审批")
+    if status != "paused":
+        raise _queue_conflict("queue_not_paused", "当前队列不需要人工继续")
+
+    dispatched = await _dispatch_locked_head(
+        db=db,
+        head=head,
+        uid=str(uid),
+        agent_slug=agent_slug,
+        thread_id=thread_id,
+        conversation_id=conversation.id,
+    )
+    if dispatched:
+        return dispatched
+
+    active_run = await AgentRunRepository(db).get_active_run_by_thread_for_user(
+        uid=str(uid),
+        agent_slug=agent_slug,
+        conversation_thread_id=thread_id,
+    )
+    if active_run:
+        raise _queue_conflict("run_active", "线程已有正在执行的运行")
+    raise _queue_conflict("queue_not_paused", "当前队列状态已变化")
 
 
 async def stream_request_events(
@@ -463,3 +519,172 @@ async def stream_request_events(
             await asyncio.sleep(SSE_POLL_INTERVAL_SECONDS)
     except asyncio.CancelledError:
         return
+
+
+def _queue_conflict(code: str, message: str) -> HTTPException:
+    return HTTPException(status_code=409, detail={"code": code, "message": message})
+
+
+def _build_message_metadata(
+    *, request_id: str, source: str, input_message: AgentRunInputMessage, meta: dict
+) -> dict[str, Any]:
+    """构建 Message.extra_metadata：request_id + source + raw_message + 附加上下文。"""
+    metadata: dict[str, Any] = {"request_id": request_id}
+    if source:
+        metadata["source"] = source
+    if raw_message := input_message.raw_message():
+        metadata["raw_message"] = raw_message
+    if attachment_file_ids := meta.get("attachment_file_ids"):
+        metadata["attachment_file_ids"] = attachment_file_ids
+    if isinstance(meta.get("agent_invocation_meta"), dict):
+        metadata["agent_invocation_meta"] = meta["agent_invocation_meta"]
+    if meta.get("tool_approval_mode") is not None:
+        metadata["tool_approval_mode"] = meta["tool_approval_mode"]
+    return metadata
+
+
+async def _get_thread_conversation(
+    *,
+    db: AsyncSession,
+    uid: str,
+    agent_slug: str,
+    thread_id: str,
+):
+    conversation = await ConversationRepository(db).get_conversation_by_thread_id(thread_id)
+    if _conversation_matches(conversation, uid=uid, agent_slug=agent_slug):
+        return conversation
+    raise HTTPException(status_code=404, detail="对话线程不存在")
+
+
+def _conversation_matches(conversation, *, uid: str, agent_slug: str) -> bool:
+    """线程归属校验：存在、未删除、归属当前用户与 agent。"""
+    return (
+        conversation is not None
+        and conversation.uid == str(uid)
+        and conversation.status != "deleted"
+        and conversation.agent_id == agent_slug
+    )
+
+
+async def _get_queue_state(
+    *,
+    db: AsyncSession,
+    uid: str,
+    agent_slug: str,
+    thread_id: str,
+    head: AgentRunRequest | None,
+) -> tuple[str, dict]:
+    """基于队头、active run 与最新顶层 run 派生队列状态。"""
+    if head is None:
+        return "idle", {"paused_reason": None, "blocking_run_id": None, "can_continue": False}
+
+    run_repo = AgentRunRepository(db)
+    active_run = await run_repo.get_active_run_by_thread_for_user(
+        uid=str(uid), agent_slug=agent_slug, conversation_thread_id=thread_id
+    )
+    if active_run:
+        return "running", {"paused_reason": None, "blocking_run_id": None, "can_continue": False}
+
+    latest_run = await run_repo.get_latest_chat_or_resume_run(
+        uid=str(uid), agent_slug=agent_slug, conversation_thread_id=thread_id
+    )
+    if latest_run and latest_run.status == "interrupted":
+        return "interrupted", {
+            "paused_reason": None,
+            "blocking_run_id": latest_run.id,
+            "can_continue": False,
+        }
+
+    if latest_run and latest_run.status in {"failed", "cancelled"} and latest_run.finished_at is None:
+        raise RuntimeError(f"Terminal run {latest_run.id} is missing finished_at")
+
+    if latest_run and latest_run.status in {"failed", "cancelled"} and head.created_at <= latest_run.finished_at:
+        return "paused", {
+            "paused_reason": latest_run.status,
+            "blocking_run_id": latest_run.id,
+            "can_continue": True,
+        }
+
+    return "ready", {"paused_reason": None, "blocking_run_id": None, "can_continue": False}
+
+
+async def _dispatch_ready_head(
+    *,
+    db: AsyncSession,
+    uid: str,
+    agent_slug: str,
+    thread_id: str,
+    conversation_id: int,
+    expected_request_id: str | None = None,
+) -> DispatchResult | None:
+    """只在 ready 状态派发 FIFO 队头。"""
+    repo = AgentRunRequestRepository(db)
+    head = await repo.get_queue_head(
+        uid=uid,
+        agent_slug=agent_slug,
+        conversation_thread_id=thread_id,
+    )
+    if not head:
+        return None
+    if expected_request_id is not None and head.request_id != expected_request_id:
+        return None
+    status, _ = await _get_queue_state(
+        db=db,
+        uid=uid,
+        agent_slug=agent_slug,
+        thread_id=thread_id,
+        head=head,
+    )
+    if status != "ready":
+        return None
+    return await _dispatch_locked_head(
+        db=db,
+        head=head,
+        uid=uid,
+        agent_slug=agent_slug,
+        thread_id=thread_id,
+        conversation_id=conversation_id,
+    )
+
+
+async def _dispatch_locked_head(
+    *,
+    db: AsyncSession,
+    head: AgentRunRequest,
+    uid: str,
+    agent_slug: str,
+    thread_id: str,
+    conversation_id: int,
+) -> DispatchResult | None:
+    """将已锁定的 queued 队头转换为 AgentRun，不提交事务。"""
+    repo = AgentRunRequestRepository(db)
+    run_repo = AgentRunRepository(db)
+    run_id = str(uuid.uuid4())
+    try:
+        async with db.begin_nested():
+            await run_repo.create_run(
+                run_id=run_id,
+                conversation_thread_id=thread_id,
+                agent_slug=agent_slug,
+                uid=uid,
+                request_id=head.request_id,
+                input_payload=head.input_payload or {},
+                conversation_id=conversation_id,
+                run_type="chat",
+                input_message_id=head.input_message_id,
+            )
+            msg = await db.get(Message, head.input_message_id)
+            if msg:
+                msg.run_id = run_id
+                msg.delivery_status = DELIVERY_STATUS_DISPATCHED
+            await db.flush()
+            await repo.mark_dispatched(head.request_id, run_id=run_id)
+    except IntegrityError as exc:
+        cause = getattr(exc.orig, "__cause__", None)
+        constraint_name = getattr(exc.orig, "constraint_name", None) or getattr(cause, "constraint_name", None)
+        if constraint_name != "uq_agent_runs_one_active_per_thread":
+            raise
+        logger.info(f"Dispatch conflict for request {head.request_id}, keeping queued")
+        return None
+
+    return DispatchResult(request_id=head.request_id, run_id=run_id)

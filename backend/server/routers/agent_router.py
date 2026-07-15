@@ -17,10 +17,12 @@ from yuxi.repositories.agent_repository import (
 )
 from yuxi.services.agent_request_queue_service import (
     cancel_queued_request as cancel_queued_request_svc,
+    continue_thread_queue,
+    finalize_dispatch,
     finalize_intake,
     get_request as get_request_svc,
+    get_thread_queue_snapshot,
     intake_request,
-    list_queued_requests,
     stream_request_events,
 )
 from yuxi.services.agent_run_service import (
@@ -355,8 +357,29 @@ async def list_thread_requests(
     agent_slug: str = Query(..., description="智能体 slug"),
     db: AsyncSession = Depends(get_db),
 ):
-    requests = await list_queued_requests(db=db, uid=str(current_user.uid), agent_slug=agent_slug, thread_id=thread_id)
-    return {"requests": requests}
+    return await get_thread_queue_snapshot(
+        db=db,
+        uid=str(current_user.uid),
+        agent_slug=agent_slug,
+        thread_id=thread_id,
+    )
+
+
+@agent_router.post("/thread/{thread_id}/requests/continue")
+async def continue_thread_requests(
+    thread_id: str,
+    current_user: User = Depends(get_required_user),
+    agent_slug: str = Query(..., description="智能体 slug"),
+    db: AsyncSession = Depends(get_db),
+):
+    dispatch = await continue_thread_queue(
+        db=db,
+        uid=str(current_user.uid),
+        agent_slug=agent_slug,
+        thread_id=thread_id,
+    )
+    await finalize_dispatch(db=db, dispatch=dispatch)
+    return {"status": "dispatched", "request_id": dispatch.request_id, "run_id": dispatch.run_id}
 
 
 @agent_router.post("/requests/{request_id}/cancel")

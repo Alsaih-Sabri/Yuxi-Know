@@ -126,6 +126,14 @@ export const agentApi = {
   },
 
   /**
+   * 手动继续 failed/cancelled 后暂停的线程队列
+   */
+  continueThreadQueue: (threadId, agentSlug) => {
+    const params = new URLSearchParams({ agent_slug: agentSlug })
+    return apiPost(`/api/agent/thread/${threadId}/requests/continue?${params.toString()}`, {})
+  },
+
+  /**
    * 取消排队中的请求
    */
   cancelRequest: (requestId) => apiPost(`/api/agent/requests/${requestId}/cancel`, {}),

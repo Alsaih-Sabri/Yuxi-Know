@@ -99,9 +99,7 @@ def _load_agent_context(agent_item, agent_backend):
     return context
 
 
-def resolve_agent_run_model_spec(
-    model_spec: str | None, agent_item, agent_backend, context=None
-) -> str:
+def resolve_agent_run_model_spec(model_spec: str | None, agent_item, agent_backend, context=None) -> str:
     """解析本次 run 实际使用的模型：显式覆盖优先，否则配置模型，最后系统默认模型。"""
     normalized = model_spec.strip() if isinstance(model_spec, str) else None
     if normalized:
@@ -115,9 +113,7 @@ def resolve_agent_run_model_spec(
     return resolve_chat_model_spec(getattr(context, "model", None))
 
 
-def resolve_agent_run_tool_approval_mode(
-    requested_mode: str | None, agent_item, agent_backend, context=None
-) -> str:
+def resolve_agent_run_tool_approval_mode(requested_mode: str | None, agent_item, agent_backend, context=None) -> str:
     """解析本次 run 的工具审批模式：显式覆盖优先，否则使用 Agent 配置与默认值。"""
     source = requested_mode
     if source is None:
@@ -707,10 +703,24 @@ async def prepare_agent_run_creation_scope(
             raise HTTPException(status_code=422, detail="created_by_run_id 不能为空")
         if not existing:
             parent_run = await run_repo.get_run_for_user(created_by_run_id, str(current_uid))
-            if not parent_run or parent_run.conversation_thread_id != conversation_thread_id:
+            if (
+                not parent_run
+                or parent_run.conversation_thread_id != conversation_thread_id
+                or parent_run.agent_slug != agent_slug
+            ):
                 raise HTTPException(status_code=404, detail="被恢复的运行任务不存在")
             if parent_run.status != "interrupted":
                 raise HTTPException(status_code=409, detail="只有 interrupted run 可以恢复")
+            latest_run = await run_repo.get_latest_chat_or_resume_run(
+                uid=str(current_uid),
+                agent_slug=agent_slug,
+                conversation_thread_id=conversation_thread_id,
+            )
+            if latest_run and latest_run.id != parent_run.id:
+                raise HTTPException(
+                    status_code=409,
+                    detail={"code": "resume_superseded", "message": "中断运行已被后续运行超越"},
+                )
             parent_payload = parent_run.input_payload
             if not isinstance(parent_payload, dict) or not parent_payload.get("model_spec"):
                 raise HTTPException(status_code=409, detail="被恢复的运行任务缺少模型快照")

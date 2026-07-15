@@ -91,6 +91,27 @@ class AgentRunRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_latest_chat_or_resume_run(
+        self,
+        *,
+        uid: str,
+        agent_slug: str,
+        conversation_thread_id: str,
+    ) -> AgentRun | None:
+        """读取队列作用域内最新的顶层 chat/resume run。"""
+        result = await self.db.execute(
+            select(AgentRun)
+            .where(
+                AgentRun.uid == str(uid),
+                AgentRun.agent_slug == agent_slug,
+                AgentRun.conversation_thread_id == conversation_thread_id,
+                AgentRun.run_type.in_(["chat", "resume"]),
+            )
+            .order_by(AgentRun.created_at.desc(), AgentRun.id.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def list_child_runs_for_user(self, created_by_run_id: str, uid: str) -> list[AgentRun]:
         """列出由指定 run 创建的所有子 run。"""
         result = await self.db.execute(

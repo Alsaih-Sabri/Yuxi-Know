@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
 from unittest.mock import MagicMock
 
 import pytest
@@ -240,7 +241,7 @@ async def test_create_message_with_queued_delivery_status(session):
 @pytest.mark.asyncio
 async def test_dispatch_sets_delivery_status_dispatched(session):
     from yuxi.repositories.agent_run_request_repository import AgentRunRequestRepository
-    from yuxi.services.agent_request_queue_service import _try_dispatch_head
+    from yuxi.services.agent_request_queue_service import _dispatch_ready_head
     from yuxi.storage.postgres.models_business import Message
 
     await _seed_thread(session, msg_id=200)
@@ -254,11 +255,17 @@ async def test_dispatch_sets_delivery_status_dispatched(session):
     )
     await session.commit()
 
-    run_id = await _try_dispatch_head(session, uid="user-1", agent_slug="main", thread_id="t1", conversation_id=10)
-    assert run_id is not None
+    dispatched = await _dispatch_ready_head(
+        db=session,
+        uid="user-1",
+        agent_slug="main",
+        thread_id="t1",
+        conversation_id=10,
+    )
+    assert dispatched is not None
 
     msg = await session.get(Message, 200)
-    assert msg.run_id == run_id
+    assert msg.run_id == dispatched.run_id
     assert msg.delivery_status == "dispatched"
 
 
@@ -266,7 +273,7 @@ async def test_dispatch_sets_delivery_status_dispatched(session):
 async def test_dispatches_multiple_queued_requests_one_at_a_time(session):
     from yuxi.repositories.agent_run_repository import AgentRunRepository
     from yuxi.repositories.agent_run_request_repository import AgentRunRequestRepository
-    from yuxi.services.agent_request_queue_service import _try_dispatch_head
+    from yuxi.services.agent_request_queue_service import _dispatch_ready_head
 
     await _seed_thread(session, msg_id=300)
     session.add_all(
@@ -286,18 +293,32 @@ async def test_dispatches_multiple_queued_requests_one_at_a_time(session):
         )
     await session.commit()
 
-    run_b = await _try_dispatch_head(session, uid="user-1", agent_slug="main", thread_id="t1", conversation_id=10)
+    dispatched_b = await _dispatch_ready_head(
+        db=session,
+        uid="user-1",
+        agent_slug="main",
+        thread_id="t1",
+        conversation_id=10,
+    )
     await session.commit()
-    assert run_b is not None
+    assert dispatched_b is not None
+    run_b = dispatched_b.run_id
     assert (await request_repo.get_by_request_id("request-b")).dispatched_run_id == run_b
     assert await request_repo.get_queue_position("request-c") == 1
 
     await AgentRunRepository(session).set_terminal_status(run_b, status="completed")
     await session.commit()
-    run_c = await _try_dispatch_head(session, uid="user-1", agent_slug="main", thread_id="t1", conversation_id=10)
+    dispatched_c = await _dispatch_ready_head(
+        db=session,
+        uid="user-1",
+        agent_slug="main",
+        thread_id="t1",
+        conversation_id=10,
+    )
     await session.commit()
 
-    assert run_c is not None
+    assert dispatched_c is not None
+    run_c = dispatched_c.run_id
     assert run_c != run_b
     assert (await request_repo.get_by_request_id("request-c")).dispatched_run_id == run_c
     assert await request_repo.get_queue_position("request-c") == 0
@@ -477,3 +498,318 @@ async def test_reject_idempotent(session):
     )
     assert second.status == "rejected"
     assert second.message_id == first.message_id
+
+
+# ── queue snapshot and manual continue ──
+
+
+async def _seed_queued_request(session, *, request_id: str, message_id: int, created_at):
+    from yuxi.repositories.agent_run_request_repository import AgentRunRequestRepository
+
+    session.add(Message(id=message_id, conversation_id=10, role="user", content=request_id, delivery_status="queued"))
+    await session.flush()
+    request = await AgentRunRequestRepository(session).create(
+        request_id=request_id,
+        uid="user-1",
+        agent_slug="main",
+        conversation_thread_id="t1",
+        input_message_id=message_id,
+    )
+    request.created_at = created_at
+    request.updated_at = created_at
+    await session.flush()
+    return request
+
+
+async def _seed_terminal_run(session, *, run_id: str, status: str, created_at, finished_at):
+    from yuxi.storage.postgres.models_business import AgentRun
+
+    session.add(
+        AgentRun(
+            id=run_id,
+            conversation_thread_id="t1",
+            agent_slug="main",
+            uid="user-1",
+            request_id=f"request-{run_id}",
+            input_payload={},
+            status=status,
+            run_type="chat",
+            created_at=created_at,
+            finished_at=finished_at,
+        )
+    )
+    await session.flush()
+
+
+@pytest.mark.asyncio
+async def test_snapshot_marks_existing_backlog_paused_after_failed_run(session):
+    from yuxi.services.agent_request_queue_service import get_thread_queue_snapshot
+
+    await _seed_thread(session)
+    now = utc_now_naive()
+    await _seed_queued_request(session, request_id="request-b", message_id=101, created_at=now - timedelta(seconds=2))
+    await _seed_terminal_run(
+        session,
+        run_id="run-a",
+        status="failed",
+        created_at=now - timedelta(seconds=3),
+        finished_at=now,
+    )
+    await session.commit()
+
+    snapshot = await get_thread_queue_snapshot(db=session, uid="user-1", agent_slug="main", thread_id="t1")
+
+    assert snapshot["queue"] == {
+        "status": "paused",
+        "paused_reason": "failed",
+        "blocking_run_id": "run-a",
+        "can_continue": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_snapshot_marks_interrupted_queue_as_non_continuable(session):
+    from yuxi.services.agent_request_queue_service import get_thread_queue_snapshot
+
+    await _seed_thread(session)
+    now = utc_now_naive()
+    await _seed_queued_request(session, request_id="request-b", message_id=101, created_at=now)
+    await _seed_terminal_run(
+        session,
+        run_id="run-a",
+        status="interrupted",
+        created_at=now - timedelta(seconds=1),
+        finished_at=now,
+    )
+    await session.commit()
+
+    snapshot = await get_thread_queue_snapshot(db=session, uid="user-1", agent_slug="main", thread_id="t1")
+
+    assert snapshot["queue"]["status"] == "interrupted"
+    assert snapshot["queue"]["blocking_run_id"] == "run-a"
+    assert snapshot["queue"]["can_continue"] is False
+
+
+@pytest.mark.asyncio
+async def test_snapshot_marks_post_failure_request_ready(session):
+    from yuxi.services.agent_request_queue_service import get_thread_queue_snapshot
+
+    await _seed_thread(session)
+    now = utc_now_naive()
+    await _seed_terminal_run(
+        session,
+        run_id="run-a",
+        status="cancelled",
+        created_at=now - timedelta(seconds=2),
+        finished_at=now - timedelta(seconds=1),
+    )
+    await _seed_queued_request(session, request_id="request-b", message_id=101, created_at=now)
+    await session.commit()
+
+    snapshot = await get_thread_queue_snapshot(db=session, uid="user-1", agent_slug="main", thread_id="t1")
+
+    assert snapshot["queue"]["status"] == "ready"
+    assert snapshot["queue"]["can_continue"] is False
+
+
+@pytest.mark.asyncio
+async def test_snapshot_rejects_terminal_run_without_finished_at(session):
+    from yuxi.services.agent_request_queue_service import get_thread_queue_snapshot
+
+    await _seed_thread(session)
+    now = utc_now_naive()
+    await _seed_terminal_run(
+        session,
+        run_id="run-a",
+        status="failed",
+        created_at=now - timedelta(seconds=1),
+        finished_at=None,
+    )
+    await _seed_queued_request(session, request_id="request-b", message_id=101, created_at=now)
+    await session.commit()
+
+    with pytest.raises(RuntimeError, match="run-a.*missing finished_at"):
+        await get_thread_queue_snapshot(db=session, uid="user-1", agent_slug="main", thread_id="t1")
+
+
+@pytest.mark.asyncio
+async def test_continue_dispatches_only_paused_fifo_head(session):
+    from yuxi.repositories.agent_run_request_repository import AgentRunRequestRepository
+    from yuxi.services.agent_request_queue_service import continue_thread_queue
+
+    await _seed_thread(session)
+    now = utc_now_naive()
+    await _seed_queued_request(session, request_id="request-b", message_id=101, created_at=now - timedelta(seconds=2))
+    await _seed_queued_request(session, request_id="request-c", message_id=102, created_at=now - timedelta(seconds=1))
+    await _seed_terminal_run(
+        session,
+        run_id="run-a",
+        status="cancelled",
+        created_at=now - timedelta(seconds=3),
+        finished_at=now,
+    )
+    await session.commit()
+
+    dispatched = await continue_thread_queue(
+        db=session,
+        uid="user-1",
+        agent_slug="main",
+        thread_id="t1",
+    )
+
+    repo = AgentRunRequestRepository(session)
+    assert dispatched.request_id == "request-b"
+    assert (await repo.get_by_request_id("request-b")).status == "dispatched"
+    assert await repo.get_queue_position("request-c") == 1
+
+
+@pytest.mark.asyncio
+async def test_reject_does_not_resume_paused_queue(session):
+    from yuxi.repositories.agent_run_request_repository import AgentRunRequestRepository
+    from yuxi.services.input_message_service import build_chat_input_message
+
+    await _seed_thread(session)
+    now = utc_now_naive()
+    await _seed_queued_request(session, request_id="request-b", message_id=101, created_at=now - timedelta(seconds=2))
+    await _seed_terminal_run(
+        session,
+        run_id="run-a",
+        status="failed",
+        created_at=now - timedelta(seconds=3),
+        finished_at=now,
+    )
+    await session.commit()
+
+    result = await intake_request(
+        db=session,
+        request_id="request-c",
+        uid="user-1",
+        agent_slug="main",
+        thread_id="t1",
+        queue_policy="reject",
+        input_message=build_chat_input_message("C"),
+        agent_item=MagicMock(),
+        agent_backend=MagicMock(),
+    )
+
+    repo = AgentRunRequestRepository(session)
+    assert result.status == "rejected"
+    assert (await repo.get_by_request_id("request-b")).status == "queued"
+    assert (await repo.get_by_request_id("request-c")).status == "rejected"
+
+
+@pytest.mark.asyncio
+async def test_reject_marks_request_rejected_when_immediate_dispatch_loses_race(
+    session,
+    monkeypatch: pytest.MonkeyPatch,
+):
+    from yuxi.repositories.agent_run_request_repository import AgentRunRequestRepository
+    from yuxi.services import agent_request_queue_service
+    from yuxi.services.input_message_service import build_chat_input_message
+
+    monkeypatch.setattr(agent_request_queue_service, "resolve_agent_run_config", lambda *args: ("model", "default"))
+
+    async def lose_dispatch_race(**kwargs):
+        return None
+
+    monkeypatch.setattr(agent_request_queue_service, "_dispatch_ready_head", lose_dispatch_race)
+    await _seed_thread(session)
+
+    result = await intake_request(
+        db=session,
+        request_id="request-reject",
+        uid="user-1",
+        agent_slug="main",
+        thread_id="t1",
+        queue_policy="reject",
+        input_message=build_chat_input_message("reject me"),
+        agent_item=MagicMock(),
+        agent_backend=MagicMock(),
+    )
+
+    request = await AgentRunRequestRepository(session).get_by_request_id("request-reject")
+    message = await session.get(Message, result.message_id)
+    assert result.status == "rejected"
+    assert request.status == "rejected"
+    assert request.input_payload == {}
+    assert message.delivery_status == "rejected"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("queue_policy", ["enqueue", "reject"])
+async def test_intake_rejects_message_while_run_is_interrupted(
+    session, monkeypatch: pytest.MonkeyPatch, queue_policy: str
+):
+    from fastapi import HTTPException
+    from yuxi.repositories.agent_run_request_repository import AgentRunRequestRepository
+    from yuxi.services import agent_request_queue_service
+    from yuxi.services.input_message_service import build_chat_input_message
+
+    monkeypatch.setattr(agent_request_queue_service, "resolve_agent_run_config", lambda *args: ("model", "default"))
+    await _seed_thread(session)
+    now = utc_now_naive()
+    await _seed_queued_request(session, request_id="request-b", message_id=101, created_at=now)
+    await _seed_terminal_run(
+        session,
+        run_id="run-a",
+        status="interrupted",
+        created_at=now - timedelta(seconds=1),
+        finished_at=now,
+    )
+    await session.commit()
+
+    with pytest.raises(HTTPException) as exc_info:
+        await intake_request(
+            db=session,
+            request_id="request-c",
+            uid="user-1",
+            agent_slug="main",
+            thread_id="t1",
+            queue_policy=queue_policy,
+            input_message=build_chat_input_message("C"),
+            agent_item=MagicMock(),
+            agent_backend=MagicMock(),
+        )
+
+    repo = AgentRunRequestRepository(session)
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == {
+        "code": "run_interrupted",
+        "message": "线程正在等待用户回答或审批",
+    }
+    assert (await repo.get_by_request_id("request-b")).status == "queued"
+    assert await repo.get_by_request_id("request-c") is None
+    message_count = await session.scalar(select(sa_func.count()).select_from(Message).where(Message.content == "C"))
+    assert message_count == 0
+
+
+@pytest.mark.asyncio
+async def test_enqueue_after_empty_failed_queue_dispatches_new_request(session, monkeypatch: pytest.MonkeyPatch):
+    from yuxi.services import agent_request_queue_service
+    from yuxi.services.input_message_service import build_chat_input_message
+
+    monkeypatch.setattr(agent_request_queue_service, "resolve_agent_run_config", lambda *args: ("model", "default"))
+    await _seed_thread(session)
+    now = utc_now_naive()
+    await _seed_terminal_run(
+        session,
+        run_id="run-a",
+        status="failed",
+        created_at=now - timedelta(seconds=2),
+        finished_at=now - timedelta(seconds=1),
+    )
+    await session.commit()
+
+    result = await intake_request(
+        db=session,
+        request_id="request-b",
+        uid="user-1",
+        agent_slug="main",
+        thread_id="t1",
+        input_message=build_chat_input_message("B"),
+        agent_item=MagicMock(),
+        agent_backend=MagicMock(),
+    )
+
+    assert result.status == "dispatched"
+    assert result.run_id is not None
