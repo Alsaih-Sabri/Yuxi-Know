@@ -207,19 +207,13 @@ def _normalize_parse_method(file_name: str, parse_method: str | None) -> str:
     if suffix not in TMP_ATTACHMENT_PARSE_EXTENSIONS:
         raise HTTPException(status_code=400, detail="当前仅支持 PDF 和图片附件解析")
 
-    if suffix in TMP_ATTACHMENT_IMAGE_EXTENSIONS:
-        default_engine = app_config.default_ocr_engine
-        method = parse_method or ("rapid_ocr" if default_engine == "disable" else default_engine)
-    else:
-        method = parse_method or "disable"
-    if suffix in TMP_ATTACHMENT_IMAGE_EXTENSIONS:
-        allowed_methods = TMP_ATTACHMENT_OCR_METHODS
-    else:
-        allowed_methods = TMP_ATTACHMENT_PARSE_METHODS
+    default_engine = app_config.default_ocr_engine
+    method = parse_method or ("rapid_ocr" if default_engine == "disable" else default_engine)
 
-    if method not in allowed_methods:
+    if method not in TMP_ATTACHMENT_OCR_METHODS:
         allowed = ", ".join(allowed_methods)
         raise HTTPException(status_code=400, detail=f"不支持的解析方法: {method}，可选: {allowed}")
+
     return method
 
 
