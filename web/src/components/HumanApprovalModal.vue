@@ -1,9 +1,33 @@
 <template>
   <transition name="slide-up">
-    <div v-if="visible" class="approval-modal" :class="{ 'is-tool-approval': isToolApproval }">
+    <div
+      v-if="visible"
+      class="approval-modal"
+      :class="{ 'is-tool-approval': isToolApproval }"
+      :role="isToolApproval ? 'dialog' : undefined"
+      :aria-labelledby="isToolApproval ? 'tool-approval-question' : undefined"
+      :aria-describedby="isToolApproval ? 'tool-approval-summary' : undefined"
+    >
       <div class="approval-content">
         <div v-if="isToolApproval" class="tool-approval-block">
-          <div v-if="actionRequests.length > 1" class="tool-approval-progress" aria-label="审批进度">
+          <div class="approval-header tool-approval-header">
+            <div class="tool-approval-context">
+              <span class="tool-approval-icon">
+                <component :is="activeToolIcon" :size="17" />
+              </span>
+              <span>{{ toolDisplayName(activeToolRequest?.name) }}</span>
+              <code>{{ activeToolRequest?.name }}</code>
+            </div>
+            <span v-if="actionRequests.length > 1" class="tool-progress-label">
+              {{ activeToolIndex + 1 }} / {{ actionRequests.length }}
+            </span>
+          </div>
+
+          <div
+            v-if="actionRequests.length > 1"
+            class="tool-approval-progress"
+            aria-label="审批进度"
+          >
             <span
               v-for="(_, index) in actionRequests"
               :key="index"
@@ -17,36 +41,37 @@
             </span>
           </div>
 
-          <div class="approval-header tool-approval-header">
-            <div class="tool-approval-title">
-              <CircleHelp :size="18" />
-              <h4>是否批准此工具操作？</h4>
-            </div>
-            <span v-if="actionRequests.length > 1" class="tool-progress-label">
-              {{ activeToolIndex + 1 }} / {{ actionRequests.length }}
-            </span>
-          </div>
+          <h4 id="tool-approval-question" class="tool-approval-question">
+            {{ toolApprovalQuestion }}
+          </h4>
 
-          <div v-if="activeToolRequest" class="tool-request-summary">
-            <span class="tool-request-icon">
-              <component :is="activeToolIcon" :size="18" />
-            </span>
-            <div class="tool-request-copy">
-              <div class="tool-request-name">
-                <strong>{{ toolDisplayName(activeToolRequest.name) }}</strong>
-                <code>{{ activeToolRequest.name }}</code>
+          <div
+            v-if="activeToolRequest"
+            class="tool-args-disclosure"
+            :class="{ 'is-expanded': toolArgsExpanded }"
+          >
+            <button
+              id="tool-approval-summary"
+              type="button"
+              class="tool-args-trigger"
+              :aria-expanded="toolArgsExpanded"
+              aria-controls="tool-approval-full-args"
+              @click="toolArgsExpanded = !toolArgsExpanded"
+            >
+              <code>{{ toolApprovalSummary }}</code>
+              <ChevronDown
+                :size="15"
+                class="tool-args-chevron"
+                :class="{ 'is-expanded': toolArgsExpanded }"
+              />
+            </button>
+            <transition name="tool-args-expand">
+              <div v-if="toolArgsExpanded" class="tool-args-panel">
+                <pre id="tool-approval-full-args" class="tool-args-expanded">{{
+                  formattedToolArgs
+                }}</pre>
               </div>
-              <a-tooltip placement="topLeft">
-                <template #title>
-                  <pre class="tool-args-tooltip">{{ formattedToolArgs }}</pre>
-                </template>
-                <button type="button" class="tool-args-preview" aria-label="悬浮查看完整参数">
-                  <span>参数</span>
-                  <code>{{ previewedToolArgs }}</code>
-                  <Info :size="13" />
-                </button>
-              </a-tooltip>
-            </div>
+            </transition>
           </div>
         </div>
 
@@ -125,6 +150,7 @@
 
       <div v-if="isToolApproval" class="approval-actions tool-approval-actions">
         <button
+          ref="toolRejectButtonRef"
           type="button"
           class="btn btn-reject"
           :disabled="isProcessing"
@@ -138,7 +164,7 @@
           :disabled="isProcessing"
           @click="handleToolDecision('approve')"
         >
-          批准
+          允许
         </button>
       </div>
 
@@ -163,19 +189,23 @@
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
-import { CircleHelp, Info, Wrench } from 'lucide-vue-next'
+import { ChevronDown, Wrench } from 'lucide-vue-next'
 import {
   isOtherOption,
   normalizeQuestions,
   DEFAULT_OTHER_OPTION_VALUE
 } from '@/utils/questionUtils'
 import { getToolIcon } from '@/components/ToolCallingResult/toolRegistry'
-import { buildToolApprovalDecisions } from '@/utils/toolApproval'
+import {
+  buildToolApprovalDecisions,
+  formatToolApprovalArgs,
+  getToolApprovalSummary
+} from '@/utils/toolApproval'
 
 const TOOL_DISPLAY_NAMES = {
   write_file: '写入文件',
   edit_file: '编辑文件',
-  execute: '执行命令',
+  execute: '执行命令'
 }
 
 const props = defineProps({
@@ -192,6 +222,8 @@ const activeQuestionIndex = ref(0)
 const selectedValues = ref({})
 const otherTexts = ref({})
 const otherTextareaRef = ref(null)
+const toolRejectButtonRef = ref(null)
+const toolArgsExpanded = ref(false)
 const toolDecisions = ref({})
 const activeToolIndex = ref(0)
 const OTHER_TEXTAREA_MAX_ROWS = 4
@@ -210,6 +242,13 @@ const normalizedQuestions = computed(() => {
 const isToolApproval = computed(() => props.kind === 'tool_approval')
 const activeToolRequest = computed(() => props.actionRequests[activeToolIndex.value] || null)
 const activeToolIcon = computed(() => getToolIcon(activeToolRequest.value?.name) || Wrench)
+const toolApprovalQuestion = computed(() => {
+  if (activeToolRequest.value?.name === 'execute') return '是否允许执行以下命令？'
+  if (activeToolRequest.value?.name === 'write_file') return '是否允许写入此文件？'
+  if (activeToolRequest.value?.name === 'edit_file') return '是否允许编辑此文件？'
+  return '是否允许执行此工具操作？'
+})
+const toolApprovalSummary = computed(() => getToolApprovalSummary(activeToolRequest.value))
 
 const activeQuestion = computed(() => {
   if (normalizedQuestions.value.length === 0) return null
@@ -222,6 +261,7 @@ const resetForm = () => {
   activeQuestionIndex.value = 0
   selectedValues.value = {}
   otherTexts.value = {}
+  toolArgsExpanded.value = false
   toolDecisions.value = {}
   activeToolIndex.value = 0
 }
@@ -317,8 +357,12 @@ watch(
     if (newVal) {
       activeQuestionIndex.value = 0
       activeToolIndex.value = 0
+      toolArgsExpanded.value = false
       nextTick(() => {
         adjustOtherTextareaHeight()
+        if (isToolApproval.value) {
+          toolRejectButtonRef.value?.focus()
+        }
       })
       return
     }
@@ -464,6 +508,7 @@ const handleToolDecision = (decision) => {
   toolDecisions.value = nextDecisions
 
   if (activeToolIndex.value < props.actionRequests.length - 1) {
+    toolArgsExpanded.value = false
     activeToolIndex.value += 1
     return
   }
@@ -474,19 +519,9 @@ const handleToolDecision = (decision) => {
   })
 }
 
-const toolDisplayName = (name) =>
-  TOOL_DISPLAY_NAMES[name] || '工具调用'
+const toolDisplayName = (name) => TOOL_DISPLAY_NAMES[name] || '工具调用'
 
-const formatToolArgs = (args) =>
-  typeof args === 'string' ? args : JSON.stringify(args ?? {}, null, 2)
-
-const previewToolArgs = (formattedArgs) => {
-  const value = formattedArgs.replace(/\s+/g, ' ')
-  return value.length > 96 ? `${value.slice(0, 93)}...` : value
-}
-
-const formattedToolArgs = computed(() => formatToolArgs(activeToolRequest.value?.args))
-const previewedToolArgs = computed(() => previewToolArgs(formattedToolArgs.value))
+const formattedToolArgs = computed(() => formatToolApprovalArgs(activeToolRequest.value?.args))
 </script>
 
 <style scoped lang="less">
@@ -501,7 +536,18 @@ const previewedToolArgs = computed(() => previewToolArgs(formattedToolArgs.value
   border: 1px solid var(--gray-200);
 
   &.is-tool-approval {
-    max-width: 560px;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    margin: 0;
+    border-radius: 13px;
+    box-shadow:
+      0 12px 32px var(--shadow-1),
+      0 2px 8px var(--shadow-1);
   }
 }
 
@@ -584,26 +630,39 @@ const previewedToolArgs = computed(() => previewToolArgs(formattedToolArgs.value
 
 .tool-approval-header {
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
-.tool-approval-title {
+.tool-approval-context {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--color-text);
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
 
-  h4 {
-    font-size: 15px;
-    font-weight: 600;
+  code {
+    overflow: hidden;
+    color: var(--color-text-tertiary);
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
+}
+
+.tool-approval-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
 }
 
 .tool-approval-progress {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .tool-progress-step {
@@ -637,66 +696,38 @@ const previewedToolArgs = computed(() => previewToolArgs(formattedToolArgs.value
   font-size: 12px;
 }
 
-.tool-request-summary {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  padding: 10px 12px;
+.tool-approval-question {
+  margin: 0 0 12px;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.tool-args-disclosure {
+  width: 100%;
   border: 1px solid var(--gray-150);
   border-radius: 8px;
-  background: var(--gray-10);
-}
+  background: var(--gray-25);
+  overflow: hidden;
 
-.tool-request-icon {
-  width: 34px;
-  height: 34px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  border-radius: 8px;
-  background: var(--gray-0);
-  color: var(--color-text-secondary);
-}
-
-.tool-request-copy {
-  min-width: 0;
-  flex: 1;
-}
-
-.tool-request-name {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  min-width: 0;
-
-  strong {
-    color: var(--color-text);
-    font-size: 13px;
-  }
-
-  code {
-    overflow: hidden;
-    color: var(--color-text-secondary);
-    font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  &.is-expanded .tool-args-trigger {
+    border-bottom: 1px solid var(--gray-150);
   }
 }
 
-.tool-args-preview {
+.tool-args-trigger {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  padding: 0;
+  gap: 10px;
+  min-height: 42px;
+  padding: 10px 12px;
   border: 0;
   background: transparent;
-  color: var(--color-text-tertiary);
+  color: var(--color-text-secondary);
   text-align: left;
-  cursor: help;
+  cursor: pointer;
 
   > span,
   > svg {
@@ -704,23 +735,73 @@ const previewedToolArgs = computed(() => previewToolArgs(formattedToolArgs.value
   }
 
   code {
+    flex: 1;
     min-width: 0;
     overflow: hidden;
-    color: var(--color-text-secondary);
-    font-size: 12px;
+    color: var(--color-text);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.55;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  &:hover {
+    border-color: var(--gray-300);
+    background: var(--gray-50);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--main-color);
+    outline-offset: -2px;
+  }
 }
 
-.tool-args-tooltip {
-  max-width: 420px;
-  max-height: 240px;
+.tool-args-chevron {
+  transition: transform 0.2s ease;
+
+  &.is-expanded {
+    transform: rotate(180deg);
+  }
+}
+
+.tool-args-panel {
+  max-height: 300px;
+  overflow: hidden;
+}
+
+.tool-args-expanded {
+  box-sizing: border-box;
+  max-height: 300px;
   margin: 0;
+  padding: 12px;
   overflow: auto;
+  background: var(--gray-10);
+  color: var(--color-text-secondary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.6;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 12px;
+}
+
+.tool-args-expand-enter-active,
+.tool-args-expand-leave-active {
+  transition:
+    max-height 0.22s ease,
+    opacity 0.18s ease;
+}
+
+.tool-args-expand-enter-from,
+.tool-args-expand-leave-to {
+  max-height: 0;
+  opacity: 0;
+}
+
+.tool-args-expand-enter-to,
+.tool-args-expand-leave-from {
+  max-height: 300px;
+  opacity: 1;
 }
 
 .approval-operation {
@@ -792,6 +873,16 @@ const previewedToolArgs = computed(() => previewToolArgs(formattedToolArgs.value
   padding: 10px 20px 14px;
 }
 
+.tool-approval-actions {
+  justify-content: flex-end;
+  padding-top: 4px;
+
+  .btn {
+    flex: 0 0 auto;
+    min-width: 82px;
+  }
+}
+
 .btn {
   flex: 1;
   min-height: 34px;
@@ -809,8 +900,14 @@ const previewedToolArgs = computed(() => previewToolArgs(formattedToolArgs.value
   cursor: not-allowed;
 }
 
+.btn:focus-visible {
+  outline: 2px solid var(--main-color);
+  outline-offset: 2px;
+}
+
 .btn-reject {
-  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  background: var(--gray-25);
   color: var(--gray-700);
 }
 
@@ -875,6 +972,10 @@ const previewedToolArgs = computed(() => previewToolArgs(formattedToolArgs.value
     min-width: 0;
   }
 
+  .approval-modal.is-tool-approval {
+    width: 100%;
+  }
+
   .approval-content {
     padding: 12px 16px;
   }
@@ -905,10 +1006,31 @@ const previewedToolArgs = computed(() => previewToolArgs(formattedToolArgs.value
     gap: 8px;
   }
 
+  .tool-approval-context code {
+    display: none;
+  }
+
   .btn {
     min-height: 32px;
     padding: 6px 14px;
     font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .slide-up-enter-active,
+  .slide-up-leave-active {
+    transition: none;
+  }
+
+  .processing-spinner {
+    animation-duration: 1.5s;
+  }
+
+  .tool-args-chevron,
+  .tool-args-expand-enter-active,
+  .tool-args-expand-leave-active {
+    transition: none;
   }
 }
 </style>

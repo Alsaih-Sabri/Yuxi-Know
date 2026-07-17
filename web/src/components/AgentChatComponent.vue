@@ -123,16 +123,6 @@
             </div>
           </div>
           <div class="bottom" :class="{ 'start-screen': !conversations.length }">
-            <!-- 人工审批弹窗 - 放在输入框上方 -->
-            <HumanApprovalModal
-              :visible="currentApprovalModalVisible"
-              :questions="currentApprovalQuestions"
-              :kind="approvalState.kind"
-              :action-requests="approvalState.actionRequests"
-              @submit="handleQuestionSubmit"
-              @cancel="handleQuestionCancel"
-            />
-
             <div class="message-input-wrapper">
               <!-- 加载状态：加载消息 -->
               <div v-if="isLoadingMessages" class="chat-loading">
@@ -198,39 +188,59 @@
                 </div>
               </section>
 
-              <AgentInputArea
-                v-model="userInput"
-                :is-loading="shouldShowStopButton"
-                :disabled="!currentAgent"
-                :send-button-disabled="isSendButtonDisabled"
-                :mention="mentionConfig"
-                :thread-id="currentChatId"
-                :supports-file-upload="supportsFileUpload"
-                :attachments="currentPendingThreadAttachments"
-                @send="handleSendOrStop"
-                @upload-attachment="handleAttachmentUpload"
-                @remove-attachment="handleAttachmentRemove"
+              <div
+                class="message-input-stage"
+                :class="{ 'has-tool-approval': currentToolApprovalVisible }"
               >
-                <template #actions-left-extra>
-                  <ToolApprovalModeSelector
-                    :model-value="currentToolApprovalMode"
-                    @update:model-value="handleToolApprovalModeSelect"
-                  />
-                  <slot name="input-actions-left" :has-active-thread="!!currentChatId"></slot>
-                </template>
-                <template #actions-right-extra>
-                  <div class="input-model-selector">
-                    <ModelSelectorComponent
-                      :model_spec="currentModelSpec"
-                      size="nano"
-                      display-name="mini"
-                      placeholder="选择模型"
-                      @select-model="handleModelSelect"
-                    />
-                  </div>
-                  <slot name="input-actions-right" :has-active-thread="!!currentChatId"></slot>
-                </template>
-              </AgentInputArea>
+                <HumanApprovalModal
+                  :visible="currentApprovalModalVisible"
+                  :questions="currentApprovalQuestions"
+                  :kind="approvalState.kind"
+                  :action-requests="approvalState.actionRequests"
+                  @submit="handleQuestionSubmit"
+                  @cancel="handleQuestionCancel"
+                />
+
+                <div
+                  class="message-input-surface"
+                  :inert="currentToolApprovalVisible"
+                  :aria-hidden="currentToolApprovalVisible ? 'true' : undefined"
+                >
+                  <AgentInputArea
+                    v-model="userInput"
+                    :is-loading="shouldShowStopButton"
+                    :disabled="!currentAgent || currentToolApprovalVisible"
+                    :send-button-disabled="isSendButtonDisabled"
+                    :mention="mentionConfig"
+                    :thread-id="currentChatId"
+                    :supports-file-upload="supportsFileUpload"
+                    :attachments="currentPendingThreadAttachments"
+                    @send="handleSendOrStop"
+                    @upload-attachment="handleAttachmentUpload"
+                    @remove-attachment="handleAttachmentRemove"
+                  >
+                    <template #actions-left-extra>
+                      <ToolApprovalModeSelector
+                        :model-value="currentToolApprovalMode"
+                        @update:model-value="handleToolApprovalModeSelect"
+                      />
+                      <slot name="input-actions-left" :has-active-thread="!!currentChatId"></slot>
+                    </template>
+                    <template #actions-right-extra>
+                      <div class="input-model-selector">
+                        <ModelSelectorComponent
+                          :model_spec="currentModelSpec"
+                          size="nano"
+                          display-name="mini"
+                          placeholder="选择模型"
+                          @select-model="handleModelSelect"
+                        />
+                      </div>
+                      <slot name="input-actions-right" :has-active-thread="!!currentChatId"></slot>
+                    </template>
+                  </AgentInputArea>
+                </div>
+              </div>
 
               <AttachmentTmpUploadModal
                 v-model:open="attachmentUploadModalOpen"
@@ -686,6 +696,7 @@ import {
   isThreadWaitingForUserAction,
   isToolApprovalMode,
   readToolApprovalModePreference,
+  resolveToolApprovalMode,
   writeToolApprovalModePreference
 } from '@/utils/toolApproval'
 
@@ -1057,17 +1068,16 @@ const handleModelSelect = (spec) => {
   }
 }
 
-const agentDefaultToolApprovalMode = computed(
-  () =>
-    agentConfig.value?.tool_approval_mode ||
-    currentAgent.value?.config_json?.context?.tool_approval_mode ||
-    'default'
-)
-const currentToolApprovalMode = computed(
-  () =>
-    selectedToolApprovalModeByThread[currentChatId.value || DRAFT_MODEL_KEY] ||
-    savedToolApprovalMode.value ||
-    agentDefaultToolApprovalMode.value
+const configuredAgentToolApprovalMode = computed(() => {
+  const configJson = currentAgent.value?.config_json
+  return configJson?.context?.tool_approval_mode || configJson?.tool_approval_mode || null
+})
+const currentToolApprovalMode = computed(() =>
+  resolveToolApprovalMode({
+    threadMode: selectedToolApprovalModeByThread[currentChatId.value || DRAFT_MODEL_KEY],
+    agentMode: configuredAgentToolApprovalMode.value,
+    savedMode: savedToolApprovalMode.value
+  })
 )
 const handleToolApprovalModeSelect = (mode) => {
   if (!isToolApprovalMode(mode)) return
@@ -1423,6 +1433,9 @@ const currentApprovalModalVisible = computed(
 )
 const currentApprovalQuestions = computed(() =>
   currentApprovalModalVisible.value ? approvalState.questions : []
+)
+const currentToolApprovalVisible = computed(
+  () => currentApprovalModalVisible.value && approvalState.kind === 'tool_approval'
 )
 
 const shouldSuppressRefsForApproval = () =>
@@ -3557,6 +3570,35 @@ watch(currentChatId, (threadId, oldThreadId) => {
     width: 100%;
     max-width: 800px;
     margin: 0 auto;
+
+    .message-input-stage {
+      position: relative;
+      min-width: 0;
+    }
+
+    .message-input-stage.has-tool-approval {
+      display: grid;
+
+      > .approval-modal,
+      > .message-input-surface {
+        min-width: 0;
+        grid-area: 1 / 1;
+      }
+
+      > .approval-modal {
+        z-index: 2;
+      }
+
+      > .message-input-surface {
+        opacity: 0;
+        pointer-events: none;
+      }
+    }
+
+    .message-input-surface {
+      min-width: 0;
+      transition: opacity 0.18s ease;
+    }
 
     .queued-request-panel {
       margin-bottom: 8px;

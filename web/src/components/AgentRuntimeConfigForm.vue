@@ -66,10 +66,7 @@
 
                 <!-- 单选 -->
                 <a-select
-                  v-else-if="
-                    getConfigOptions(value).length > 0 &&
-                    (value?.type === 'str' || value?.type === 'select')
-                  "
+                  v-else-if="isSingleSelectAgentConfig(value)"
                   :value="agentConfig[key]"
                   :disabled="isReadOnlyConfig"
                   @update:value="(val) => updateConfigValue(key, val)"
@@ -398,7 +395,8 @@ import {
   getAgentConfigOptionLabel as getOptionLabel,
   getAgentConfigOptions as getConfigOptions,
   getAgentConfigOptionValue as getOptionValue,
-  isDefaultAllAgentResourceKind
+  isDefaultAllAgentResourceKind,
+  isSingleSelectAgentConfig
 } from '@/utils/agentConfigUtils'
 import { storeToRefs } from 'pinia'
 
