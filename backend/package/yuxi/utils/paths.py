@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
 
-VIRTUAL_PATH_PREFIX = (os.getenv("SANDBOX_VIRTUAL_PATH_PREFIX") or "/home/gem/user-data").strip()
+_raw_prefix = os.getenv("SANDBOX_VIRTUAL_PATH_PREFIX")
+VIRTUAL_PATH_PREFIX = (_raw_prefix.strip() if _raw_prefix else "/home/gem/user-data") or "/home/gem/user-data"
 if not VIRTUAL_PATH_PREFIX.startswith("/"):
     VIRTUAL_PATH_PREFIX = f"/{VIRTUAL_PATH_PREFIX}"
 WORKSPACE_DIR_NAME = "workspace"
