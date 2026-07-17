@@ -47,11 +47,18 @@ ensure_sandbox_env() {
     fi
 
     SANDBOX_PROVISIONER_TOKEN=$(generate_hex 32)
-    cat >> .env << EOF
+
+    if grep -Eq '^SANDBOX_PROVISIONER_TOKEN=' .env; then
+        sed -i.bak "s/^SANDBOX_PROVISIONER_TOKEN=.*/SANDBOX_PROVISIONER_TOKEN=${SANDBOX_PROVISIONER_TOKEN}/" .env
+        rm -f .env.bak
+    else
+        cat >> .env << EOF
 
 # Sandbox provisioner authentication
 SANDBOX_PROVISIONER_TOKEN=${SANDBOX_PROVISIONER_TOKEN}
 EOF
+    fi
+
     echo "Generated SANDBOX_PROVISIONER_TOKEN and saved it to .env."
 }
 
