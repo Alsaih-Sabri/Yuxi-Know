@@ -9,6 +9,11 @@ import {
   Settings2,
   Trash2,
   CheckCircle2,
+  TextInitial,
+  Image,
+  Video,
+  AudioLines,
+  FileText,
   LayersPlus,
   LoaderCircle,
   Zap
@@ -17,6 +22,10 @@ import {
 import { modelProviderApi } from '@/apis/system_api'
 import { useConfigStore } from '@/stores/config'
 import { modelIcons } from '@/utils/modelIcon'
+import {
+  loadModelMetadataCatalog,
+  resolveModelDisplayMetadata
+} from '@/utils/modelMetadata'
 import PageShoulder from '@/components/shared/PageShoulder.vue'
 import InfoCard from '@/components/shared/InfoCard.vue'
 import ExtensionCardGrid from '@/components/extensions/ExtensionCardGrid.vue'
@@ -39,6 +48,14 @@ const PROVIDER_TYPE_OPTIONS = [
 const providerTypeLabelMap = Object.fromEntries(
   PROVIDER_TYPE_OPTIONS.map((option) => [option.value, option.label])
 )
+
+const MODALITY_DISPLAY = {
+  text: { icon: TextInitial, label: '文本输入' },
+  image: { icon: Image, label: '图像输入' },
+  video: { icon: Video, label: '视频输入' },
+  audio: { icon: AudioLines, label: '音频输入' },
+  pdf: { icon: FileText, label: 'PDF 文档输入' }
+}
 
 // Provider form state
 const showProviderModal = ref(false)
@@ -88,6 +105,7 @@ const remoteModelsMap = ref({})
 
 // Remote model loading state per provider
 const remoteModelsLoaded = ref({})
+const modelCatalogProviders = ref({})
 
 // Remote model search state per provider
 const remoteModelSearch = ref({})
@@ -141,31 +159,6 @@ const getIconUrl = (icon) => {
   return modelIcons.default
 }
 
-const formatContextLength = (len) => {
-  if (!len) return '-'
-  if (len >= 1000000) return `${(len / 1000000).toFixed(1)}M`
-  if (len >= 1000) return `${(len / 1000).toFixed(0)}K`
-  return len.toString()
-}
-
-const formatMtokenPrice = (pricing) => {
-  if (!pricing) return null
-  const prompt = parseFloat(pricing.prompt || pricing.prompt_price || 0)
-  const completion = parseFloat(pricing.completion || pricing.completion_price || 0)
-  if (prompt < 0 || completion < 0) return null
-  if (prompt === 0 && completion === 0) return null
-  return {
-    prompt: prompt * 100000,
-    completion: completion * 100000
-  }
-}
-
-const formatPriceDisplay = (pricing) => {
-  const p = formatMtokenPrice(pricing)
-  if (!p) return null
-  return `$${p.prompt.toFixed(2)} / $${p.completion.toFixed(2)}`
-}
-
 const getModelDisplayName = (model) => {
   return model.name || model.display_name || model.id
 }
@@ -211,13 +204,20 @@ const getModelTestTitle = (providerId, model) => {
   return `${statusText}: ${result.message || '无详细信息'}`
 }
 
-const getInputModalities = (model) => {
-  if (!model) return []
-  if (model.input_modalities) return model.input_modalities
-  if (model.architecture?.input_modalities) return model.architecture.input_modalities
-  if (model.raw_metadata?.architecture?.input_modalities)
-    return model.raw_metadata.architecture.input_modalities
-  return []
+const getProviderModelInfo = (providerId, model) =>
+  resolveModelDisplayMetadata(modelCatalogProviders.value, providerId, model)
+
+const getModalityDisplay = (modality) =>
+  MODALITY_DISPLAY[modality] || { icon: FileText, label: modality }
+
+const loadModelMetadata = async () => {
+  if (Object.keys(modelCatalogProviders.value).length) return
+  try {
+    const catalog = await loadModelMetadataCatalog()
+    modelCatalogProviders.value = catalog.providers
+  } catch (error) {
+    console.warn('Failed to load model metadata catalog:', error)
+  }
 }
 
 const remoteIdsMap = computed(() => {
@@ -486,6 +486,7 @@ const openModelsModal = (provider) => {
     remoteModelSearch.value[provider.provider_id] || ''
   remoteModelTypeFilter.value[provider.provider_id] = 'all'
   showModelsModal.value = true
+  loadModelMetadata()
 }
 
 // ============ Remote Models Operations ============
@@ -970,7 +971,12 @@ defineExpose({
                   <LayersPlus :size="12" />
                 </span>
               </span>
-              <span class="col-context">{{ formatContextLength(model.context_length) }}</span>
+              <span class="col-context">
+                {{
+                  getProviderModelInfo(currentProviderForModels.provider_id, model).contextLabel ||
+                  '-'
+                }}
+              </span>
               <span class="col-dim">
                 <span
                   v-if="model.type === 'embedding' && !model.dimension"
@@ -999,13 +1005,21 @@ defineExpose({
                   />
                   <Zap v-else :size="13" />
                 </a-button>
-                <a-button size="small" class="lucide-icon-btn" @click="openModelConfigModal(model)">
+                <a-button
+                  size="small"
+                  class="lucide-icon-btn"
+                  :title="`配置 ${getModelDisplayName(model)}`"
+                  :aria-label="`配置 ${getModelDisplayName(model)}`"
+                  @click="openModelConfigModal(model)"
+                >
                   <Settings2 :size="13" />
                 </a-button>
                 <a-button
                   size="small"
                   danger
                   class="lucide-icon-btn"
+                  :title="`移除 ${getModelDisplayName(model)}`"
+                  :aria-label="`移除 ${getModelDisplayName(model)}`"
                   @click="removeModel(currentProviderForModels.provider_id, model.id)"
                 >
                   <Trash2 :size="13" />
@@ -1047,20 +1061,44 @@ defineExpose({
             >
               <span class="remote-name">{{ getModelDisplayName(remoteModel) }}</span>
               <div class="remote-tags">
+                <template
+                  v-for="mod in getProviderModelInfo(
+                    currentProviderForModels.provider_id,
+                    remoteModel
+                  ).inputModalities"
+                  :key="mod"
+                >
+                  <a-tooltip :title="getModalityDisplay(mod).label">
+                    <span
+                      class="modality-tag"
+                      role="img"
+                      :aria-label="getModalityDisplay(mod).label"
+                    >
+                      <component :is="getModalityDisplay(mod).icon" :size="13" />
+                    </span>
+                  </a-tooltip>
+                </template>
                 <span class="type-tag" :class="remoteModel.type || 'chat'">
                   {{ remoteModel.type || 'chat' }}
                 </span>
-                <template v-for="mod in getInputModalities(remoteModel) || []" :key="mod">
-                  <span class="modality-tag">{{ mod }}</span>
-                </template>
               </div>
               <span class="remote-context">{{
-                formatContextLength(remoteModel.context_length)
+                getProviderModelInfo(currentProviderForModels.provider_id, remoteModel)
+                  .contextLabel || '-'
               }}</span>
-              <span class="remote-price" v-if="formatMtokenPrice(remoteModel.pricing)">
-                {{ formatPriceDisplay(remoteModel.pricing) }}
+              <span
+                v-if="
+                  getProviderModelInfo(currentProviderForModels.provider_id, remoteModel)
+                    .priceDisplay
+                "
+                class="remote-price"
+              >
+                {{
+                  getProviderModelInfo(currentProviderForModels.provider_id, remoteModel)
+                    .priceDisplay
+                }}
               </span>
-              <span class="remote-price placeholder" v-else>N/A</span>
+              <span v-else class="remote-price placeholder">N/A</span>
               <a-button
                 size="small"
                 :type="
@@ -1069,6 +1107,16 @@ defineExpose({
                     : 'default'
                 "
                 class="lucide-icon-btn"
+                :title="
+                  currentProviderForModels.enabled_models?.some((m) => m.id === remoteModel.id)
+                    ? `${getModelDisplayName(remoteModel)} 已启用`
+                    : `启用 ${getModelDisplayName(remoteModel)}`
+                "
+                :aria-label="
+                  currentProviderForModels.enabled_models?.some((m) => m.id === remoteModel.id)
+                    ? `${getModelDisplayName(remoteModel)} 已启用`
+                    : `启用 ${getModelDisplayName(remoteModel)}`
+                "
                 :disabled="
                   currentProviderForModels.enabled_models?.some((m) => m.id === remoteModel.id)
                 "
@@ -1430,12 +1478,12 @@ defineExpose({
 .modality-tag {
   display: inline-flex;
   align-items: center;
-  padding: 2px 6px;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
   border-radius: 3px;
   background: var(--color-accent-50);
   color: var(--color-accent-700);
-  font-size: 10px;
-  font-weight: 500;
 }
 
 .dim-warning {

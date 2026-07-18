@@ -82,3 +82,4 @@ docs/vibe
 
 .taskr/
 web/src/utils/__tests__/
+web/test/
