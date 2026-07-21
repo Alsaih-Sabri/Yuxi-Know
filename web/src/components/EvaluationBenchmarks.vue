@@ -718,10 +718,7 @@ const downloadDataset = async (benchmark) => {
 // 继续生成基准
 const resumeDataset = async (benchmark) => {
   try {
-    const response = await evaluationApi.resumeDatasetGeneration(
-      props.kbId,
-      benchmark.dataset_id
-    )
+    const response = await evaluationApi.resumeDatasetGeneration(props.kbId, benchmark.dataset_id)
     if (response.message === 'success') {
       message.success(response.data?.message || '已恢复生成')
       loadBenchmarks()
