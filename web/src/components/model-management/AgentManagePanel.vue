@@ -297,19 +297,19 @@ defineExpose({
 .agent-chat-entry {
   min-width: 88px;
   height: 32px;
-  padding: 0 12px;
+  padding: 2px 10px;
   border: 0;
   border-radius: 8px;
-  background: var(--main-50);
+  background: var(--gray-100);
   box-shadow: none;
-  color: var(--main-700);
+  color: var(--gray-800);
   font-size: 12px;
 
   &:hover {
     border: 0;
-    background: var(--main-100);
+    background: var(--gray-700);
     box-shadow: none;
-    color: var(--main-800);
+    color: var(--gray-0);
   }
 
   &:focus:not(:focus-visible) {
