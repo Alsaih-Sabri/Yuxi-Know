@@ -6,6 +6,7 @@
 
 ## v0.7.2 (current)
 
+- 优化知识库文档列表性能：根目录虚拟目录分组改用部分索引（`idx_kf_kb_parent_segment` 按路径首段聚合），平铺文件筛选与排序用 `idx_kf_kb_parent_flat` 支撑，避免大知识库全表扫描与 46MB 磁盘排序溢出；文件统计聚合结果增加 10 秒 Redis 短缓存，列表、统计、子目录计数与创建人查询并行执行，前端自动刷新轮询间隔同步调整为 10 秒。36 万文件知识库列表接口耗时由约 1.3s 降至约 300ms。
 - 收窄知识库状态边界：读取模型统一收口至 `read_models.py`；创建、列表、详情与更新由 Manager 统一返回 `KnowledgeBaseSummary/Detail`，Router 只转换 HTTP 响应；Manager 协调查询配置、主记录与聚合统计，Repository 在行锁内合并统计投影；executor 接收 frozen `KnowledgeBaseConfig`，负责类型资源、文档操作与类型专属一致性检测，不再写知识库主记录。
 - 修复 Agent worker 知识库运行配置不一致：`get_kb_config` 从 Redis 读取最小 Config 快照，未命中时在 KB 级分布式锁内回源 PostgreSQL，Redis 连接故障时只读请求直接回源且不回填；更新与删除先可靠失效缓存再提交数据库，避免旧请求回填过期配置。查询参数在数据库行锁内合并，并发保存不再互相覆盖。
 - 精简知识库文档内容接口响应：`GET /api/knowledge/databases/{kb_id}/documents/{doc_id}/content` 不再返回分块内部的实体 ID 与抽取结果，避免向文档预览请求传输仅供知识图谱构建使用的数据。
@@ -40,6 +41,7 @@
 - 模型供应商列表优化：卡片移除右下角启用/禁用开关，供应商按启用状态拆分为「已启用 / 未启用」两组展示；已启用供应商保留 Base URL、能力与「管理模型」入口，未启用供应商只展示图标与名称的小卡片，不再展示 Base URL 与管理模型按钮。
 - 知识库卡片补充共享权限标签：参考 Skill / 智能体卡片，在现有类型与嵌入模型标签之外新增共享范围标签（如「只读全局」），与 Agent 卡片保持一致的灰色样式。
 - 收敛 Ruff CI 行为：Pull Request 与 push 到 main 均只检查、不修改仓库内容，发现问题直接标红并提示本地运行 `make format`；工作流仅保留 `contents: read` 权限，不再自动提交或创建修复 PR。
+- 优化知识库详情页自动轮询：轮询从固定 1s `setInterval` 改为链式调度，等上一轮知识库信息与文件列表请求全部返回后再排下一轮，慢接口下不再出现请求堆积重叠；全库 `processing_count` 持续不变时按退避因子拉长间隔（上限 30s），连续多轮无进展即自动停止轮询；离开详情页时 `onUnmounted` 主动清理定时器。
 - 统一工具调用展示名称映射：知识库工具显示名改为后端 `display_name` 定义，前端拉取完整工具元数据；工具卡片与折叠摘要按「工具列表 display name → middleware 兜底映射 → 工具 id」统一展示。
 
 

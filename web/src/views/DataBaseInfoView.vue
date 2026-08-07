@@ -244,7 +244,7 @@
     <a-modal
       v-model:open="editModalVisible"
       title="配置知识库"
-      width="920px"
+      width="720px"
       :mask-closable="false"
       wrap-class-name="database-edit-modal"
     >
@@ -366,7 +366,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDatabaseStore } from '@/stores/database'
 import { useTaskerStore } from '@/stores/tasker'
@@ -922,6 +922,10 @@ onMounted(() => {
   loadChunkPresetOptions()
   loadDepartments()
   loadUsers()
+})
+
+onUnmounted(() => {
+  store.stopAutoRefresh()
 })
 </script>
 

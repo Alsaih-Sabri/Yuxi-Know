@@ -54,6 +54,7 @@
       :loading="store.fileBrowser.loading"
       :pagination="tablePagination"
       :selection="tableSelection"
+      :scroll="{ x: 868 }"
       :empty-text="emptyText"
       refreshable
       :refreshing="refreshing"
@@ -117,7 +118,7 @@
                     :class="{ 'is-loading': refreshing }"
                     @click="handleRefresh"
                   >
-                    <RotateCw size="16" :class="{ spin: refreshing }" />
+                    <ListRestart size="16" :class="{ spin: refreshing }" />
                     <span>刷新</span>
                   </div>
 
@@ -411,6 +412,7 @@ import {
   Trash2,
   Download,
   RotateCw,
+  ListRestart,
   Ellipsis,
   FolderPlus,
   CheckSquare,
@@ -656,7 +658,7 @@ const columnsCompact = [
     dataIndex: 'filename',
     key: 'filename',
     ellipsis: true,
-    width: undefined, // 不设置宽度，让它占据剩余空间
+    width: 280,
     sorter: (a, b) => {
       if (a.is_folder && !b.is_folder) return -1
       if (!a.is_folder && b.is_folder) return 1

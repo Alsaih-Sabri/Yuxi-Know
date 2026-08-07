@@ -413,6 +413,15 @@ class PostgresManager(metaclass=SingletonMeta):
             "CREATE INDEX IF NOT EXISTS idx_kf_parent ON knowledge_files(parent_id)",
             "CREATE INDEX IF NOT EXISTS idx_kf_status ON knowledge_files(status)",
             "CREATE INDEX IF NOT EXISTS idx_kf_hash ON knowledge_files(content_hash)",
+            # 虚拟目录分组索引：按路径首段聚合，避免大知识库全表扫描 + 磁盘排序
+            (
+                "CREATE INDEX IF NOT EXISTS idx_kf_kb_parent_segment ON knowledge_files "
+                "(kb_id, parent_id, split_part(filename, '/', 1)) WHERE strpos(filename, '/') > 0"
+            ),
+            (
+                "CREATE INDEX IF NOT EXISTS idx_kf_kb_parent_flat ON knowledge_files (kb_id, parent_id) "
+                "WHERE strpos(filename, '/') = 0 AND filename IS NOT NULL AND filename <> ''"
+            ),
             "CREATE INDEX IF NOT EXISTS ix_evaluation_datasets_kb_id ON evaluation_datasets(kb_id)",
             (
                 "CREATE INDEX IF NOT EXISTS ix_evaluation_dataset_items_dataset_index "
