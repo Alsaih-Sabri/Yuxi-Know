@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import base64
+import gc
 import threading
+import weakref
 from types import MethodType, SimpleNamespace
 
 import pytest
@@ -17,7 +19,7 @@ from yuxi.agents.backends.composite import (
     create_agent_filesystem_middleware,
     sync_agent_context_skills,
 )
-from yuxi.agents.backends.sandbox import resolve_virtual_path, sandbox_id_for_thread
+from yuxi.agents.backends.sandbox import ProvisionerSandboxProvider, resolve_virtual_path, sandbox_id_for_thread
 from yuxi.agents.backends.sandbox.backend import ProvisionerSandboxBackend
 from yuxi.agents.middlewares.skills import SkillsMiddleware
 from yuxi.utils.paths import VIRTUAL_PATH_CONVERSATION_HISTORY, VIRTUAL_PATH_LARGE_TOOL_RESULTS
@@ -61,6 +63,94 @@ def test_create_agent_composite_backend_uses_prepared_readable_skills(monkeypatc
     assert backend.artifacts_root == "/home/gem/user-data/outputs"
     assert "/skills/" in backend.routes
     assert "/home/gem/kbs/" not in backend.routes
+
+
+def test_sandbox_provider_release_deletes_sandbox_and_clears_cache():
+    deleted: list[str] = []
+    provider = object.__new__(ProvisionerSandboxProvider)
+    provider._lock = threading.Lock()
+    provider._thread_locks = {}
+    provider._connections = {}
+    provider._last_touch_at = {}
+    provider._client = SimpleNamespace(delete=deleted.append)
+    connection = SimpleNamespace(sandbox_id="sandbox-1")
+    cache_key = "user-1::thread-1::thread-1"
+    provider._connections[cache_key] = connection
+    provider._last_touch_at[cache_key] = 1.0
+
+    provider.release("thread-1", uid="user-1")
+
+    assert deleted == ["sandbox-1"]
+    assert cache_key not in provider._connections
+    assert cache_key not in provider._last_touch_at
+
+
+def test_sandbox_provider_discards_unused_thread_locks():
+    provider = object.__new__(ProvisionerSandboxProvider)
+    provider._lock = threading.Lock()
+    provider._thread_locks = weakref.WeakValueDictionary()
+
+    lock = provider._thread_lock("user-1::thread-1::thread-1")
+    lock_ref = weakref.ref(lock)
+    assert provider._thread_lock("user-1::thread-1::thread-1") is lock
+
+    del lock
+    gc.collect()
+
+    assert lock_ref() is None
+    assert not provider._thread_locks
+
+
+def test_sandbox_provider_waiter_keeps_shared_thread_lock_alive():
+    provider = object.__new__(ProvisionerSandboxProvider)
+    provider._lock = threading.Lock()
+    provider._thread_locks = weakref.WeakValueDictionary()
+    cache_key = "user-1::thread-1::thread-1"
+    first_lock = provider._thread_lock(cache_key)
+    waiter_ready = threading.Event()
+    waiter_acquired = threading.Event()
+
+    def wait_for_lock() -> None:
+        waiting_lock = provider._thread_lock(cache_key)
+        assert waiting_lock is first_lock
+        waiter_ready.set()
+        with waiting_lock:
+            waiter_acquired.set()
+
+    first_lock.acquire()
+    waiter = threading.Thread(target=wait_for_lock)
+    waiter.start()
+    assert waiter_ready.wait(timeout=1)
+    assert provider._thread_lock(cache_key) is first_lock
+    assert not waiter_acquired.is_set()
+
+    first_lock.release()
+    waiter.join(timeout=1)
+
+    assert waiter_acquired.is_set()
+
+
+def test_sandbox_provider_release_keeps_cache_when_delete_fails():
+    provider = object.__new__(ProvisionerSandboxProvider)
+    provider._lock = threading.Lock()
+    provider._thread_locks = {}
+    provider._connections = {}
+    provider._last_touch_at = {}
+
+    def fail_delete(_sandbox_id):
+        raise RuntimeError("delete failed")
+
+    provider._client = SimpleNamespace(delete=fail_delete)
+    connection = SimpleNamespace(sandbox_id="sandbox-1")
+    cache_key = "user-1::thread-1::thread-1"
+    provider._connections[cache_key] = connection
+    provider._last_touch_at[cache_key] = 1.0
+
+    with pytest.raises(RuntimeError, match="delete failed"):
+        provider.release("thread-1", uid="user-1")
+
+    assert provider._connections[cache_key] is connection
+    assert provider._last_touch_at[cache_key] == 1.0
 
 
 @pytest.mark.asyncio
@@ -803,6 +893,46 @@ def test_provisioner_download_files_treats_sandbox_404_as_missing(monkeypatch) -
     responses = backend.download_files(["/home/gem/user-data/outputs/missing.md"])
 
     assert responses[0].error == "file_not_found"
+
+
+def test_provisioner_limited_download_caps_read_inside_sandbox(monkeypatch) -> None:
+    monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
+    backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
+    commands: list[str] = []
+
+    def execute(**kwargs):
+        commands.append(kwargs["command"])
+        return SimpleNamespace(data=SimpleNamespace(exit_code=0, output=""))
+
+    fake_client = SimpleNamespace(shell=SimpleNamespace(exec_command=execute))
+    backend._get_client = MethodType(lambda self: fake_client, backend)
+    monkeypatch.setattr(backend, "_read_binary", lambda _path: base64.b64encode(b"hello"))
+
+    response = backend.download_file_limited("/home/gem/user-data/outputs/demo.txt", 5)
+
+    assert response.error is None
+    assert response.content == b"hello"
+    assert ".read(6)" in commands[0]
+    assert commands[-1].startswith("rm -f /tmp/yuxi-download-")
+
+
+def test_provisioner_limited_download_reports_oversized_file(monkeypatch) -> None:
+    monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
+    backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
+
+    def execute(**kwargs):
+        if kwargs["command"].startswith("rm -f"):
+            return SimpleNamespace(data=SimpleNamespace(exit_code=0, output=""))
+        return SimpleNamespace(data=SimpleNamespace(exit_code=1, output="AssertionError: file_too_large"))
+
+    fake_client = SimpleNamespace(shell=SimpleNamespace(exec_command=execute))
+    backend._get_client = MethodType(lambda self: fake_client, backend)
+    monkeypatch.setattr(backend, "_read_binary", lambda _path: pytest.fail("超限文件不得传回宿主"))
+
+    response = backend.download_file_limited("/home/gem/user-data/outputs/demo.bin", 5)
+
+    assert response.content is None
+    assert response.error == "file_too_large"
 
 
 def test_provisioner_execute_returns_error_response_on_client_failure(monkeypatch) -> None:

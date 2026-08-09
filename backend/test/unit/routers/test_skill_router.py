@@ -4,10 +4,10 @@ from types import SimpleNamespace
 
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
+from yuxi.storage.postgres.models_business import Skill, User
 
 from server.routers.skill_router import skills, user_skills
 from server.utils.auth_middleware import get_admin_user, get_db, get_required_user
-from yuxi.storage.postgres.models_business import Skill, User
 
 
 def _build_app(*, role: str = "admin") -> FastAPI:
@@ -251,6 +251,26 @@ def test_remote_skill_prepare_and_admin_confirm_routes(monkeypatch):
     assert captured["confirm"]["draft_id"] == "draft-remote"
     assert captured["confirm"]["slugs"] == ["frontend-design"]
     assert captured["confirm"]["operator_uid"] == "admin"
+
+
+def test_remote_skill_list_route_passes_request_database_session(monkeypatch):
+    captured: dict[str, object] = {}
+
+    async def fake_list_remote_skills(source, db):
+        captured["source"] = source
+        captured["db"] = db
+        return [{"name": "demo", "description": "demo skill"}]
+
+    monkeypatch.setattr("server.routers.skill_router.list_remote_skills", fake_list_remote_skills)
+
+    response = TestClient(_build_app(role="user")).post(
+        "/api/skills/remote/list",
+        json={"source": "owner/repo"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["data"] == [{"name": "demo", "description": "demo skill"}]
+    assert captured == {"source": "owner/repo", "db": None}
 
 
 def test_normal_user_cannot_confirm_shared_skill_install(monkeypatch):

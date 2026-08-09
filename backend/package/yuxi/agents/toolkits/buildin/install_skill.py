@@ -9,6 +9,7 @@ from langgraph.prebuilt.tool_node import ToolRuntime
 from langgraph.types import Command
 from pydantic import BaseModel, Field
 
+from yuxi.agents.backends.sandbox.download import download_sandbox_directory
 from yuxi.agents.toolkits.registry import tool
 from yuxi.repositories.agent_repository import AgentRepository
 from yuxi.repositories.conversation_repository import ConversationRepository
@@ -19,7 +20,6 @@ from yuxi.utils.paths import VIRTUAL_PATH_WORKSPACE_SKILLS
 SANDBOX_PATH_HINT = (
     "请使用 /home/gem/user-data/workspace/...、/home/gem/user-data/uploads/... 或 /home/gem/user-data/outputs/..."
 )
-MAX_SANDBOX_SKILL_FILES = 1000
 
 
 class InstallSkillInput(BaseModel):
@@ -34,54 +34,9 @@ class InstallSkillInput(BaseModel):
     )
 
 
-def _collect_sandbox_file_paths(backend, remote_dir: str, file_paths: list[str] | None = None) -> list[str]:
-    file_paths = file_paths if file_paths is not None else []
-    result = backend.ls(remote_dir)
-    if result.error:
-        raise ValueError(result.error)
-    entries = result.entries or []
-    for entry in entries:
-        path = entry["path"]
-        if entry.get("is_dir"):
-            _collect_sandbox_file_paths(backend, path, file_paths)
-        else:
-            if len(file_paths) >= MAX_SANDBOX_SKILL_FILES:
-                raise ValueError(f"Skill 目录文件数超过限制（最多 {MAX_SANDBOX_SKILL_FILES} 个文件）")
-            file_paths.append(path)
-    return file_paths
-
-
-def _download_skill_dir(backend, remote_dir: str, local_dir: Path) -> None:
-    """递归通过沙盒 API 下载 skill 目录到本地。"""
-    remote_root = PurePosixPath(remote_dir.rstrip("/"))
-    file_paths = _collect_sandbox_file_paths(backend, remote_dir)
-    if not file_paths:
-        raise ValueError(f"沙盒路径 {remote_dir} 中未发现可下载文件")
-
-    responses = backend.download_files(file_paths)
-    if len(responses) != len(file_paths):
-        raise ValueError("沙盒文件下载结果数量不匹配")
-
-    for expected_path, response in zip(file_paths, responses):
-        error = getattr(response, "error", None)
-        content = getattr(response, "content", None)
-        if error or content is None:
-            raise ValueError(f"下载沙盒文件失败: {expected_path} ({error or 'empty_content'})")
-
-        pure_path = PurePosixPath(expected_path)
-        try:
-            relative_path = pure_path.relative_to(remote_root)
-        except ValueError:
-            relative_path = PurePosixPath(pure_path.name)
-
-        target_path = local_dir / Path(relative_path.as_posix())
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_bytes(content)
-
-
 def _prepare_skill_from_sandbox(sandbox_path: str, thread_id: str, uid: str, staging_root: Path) -> Path:
     """从 Sandbox 路径准备 skill 目录，返回本地暂存目录。"""
-    from yuxi.agents.backends.sandbox import ProvisionerSandboxBackend, resolve_virtual_path
+    from yuxi.agents.backends.sandbox import ProvisionerSandboxBackend
     from yuxi.agents.skills.service import is_valid_skill_slug
 
     slug = PurePosixPath(sandbox_path.rstrip("/")).name
@@ -92,20 +47,19 @@ def _prepare_skill_from_sandbox(sandbox_path: str, thread_id: str, uid: str, sta
         raise ValueError(f"不支持的沙盒路径: {sandbox_path}。{SANDBOX_PATH_HINT}")
 
     staging = staging_root / slug
-
-    # 优先尝试共享卷路径（性能更好，无需走沙盒 API）。
     try:
-        local_path = resolve_virtual_path(thread_id, sandbox_path, uid=uid)
-        if (local_path / "SKILL.md").exists():
-            shutil.copytree(local_path, staging)
-        else:
-            raise FileNotFoundError(f"{local_path} 中未找到 SKILL.md")
-    except FileNotFoundError:
-        staging.mkdir(parents=True, exist_ok=True)
         backend = ProvisionerSandboxBackend(thread_id=thread_id, uid=uid)
-        _download_skill_dir(backend, sandbox_path, staging)
+        download_sandbox_directory(
+            backend,
+            sandbox_path,
+            staging,
+            empty_message=f"沙盒路径 {sandbox_path} 中未发现可下载文件",
+        )
         if not (staging / "SKILL.md").exists():
             raise ValueError(f"沙盒路径 {sandbox_path} 中未找到 SKILL.md")
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
 
     return staging
 

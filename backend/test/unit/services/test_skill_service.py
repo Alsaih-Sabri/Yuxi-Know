@@ -7,7 +7,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
 from yuxi.agents.skills import service as svc
 from yuxi.agents.toolkits import service as tool_service
 from yuxi.storage.postgres.models_business import Skill, User
@@ -65,7 +64,8 @@ async def test_prepare_remote_skill_install_stages_success_and_failure(
 
     preparation = FakePreparation()
 
-    async def fake_prepare_remote_skills_batch(*, source, skills):
+    async def fake_prepare_remote_skills_batch(*, source, skills, db):
+        assert db is None
         assert source == "anthropics/skills"
         assert skills == ["pdf", "broken"]
         return preparation
@@ -529,6 +529,35 @@ def test_is_valid_skill_slug():
     assert svc.is_valid_skill_slug("../bad") is False
     assert svc.is_valid_skill_slug("Invalid") is False  # uppercase not allowed
     assert svc.is_valid_skill_slug("") is False
+
+
+def test_copy_skill_tree_rejects_symlink_without_creating_target(tmp_path: Path):
+    source_dir = tmp_path / "source"
+    target_dir = tmp_path / "target"
+    source_dir.mkdir()
+    (source_dir / "SKILL.md").write_text("# demo", encoding="utf-8")
+    (source_dir / "secret").symlink_to(tmp_path / "outside-secret")
+
+    with pytest.raises(ValueError, match="符号链接"):
+        svc._copy_skill_tree(source_dir, target_dir)
+
+    assert not target_dir.exists()
+
+
+@pytest.mark.asyncio
+async def test_export_skill_zip_rejects_symlink(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    skill_dir = tmp_path / "skills" / "demo"
+    skill_dir.mkdir(parents=True)
+    (skill_dir / "SKILL.md").write_text("# demo", encoding="utf-8")
+    (skill_dir / "secret").symlink_to(tmp_path / "outside-secret")
+
+    async def fake_get_skill_or_raise(_db, _slug):
+        return SimpleNamespace(dir_path=str(skill_dir))
+
+    monkeypatch.setattr(svc, "get_skill_or_raise", fake_get_skill_or_raise)
+
+    with pytest.raises(ValueError, match="符号链接"):
+        await svc.export_skill_zip(None, "demo")
 
 
 def test_sync_thread_readable_skills_none_keeps_no_skills(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

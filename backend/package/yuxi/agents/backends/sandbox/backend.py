@@ -645,3 +645,47 @@ class ProvisionerSandboxBackend(BaseSandbox):
                 logger.warning(f"Download from sandbox failed for {normalized_path}: {exc}")
                 responses.append(FileDownloadResponse(path=normalized_path, content=None, error=f"read_failed: {exc}"))
         return responses
+
+    def download_file_limited(self, path: str, max_bytes: int) -> FileDownloadResponse:
+        """在 Sandbox 内限制读取字节数后下载单个文件。"""
+        output_path = f"/tmp/yuxi-download-{uuid.uuid4().hex}.b64"
+        client = None
+        try:
+            normalized_path = _normalize_path(path)
+            if not _can_read_path(normalized_path):
+                return FileDownloadResponse(path=normalized_path, content=None, error="permission_denied")
+            if max_bytes < 0:
+                return FileDownloadResponse(path=normalized_path, content=None, error="file_too_large")
+
+            path_b64 = base64.b64encode(normalized_path.encode("utf-8")).decode("ascii")
+            output_path_b64 = base64.b64encode(output_path.encode("utf-8")).decode("ascii")
+            command = (
+                'python3 -c "'
+                "import base64; "
+                f"path = base64.b64decode('{path_b64}').decode('utf-8'); "
+                f"output_path = base64.b64decode('{output_path_b64}').decode('utf-8'); "
+                f"content = open(path, 'rb').read({max_bytes + 1}); "
+                f"assert len(content) <= {max_bytes}, 'file_too_large'; "
+                "open(output_path, 'w').write(base64.b64encode(content).decode('ascii'))"
+                '"'
+            )
+            client = self._get_client()
+            result = client.shell.exec_command(
+                command=command,
+                timeout=self._command_timeout_seconds,
+                truncate=False,
+            )
+            if result.data.exit_code not in (0, None):
+                error = "file_too_large" if "file_too_large" in (result.data.output or "") else "invalid_path"
+                return FileDownloadResponse(path=normalized_path, content=None, error=error)
+
+            encoded = self._read_binary(output_path)
+            content = base64.b64decode(encoded, validate=True)
+            return FileDownloadResponse(path=normalized_path, content=content, error=None)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"Limited sandbox download failed for {path}: {exc}")
+            return FileDownloadResponse(path=str(path), content=None, error="invalid_path")
+        finally:
+            if client is not None:
+                with suppress(Exception):
+                    client.shell.exec_command(command=f"rm -f {output_path}", timeout=10)

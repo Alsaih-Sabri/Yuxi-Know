@@ -157,6 +157,11 @@ description: 这是一个用于处理特定任务的技能
 
 **方式三：从远程来源安装**
 
+管理员可以通过系统配置项 `remote_skill_source_policy.allowed_hosts` 控制远程 Skill 来源域名。
+该策略保存在 PostgreSQL `config_options` 中，默认允许 `github.com` 和 `modelscope.cn`，只做
+精确域名匹配，不自动放行子域名；保存空列表时，远程 Skill 安装会被禁用。运行时以数据库
+配置为准，不依赖 `base.toml`、环境变量或 Redis 配置快照。
+
 1. 在 Skills 管理页面点击「远程安装」
 2. 在“按仓库拉取”中填写来源，例如：
    - `anthropics/skills`
