@@ -180,43 +180,6 @@ def test_docker_sandbox_mounts_shared_workspace_without_thread_history_projectio
     assert all("/agents/chats" not in destination for destination in destinations)
 
 
-def test_provider_cleans_legacy_thread_links_before_provisioner_request(monkeypatch, tmp_path):
-    monkeypatch.setenv("PROVISIONER_BACKEND", "memory")
-    module = _load_module()
-    from yuxi.agents.backends.sandbox import paths
-    from yuxi.agents.backends.sandbox.provider import ProvisionerSandboxProvider
-
-    monkeypatch.setattr(paths.conf, "save_dir", str(tmp_path))
-    thread_id = "thread-history"
-    current_thread_id = "thread-current"
-    workspace = tmp_path / "threads" / "shared" / "user-1" / "workspace"
-    legacy_dir = workspace / "agents" / thread_id
-    uploads = tmp_path / "threads" / thread_id / "user-data" / "uploads"
-    outputs = tmp_path / "threads" / thread_id / "user-data" / "outputs"
-    uploads.mkdir(parents=True)
-    outputs.mkdir(parents=True)
-    legacy_dir.mkdir(parents=True)
-    (legacy_dir / "uploads").symlink_to(uploads, target_is_directory=True)
-    (legacy_dir / "outputs").symlink_to(outputs, target_is_directory=True)
-
-    provider = object.__new__(ProvisionerSandboxProvider)
-    provider._lock = threading.Lock()
-    provider._thread_locks = {}
-    provider._connections = {}
-    provider._last_touch_at = {}
-    provider._touch_interval_seconds = 30
-    provider._client = SimpleNamespace(
-        create=lambda *args, **kwargs: module.SandboxRecord(
-            sandbox_id=args[0], sandbox_url="http://sandbox", status="Running"
-        )
-    )
-    monkeypatch.setattr("yuxi.agents.backends.sandbox.provider.load_user_agent_env", lambda _uid: {})
-
-    provider.acquire(current_thread_id, uid="user-1")
-
-    assert not legacy_dir.exists()
-
-
 def test_kubernetes_mount_check_uses_file_and_skills_thread_ids(monkeypatch):
     monkeypatch.setenv("PROVISIONER_BACKEND", "memory")
     module = _load_module()
