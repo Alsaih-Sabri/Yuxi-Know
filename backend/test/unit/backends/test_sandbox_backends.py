@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import base64
 import gc
+import hashlib
+import shlex
+import subprocess
 import threading
 import weakref
+from pathlib import Path
 from types import MethodType, SimpleNamespace
 
 import pytest
@@ -439,7 +443,17 @@ def test_provider_uses_distinct_sandbox_scope_for_different_uid(monkeypatch) -> 
     created = []
 
     class FakeClient:
-        def create(self, sandbox_id, thread_id, uid, env, *, file_thread_id=None, skills_thread_id=None):
+        def create(
+            self,
+            sandbox_id,
+            thread_id,
+            uid,
+            env,
+            *,
+            file_thread_id=None,
+            skills_thread_id=None,
+            inherit_env=True,
+        ):
             created.append((sandbox_id, thread_id, uid, env, file_thread_id, skills_thread_id))
             return SimpleNamespace(sandbox_id=sandbox_id, sandbox_url=f"http://sandbox/{uid}")
 
@@ -480,7 +494,17 @@ def test_provider_maps_external_uid_only_at_provisioner_filesystem_boundary(monk
     calls = []
 
     class FakeClient:
-        def create(self, sandbox_id, thread_id, uid, env, *, file_thread_id=None, skills_thread_id=None):
+        def create(
+            self,
+            sandbox_id,
+            thread_id,
+            uid,
+            env,
+            *,
+            file_thread_id=None,
+            skills_thread_id=None,
+            inherit_env=True,
+        ):
             calls.append((uid, env))
             return SimpleNamespace(sandbox_id=sandbox_id, sandbox_url="http://sandbox")
 
@@ -510,7 +534,17 @@ def test_provider_get_create_if_missing_ensures_expected_split_scope(monkeypatch
     calls = []
 
     class FakeClient:
-        def create(self, sandbox_id, thread_id, uid, env, *, file_thread_id=None, skills_thread_id=None):
+        def create(
+            self,
+            sandbox_id,
+            thread_id,
+            uid,
+            env,
+            *,
+            file_thread_id=None,
+            skills_thread_id=None,
+            inherit_env=True,
+        ):
             calls.append((sandbox_id, thread_id, uid, env, file_thread_id, skills_thread_id))
             return SimpleNamespace(sandbox_id=sandbox_id, sandbox_url="http://sandbox")
 
@@ -550,6 +584,33 @@ def test_provider_get_create_if_missing_ensures_expected_split_scope(monkeypatch
     ]
 
 
+def test_provider_can_create_sandbox_without_environment(monkeypatch) -> None:
+    from yuxi.agents.backends.sandbox.provider import ProvisionerSandboxProvider
+
+    calls = []
+
+    class FakeClient:
+        def create(self, sandbox_id, thread_id, uid, env, **kwargs):
+            calls.append((env, kwargs["inherit_env"]))
+            return SimpleNamespace(sandbox_id=sandbox_id, sandbox_url="http://sandbox")
+
+    provider = ProvisionerSandboxProvider.__new__(ProvisionerSandboxProvider)
+    provider._client = FakeClient()
+    provider._lock = threading.Lock()
+    provider._thread_locks = {}
+    provider._connections = {}
+    provider._last_touch_at = {}
+    provider._touch_interval_seconds = 30
+    monkeypatch.setattr(
+        "yuxi.agents.backends.sandbox.provider.load_user_agent_env",
+        lambda _uid: pytest.fail("隔离 Sandbox 不应加载用户环境变量"),
+    )
+
+    provider.get("remote-skill-test", uid="remote-skill-test", create_if_missing=True, inherit_env=False)
+
+    assert calls == [({}, False)]
+
+
 def test_provisioner_uses_file_and_skills_thread_ids(monkeypatch) -> None:
     provider_calls = []
 
@@ -580,6 +641,7 @@ def test_provisioner_uses_file_and_skills_thread_ids(monkeypatch) -> None:
                 "create_if_missing": True,
                 "file_thread_id": "parent-thread",
                 "skills_thread_id": "child-skills-thread",
+                "inherit_env": True,
             },
         )
     ]
@@ -902,18 +964,62 @@ def test_provisioner_limited_download_caps_read_inside_sandbox(monkeypatch) -> N
 
     def execute(**kwargs):
         commands.append(kwargs["command"])
-        return SimpleNamespace(data=SimpleNamespace(exit_code=0, output=""))
+        return SimpleNamespace(data=SimpleNamespace(exit_code=0, output=hashlib.sha256(b"hello").hexdigest()))
 
-    fake_client = SimpleNamespace(shell=SimpleNamespace(exec_command=execute))
+    def download_file(**kwargs):
+        assert kwargs["request_options"]["timeout_in_seconds"] == backend._command_timeout_seconds
+        yield base64.b64encode(b"hello")
+
+    fake_client = SimpleNamespace(
+        shell=SimpleNamespace(exec_command=execute),
+        file=SimpleNamespace(download_file=download_file),
+    )
     backend._get_client = MethodType(lambda self: fake_client, backend)
-    monkeypatch.setattr(backend, "_read_binary", lambda _path: base64.b64encode(b"hello"))
 
     response = backend.download_file_limited("/home/gem/user-data/outputs/demo.txt", 5)
 
     assert response.error is None
     assert response.content == b"hello"
-    assert ".read(6)" in commands[0]
+    assert "file.read(6)" in commands[0]
     assert commands[-1].startswith("rm -f /tmp/yuxi-download-")
+
+
+def test_provisioner_limited_download_rejects_replaced_output(monkeypatch) -> None:
+    monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
+    backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
+
+    def execute(**kwargs):
+        return SimpleNamespace(data=SimpleNamespace(exit_code=0, output=hashlib.sha256(b"expected").hexdigest()))
+
+    fake_client = SimpleNamespace(
+        shell=SimpleNamespace(exec_command=execute),
+        file=SimpleNamespace(download_file=lambda **_kwargs: iter([base64.b64encode(b"replaced-secret")])),
+    )
+    backend._get_client = MethodType(lambda self: fake_client, backend)
+
+    response = backend.download_file_limited("/home/gem/user-data/outputs/demo.txt", 100)
+
+    assert response.content is None
+    assert response.error == "invalid_path"
+
+
+def test_provisioner_limited_download_caps_replaced_output_stream(monkeypatch) -> None:
+    monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
+    backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
+
+    def execute(**kwargs):
+        return SimpleNamespace(data=SimpleNamespace(exit_code=0, output=hashlib.sha256(b"expected").hexdigest()))
+
+    fake_client = SimpleNamespace(
+        shell=SimpleNamespace(exec_command=execute),
+        file=SimpleNamespace(download_file=lambda **_kwargs: iter([b"A" * 9])),
+    )
+    backend._get_client = MethodType(lambda self: fake_client, backend)
+
+    response = backend.download_file_limited("/home/gem/user-data/outputs/demo.txt", 5)
+
+    assert response.content is None
+    assert response.error == "invalid_path"
 
 
 def test_provisioner_limited_download_reports_oversized_file(monkeypatch) -> None:
@@ -921,9 +1027,7 @@ def test_provisioner_limited_download_reports_oversized_file(monkeypatch) -> Non
     backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
 
     def execute(**kwargs):
-        if kwargs["command"].startswith("rm -f"):
-            return SimpleNamespace(data=SimpleNamespace(exit_code=0, output=""))
-        return SimpleNamespace(data=SimpleNamespace(exit_code=1, output="AssertionError: file_too_large"))
+        return SimpleNamespace(data=SimpleNamespace(exit_code=1, output="ValueError: file_too_large"))
 
     fake_client = SimpleNamespace(shell=SimpleNamespace(exec_command=execute))
     backend._get_client = MethodType(lambda self: fake_client, backend)
@@ -933,6 +1037,46 @@ def test_provisioner_limited_download_reports_oversized_file(monkeypatch) -> Non
 
     assert response.content is None
     assert response.error == "file_too_large"
+
+
+@pytest.mark.parametrize("symlink_in_parent", [False, True])
+def test_provisioner_limited_download_rejects_symlinks(monkeypatch, tmp_path: Path, symlink_in_parent: bool) -> None:
+    monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
+    monkeypatch.setattr("yuxi.agents.backends.sandbox.backend._can_read_path", lambda _path: True)
+    backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
+    secret_dir = tmp_path / "secret-dir"
+    secret_dir.mkdir()
+    secret = secret_dir / "secret.txt"
+    secret.write_text("sandbox-secret", encoding="utf-8")
+
+    if symlink_in_parent:
+        symlink = tmp_path / "linked-dir"
+        symlink.symlink_to(secret_dir, target_is_directory=True)
+        sandbox_path = symlink / secret.name
+    else:
+        symlink = tmp_path / "linked-secret"
+        symlink.symlink_to(secret)
+        sandbox_path = symlink
+
+    def execute(**kwargs):
+        result = subprocess.run(
+            shlex.split(kwargs["command"]),
+            capture_output=True,
+            check=False,
+            text=True,
+        )
+        return SimpleNamespace(data=SimpleNamespace(exit_code=result.returncode, output=result.stdout or result.stderr))
+
+    fake_client = SimpleNamespace(
+        shell=SimpleNamespace(exec_command=execute),
+        file=SimpleNamespace(download_file=lambda **_kwargs: pytest.fail("符号链接不得生成临时输出")),
+    )
+    backend._get_client = MethodType(lambda self: fake_client, backend)
+
+    response = backend.download_file_limited(str(sandbox_path), 100)
+
+    assert response.content is None
+    assert response.error == "invalid_path"
 
 
 def test_provisioner_execute_returns_error_response_on_client_failure(monkeypatch) -> None:

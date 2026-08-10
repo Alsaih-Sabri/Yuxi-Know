@@ -47,19 +47,16 @@ def _prepare_skill_from_sandbox(sandbox_path: str, thread_id: str, uid: str, sta
         raise ValueError(f"不支持的沙盒路径: {sandbox_path}。{SANDBOX_PATH_HINT}")
 
     staging = staging_root / slug
-    try:
-        backend = ProvisionerSandboxBackend(thread_id=thread_id, uid=uid)
-        download_sandbox_directory(
-            backend,
-            sandbox_path,
-            staging,
-            empty_message=f"沙盒路径 {sandbox_path} 中未发现可下载文件",
-        )
-        if not (staging / "SKILL.md").exists():
-            raise ValueError(f"沙盒路径 {sandbox_path} 中未找到 SKILL.md")
-    except Exception:
+    backend = ProvisionerSandboxBackend(thread_id=thread_id, uid=uid)
+    download_sandbox_directory(
+        backend,
+        sandbox_path,
+        staging,
+        empty_message=f"沙盒路径 {sandbox_path} 中未发现可下载文件",
+    )
+    if not (staging / "SKILL.md").exists():
         shutil.rmtree(staging, ignore_errors=True)
-        raise
+        raise ValueError(f"沙盒路径 {sandbox_path} 中未找到 SKILL.md")
 
     return staging
 

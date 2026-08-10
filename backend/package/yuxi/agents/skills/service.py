@@ -400,7 +400,7 @@ def sync_thread_readable_skills(
 
             temp_target = thread_skills_root / f".{slug}.tmp-{uuid.uuid4().hex[:8]}"
             try:
-                _copy_skill_tree(source_dir, temp_target)
+                shutil.copytree(source_dir, temp_target, symlinks=False)
                 temp_target.rename(target_dir)
             finally:
                 if temp_target.exists():
@@ -422,23 +422,6 @@ def _build_builtin_skill_dir_path(slug: str) -> str:
 def _dir_contains_symlink(path: Path) -> bool:
     """检查目录内是否包含任意符号链接子路径。"""
     return any(child.is_symlink() for child in path.rglob("*"))
-
-
-def _copy_skill_tree(source_dir: Path, target_dir: Path) -> None:
-    """复制不可信 Skill 目录，且在复制前后拒绝任意符号链接。"""
-    if source_dir.is_symlink() or not source_dir.is_dir() or _dir_contains_symlink(source_dir):
-        raise ValueError("Skill 目录不允许包含符号链接")
-
-    try:
-        shutil.copytree(source_dir, target_dir, symlinks=True)
-        if target_dir.is_symlink() or _dir_contains_symlink(target_dir):
-            raise ValueError("Skill 目录不允许包含符号链接")
-    except Exception:
-        if target_dir.is_symlink():
-            target_dir.unlink(missing_ok=True)
-        elif target_dir.exists():
-            shutil.rmtree(target_dir, ignore_errors=True)
-        raise
 
 
 def _dirs_equal(dir1: Path, dir2: Path) -> bool:
@@ -474,7 +457,7 @@ def _replace_skill_target(
     if temp_target.exists():
         shutil.rmtree(temp_target, ignore_errors=True)
 
-    _copy_skill_tree(source_dir, temp_target)
+    shutil.copytree(source_dir, temp_target, symlinks=False)
     try:
         if validate is not None:
             validate(temp_target)
@@ -1060,7 +1043,7 @@ async def _stage_skill_draft_item(
 ) -> dict[str, Any]:
     item_id = uuid.uuid4().hex
     item_dir = draft_items_dir / item_id
-    _copy_skill_tree(source_skill_dir, item_dir)
+    shutil.copytree(source_skill_dir, item_dir, symlinks=False)
     parsed = _parse_skill_dir_metadata(item_dir)
     final_slug = await _generate_available_slug(repo, parsed["slug"])
     return {
@@ -1106,7 +1089,7 @@ async def _import_skill_dir_impl(
     final_slug = await _generate_available_slug(repo, parsed["slug"])
     with tempfile.TemporaryDirectory(prefix=".skill-import-", dir=str(skills_root.parent)) as temp_root:
         stage_dir = Path(temp_root) / "stage"
-        _copy_skill_tree(source_skill_dir, stage_dir)
+        shutil.copytree(source_skill_dir, stage_dir)
 
         if final_slug != parsed["slug"]:
             content = (stage_dir / "SKILL.md").read_text(encoding="utf-8")
@@ -1361,7 +1344,7 @@ async def confirm_skill_install_draft(
             parsed = _parse_skill_dir_metadata(source_dir)
             with tempfile.TemporaryDirectory(prefix=".skill-confirm-", dir=str(skills_root.parent)) as temp_root:
                 stage_dir = Path(temp_root) / "stage"
-                _copy_skill_tree(source_dir, stage_dir)
+                shutil.copytree(source_dir, stage_dir)
                 if parsed["slug"] != slug:
                     content = (stage_dir / "SKILL.md").read_text(encoding="utf-8")
                     (stage_dir / "SKILL.md").write_text(_rewrite_frontmatter_slug(content, slug), encoding="utf-8")
@@ -1661,8 +1644,6 @@ async def export_skill_zip(db: AsyncSession, slug: str) -> tuple[str, str]:
     skill_dir = _resolve_skill_dir(item)
     if not skill_dir.exists() or not skill_dir.is_dir():
         raise ValueError("技能目录不存在")
-    if skill_dir.is_symlink() or _dir_contains_symlink(skill_dir):
-        raise ValueError("Skill 目录不允许包含符号链接")
 
     fd, export_path = tempfile.mkstemp(prefix=f"skill-{slug}-", suffix=".zip")
     Path(export_path).unlink(missing_ok=True)

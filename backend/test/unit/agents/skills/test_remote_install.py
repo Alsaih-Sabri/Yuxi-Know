@@ -177,17 +177,18 @@ async def test_remote_skill_sandbox_executes_cli_through_provisioner_backend():
 
 
 def test_remote_skill_sandbox_uses_unique_workspace_uid(monkeypatch: pytest.MonkeyPatch):
-    captured: dict[str, str] = {}
+    captured: dict[str, str | bool] = {}
 
     class FakeBackend:
-        def __init__(self, *, thread_id, uid):
+        def __init__(self, *, thread_id, uid, inherit_env):
             captured["thread_id"] = thread_id
             captured["uid"] = uid
+            captured["inherit_env"] = inherit_env
 
     monkeypatch.setattr(svc, "ProvisionerSandboxBackend", FakeBackend)
     sandbox = svc._RemoteSkillSandbox.create()
 
-    assert captured == {"thread_id": sandbox.thread_id, "uid": sandbox.thread_id}
+    assert captured == {"thread_id": sandbox.thread_id, "uid": sandbox.thread_id, "inherit_env": False}
 
 
 @pytest.mark.asyncio

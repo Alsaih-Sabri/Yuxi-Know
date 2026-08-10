@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import os
+import shlex
 import uuid
 from contextlib import suppress
 from datetime import datetime
@@ -182,6 +185,7 @@ class ProvisionerSandboxBackend(BaseSandbox):
         skill_sources: dict[str, str] | None = None,
         file_thread_id: str | None = None,
         skills_thread_id: str | None = None,
+        inherit_env: bool = True,
     ):
         self._thread_id = str(thread_id or "").strip()
         if not self._thread_id:
@@ -198,6 +202,7 @@ class ProvisionerSandboxBackend(BaseSandbox):
 
         self._readable_skills = list(readable_skills or [])
         self._skill_sources = dict(skill_sources or {})
+        self._inherit_env = inherit_env
         self._provider = get_sandbox_provider()
         self._id = sandbox_id_for_thread(self._file_thread_id, self._skills_thread_id, uid=self._uid)
         self._client: Any | None = None
@@ -230,6 +235,7 @@ class ProvisionerSandboxBackend(BaseSandbox):
             create_if_missing=True,
             file_thread_id=self._file_thread_id,
             skills_thread_id=self._skills_thread_id,
+            inherit_env=self._inherit_env,
         )
         if connection is None:
             raise RuntimeError(f"sandbox is unavailable for thread {self._thread_id}")
@@ -659,16 +665,37 @@ class ProvisionerSandboxBackend(BaseSandbox):
 
             path_b64 = base64.b64encode(normalized_path.encode("utf-8")).decode("ascii")
             output_path_b64 = base64.b64encode(output_path.encode("utf-8")).decode("ascii")
-            command = (
-                'python3 -c "'
-                "import base64; "
-                f"path = base64.b64decode('{path_b64}').decode('utf-8'); "
-                f"output_path = base64.b64decode('{output_path_b64}').decode('utf-8'); "
-                f"content = open(path, 'rb').read({max_bytes + 1}); "
-                f"assert len(content) <= {max_bytes}, 'file_too_large'; "
-                "open(output_path, 'w').write(base64.b64encode(content).decode('ascii'))"
-                '"'
+            script = (
+                "import base64, hashlib, os, stat\n"
+                f"path = base64.b64decode('{path_b64}').decode('utf-8')\n"
+                f"output_path = base64.b64decode('{output_path_b64}').decode('utf-8')\n"
+                "parts = [part for part in path.split('/') if part]\n"
+                "directory_fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)\n"
+                "try:\n"
+                "    for part in parts[:-1]:\n"
+                "        next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory_fd)\n"
+                "        os.close(directory_fd)\n"
+                "        directory_fd = next_fd\n"
+                "    file = os.fdopen(os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd), 'rb')\n"
+                "    try:\n"
+                "        if not stat.S_ISREG(os.fstat(file.fileno()).st_mode):\n"
+                "            raise ValueError('invalid_file_type')\n"
+                f"        content = file.read({max_bytes + 1})\n"
+                f"        if len(content) > {max_bytes}:\n"
+                "            raise ValueError('file_too_large')\n"
+                "    finally:\n"
+                "        file.close()\n"
+                "finally:\n"
+                "    os.close(directory_fd)\n"
+                "output_fd = os.open(output_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)\n"
+                "output = os.fdopen(output_fd, 'wb')\n"
+                "try:\n"
+                "    output.write(base64.b64encode(content))\n"
+                "finally:\n"
+                "    output.close()\n"
+                "print(hashlib.sha256(content).hexdigest(), end='')\n"
             )
+            command = f"python3 -c {shlex.quote(script)}"
             client = self._get_client()
             result = client.shell.exec_command(
                 command=command,
@@ -679,8 +706,19 @@ class ProvisionerSandboxBackend(BaseSandbox):
                 error = "file_too_large" if "file_too_large" in (result.data.output or "") else "invalid_path"
                 return FileDownloadResponse(path=normalized_path, content=None, error=error)
 
-            encoded = self._read_binary(output_path)
+            expected_digest = (result.data.output or "").strip()
+            max_encoded_bytes = 4 * ((max_bytes + 2) // 3)
+            encoded = bytearray()
+            for chunk in client.file.download_file(
+                path=output_path,
+                request_options={"chunk_size": 64 * 1024, "timeout_in_seconds": self._command_timeout_seconds},
+            ):
+                encoded.extend(chunk)
+                if len(encoded) > max_encoded_bytes:
+                    raise ValueError("download_output_too_large")
             content = base64.b64decode(encoded, validate=True)
+            if not hmac.compare_digest(hashlib.sha256(content).hexdigest(), expected_digest):
+                raise ValueError("download_content_changed")
             return FileDownloadResponse(path=normalized_path, content=content, error=None)
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"Limited sandbox download failed for {path}: {exc}")

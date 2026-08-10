@@ -58,7 +58,8 @@ class _RemoteSkillSandbox:
         return cls(
             thread_id=thread_id,
             home=home,
-            backend=ProvisionerSandboxBackend(thread_id=thread_id, uid=thread_id),
+            # 远程仓库不可信，不能接触全局或用户级 Sandbox 凭据。
+            backend=ProvisionerSandboxBackend(thread_id=thread_id, uid=thread_id, inherit_env=False),
         )
 
     async def run(self, args: list[str]) -> str:

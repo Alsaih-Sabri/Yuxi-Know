@@ -175,9 +175,11 @@ description: 这是一个用于处理特定任务的技能
 也可以切换到“全局搜索发现”，输入关键字检索 skills.sh 上的开源 Skills，再选择结果安装。
 
 系统会在后端：
-- 调用 `npx skills add <source> --list` 校验来源并发现可安装的 skills
-- 使用隔离的临时 `HOME` 执行 `npx skills add <source> --skill <name> -g -y --copy`
-- 从临时目录中提取对应 skill，再生成统一草稿；个人确认写入 workspace，共享确认写入 `/app/saves/skills` 与数据库
+- 只接受管理员白名单中的 HTTPS 来源；GitHub `owner/repo` 简写按 `github.com` 校验
+- 在不继承全局或用户环境变量的一次性 Sandbox 中执行 `npx skills`，Kubernetes Sandbox 不挂载 ServiceAccount token
+- 通过受限下载器提取对应 Skill，读取时拒绝文件或父目录中的符号链接，再生成统一草稿；个人确认写入 workspace，共享确认写入 `/app/saves/skills` 与数据库
+
+来源白名单用于限制产品允许的远程仓库，并不等同于 Sandbox 网络出口防火墙。
 
 ::: tip ModelScope 合集适合批量安装
 ModelScope 合集地址可以作为远程来源填写，例如 `https://modelscope.cn/collections/MiniMax/MiniMax-Office-skills`。拉取后在列表中勾选需要的 Skills，再统一解析为安装草稿。

@@ -287,6 +287,8 @@ CHECK_YUXI_SANDBOX_ENV_EXISTS=True
 
 如果需要给所有沙盒容器注入额外的环境变量（如代理配置、认证信息等），可以添加到 `sandbox.env` 文件中。
 
+远程 Skill 拉取使用专门的一次性 Sandbox，不继承这里的全局环境变量或用户级 Agent 环境变量，避免不可信仓库通过复制文件带出凭据。Kubernetes 创建的 Sandbox 同时会禁用 ServiceAccount token 自动挂载。
+
 ### 配置方式汇总
 
 | 配置目标 | 配置位置 | 示例变量 |

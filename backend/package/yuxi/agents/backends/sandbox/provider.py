@@ -152,6 +152,7 @@ class ProvisionerSandboxProvider:
         uid: str,
         file_thread_id: str | None = None,
         skills_thread_id: str | None = None,
+        inherit_env: bool = True,
     ) -> str:
         file_id = str(file_thread_id or thread_id).strip()
         skills_id = str(skills_thread_id or thread_id).strip()
@@ -177,9 +178,10 @@ class ProvisionerSandboxProvider:
                 sandbox_id,
                 thread_id,
                 _workspace_uid_dirname(uid),
-                load_user_agent_env(uid),
+                load_user_agent_env(uid) if inherit_env else {},
                 file_thread_id=file_id,
                 skills_thread_id=skills_id,
+                inherit_env=inherit_env,
             )
 
             connection = self._record_to_connection(
@@ -200,6 +202,7 @@ class ProvisionerSandboxProvider:
         create_if_missing: bool = False,
         file_thread_id: str | None = None,
         skills_thread_id: str | None = None,
+        inherit_env: bool = True,
     ) -> SandboxConnection | None:
         file_id = str(file_thread_id or thread_id).strip()
         skills_id = str(skills_thread_id or thread_id).strip()
@@ -225,9 +228,10 @@ class ProvisionerSandboxProvider:
                     sandbox_id,
                     thread_id,
                     _workspace_uid_dirname(uid),
-                    load_user_agent_env(uid),
+                    load_user_agent_env(uid) if inherit_env else {},
                     file_thread_id=file_id,
                     skills_thread_id=skills_id,
+                    inherit_env=inherit_env,
                 )
             else:
                 record = self._client.discover(sandbox_id)
