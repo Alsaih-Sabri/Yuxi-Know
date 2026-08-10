@@ -108,6 +108,7 @@ async def test_empty_value_falls_back_to_environment(db_session, monkeypatch):
 async def test_remote_skill_policy_preserves_default_and_explicit_empty_list(db_session):
     await options.ensure_options_in_db(db_session)
 
+    assert options.remote_skill_source_policy.params["fields"][0]["type"] == "list[str]"
     default_policy = await options.remote_skill_source_policy.get(db_session)
     assert default_policy["allowed_hosts"] == ["github.com", "modelscope.cn"]
 
@@ -124,17 +125,18 @@ async def test_remote_skill_policy_preserves_default_and_explicit_empty_list(db_
 
 
 @pytest.mark.asyncio
-async def test_remote_skill_policy_normalizes_exact_hosts(db_session):
+async def test_remote_skill_policy_preserves_string_list_without_domain_validation(db_session):
     await options.ensure_options_in_db(db_session)
 
+    allowed_hosts = [" GitHub.com. ", "*.github.com", "not a domain", ""]
     record = await options.update_option_value(
         db_session,
         "remote_skill_source_policy",
-        {"allowed_hosts": [" GitHub.com. ", "www.github.com", "modelscope.cn"]},
+        {"allowed_hosts": allowed_hosts},
         "tester",
     )
 
-    assert record.value["allowed_hosts"] == ["github.com", "modelscope.cn"]
+    assert record.value["allowed_hosts"] == allowed_hosts
 
 
 @pytest.mark.asyncio
@@ -184,17 +186,17 @@ async def test_update_rejects_unknown_fields_and_invalid_urls(db_session):
         await options.update_option_value(db_session, "mineru_ocr_host_opts", {"unknown": "x"}, "tester")
     with pytest.raises(ValueError):
         await options.update_option_value(db_session, "mineru_ocr_host_opts", {"server_url": "not-url"}, "tester")
-    with pytest.raises(ValueError, match="来源域名必须是列表"):
+    with pytest.raises(ValueError, match="配置值必须是列表"):
         await options.update_option_value(
             db_session,
             "remote_skill_source_policy",
             {"allowed_hosts": "github.com"},
             "tester",
         )
-    with pytest.raises(ValueError, match="无效来源域名"):
+    with pytest.raises(ValueError, match="配置值必须是字符串列表"):
         await options.update_option_value(
             db_session,
             "remote_skill_source_policy",
-            {"allowed_hosts": ["*.github.com"]},
+            {"allowed_hosts": ["github.com", 1]},
             "tester",
         )

@@ -41,7 +41,7 @@ class Option:
         for field in _fields(record):
             field_key = field["key"]
             stored_value = stored.get(field_key)
-            if field.get("type") == "host-list" and field_key in stored:
+            if field.get("type") == "list[str]" and field_key in stored:
                 resolved[field_key] = stored[field_key]
                 continue
 
@@ -139,7 +139,7 @@ remote_skill_source_policy = Option(
             {
                 "key": "allowed_hosts",
                 "label": "允许的来源域名",
-                "type": "host-list",
+                "type": "list[str]",
                 "default": ["github.com", "modelscope.cn"],
                 "help": "仅精确匹配域名；保存空列表会关闭远程安装。",
             }
@@ -265,23 +265,12 @@ def _fields(record: ConfigOption) -> list[dict[str, Any]]:
 
 
 def _normalize_value(field: dict[str, Any], value: Any) -> Any:
-    if field.get("type") == "host-list":
+    if field.get("type") == "list[str]":
         if not isinstance(value, list):
-            raise ValueError("来源域名必须是列表")
-        normalized: list[str] = []
-        seen: set[str] = set()
-        for item in value:
-            if not isinstance(item, str):
-                raise ValueError("来源域名必须是字符串列表")
-            host = item.strip().lower().rstrip(".")
-            if host == "www.github.com":
-                host = "github.com"
-            if not host or "." not in host or any(char in host for char in "/:@?#*"):
-                raise ValueError(f"无效来源域名: {item}")
-            if host not in seen:
-                normalized.append(host)
-                seen.add(host)
-        return normalized
+            raise ValueError("配置值必须是列表")
+        if not all(isinstance(item, str) for item in value):
+            raise ValueError("配置值必须是字符串列表")
+        return value
 
     normalized = str(value or "").strip()
     if field.get("type") == "url" and normalized:

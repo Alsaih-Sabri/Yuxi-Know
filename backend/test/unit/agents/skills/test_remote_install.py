@@ -97,6 +97,12 @@ def test_normalize_source_accepts_custom_allowed_host() -> None:
     )
 
 
+def test_normalize_source_normalizes_allowed_hosts_at_security_boundary() -> None:
+    result = svc._normalize_source("anthropics/skills", [" WWW.GitHub.com. "])
+
+    assert result == "https://github.com/anthropics/skills"
+
+
 def test_parse_available_skills_from_cli_output() -> None:
     output = """
     \x1b[38;5;250m███████╗\x1b[0m
