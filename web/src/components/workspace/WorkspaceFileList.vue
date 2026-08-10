@@ -44,7 +44,7 @@
     <template #name="{ row }">
       <span class="name-cell">
         <FileTypeIcon :name="row.name || row.path" :is-dir="row.is_dir" :size="17" />
-        <span class="entry-name" :title="row.name">{{ row.name }}</span>
+        <span class="entry-name" :title="row.title || row.name">{{ row.title || row.name }}</span>
       </span>
     </template>
 
@@ -57,7 +57,7 @@
     </template>
 
     <template #row-actions="{ row }">
-      <a-dropdown v-if="!row.is_dir || !readonly" :trigger="['click']">
+      <a-dropdown v-if="!row.is_dir || (!readonly && !row.readonly)" :trigger="['click']">
         <button
           type="button"
           class="more-action"
@@ -75,7 +75,12 @@
                 <span>下载</span>
               </span>
             </a-menu-item>
-            <a-menu-item v-if="!readonly" key="delete" danger @click="$emit('delete-entry', row)">
+            <a-menu-item
+              v-if="!readonly && !row.readonly"
+              key="delete"
+              danger
+              @click="$emit('delete-entry', row)"
+            >
               <span class="menu-item-content">
                 <Trash2 :size="14" />
                 <span>删除</span>
@@ -164,11 +169,15 @@ const tableSelection = computed(() => {
 
   return {
     selectedRowKeys: props.selectedPaths,
-    getCheckboxProps: (row) => ({ disabled: isDeleting(row.path) }),
+    getCheckboxProps: (row) => ({ disabled: row.readonly || isDeleting(row.path) }),
     onChange: (keys) => {
       emit(
         'update:selectedPaths',
-        keys.filter((path) => entryPathSet.value.has(path))
+        keys.filter(
+          (path) =>
+            entryPathSet.value.has(path) &&
+            !props.entries.find((entry) => entry.path === path)?.readonly
+        )
       )
     }
   }

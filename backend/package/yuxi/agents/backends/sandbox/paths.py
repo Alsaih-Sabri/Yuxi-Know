@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import re
 from pathlib import Path
@@ -126,11 +127,39 @@ def sandbox_outputs_dir(thread_id: str) -> Path:
     return _thread_root_dir(thread_id) / OUTPUTS_DIR_NAME
 
 
+def remove_legacy_workspace_thread_links(workspace_dir: Path) -> None:
+    """移除旧版历史对话映射创建的链接，避免 sandbox 通过共享工作区读取其他会话。"""
+    agents_dir = workspace_dir / WORKSPACE_AGENTS_DIR_NAME
+    if not agents_dir.is_dir() or agents_dir.is_symlink():
+        return
+
+    for entry in agents_dir.iterdir():
+        if not entry.is_dir() or entry.is_symlink():
+            continue
+        try:
+            expected_dirs = (
+                (UPLOADS_DIR_NAME, sandbox_uploads_dir(entry.name)),
+                (OUTPUTS_DIR_NAME, sandbox_outputs_dir(entry.name)),
+            )
+        except ValueError:
+            continue
+        removed_link = False
+        for namespace, expected_dir in expected_dirs:
+            link = entry / namespace
+            if link.is_symlink() and link.resolve(strict=False) == expected_dir.resolve(strict=False):
+                link.unlink(missing_ok=True)
+                removed_link = True
+        if removed_link:
+            with contextlib.suppress(OSError):
+                entry.rmdir()
+
+
 def ensure_thread_dirs(thread_id: str, uid: str) -> None:
     _resolve_threads_child_path(_global_user_data_dir(uid)).mkdir(parents=True, exist_ok=True)
     workspace_dir = _resolve_threads_child_path(sandbox_workspace_dir(thread_id, uid))
     workspace_dir.mkdir(parents=True, exist_ok=True)
     ensure_workspace_default_files(workspace_dir)
+    remove_legacy_workspace_thread_links(workspace_dir)
     _resolve_threads_child_path(sandbox_uploads_dir(thread_id)).mkdir(parents=True, exist_ok=True)
     _resolve_threads_child_path(sandbox_outputs_dir(thread_id)).mkdir(parents=True, exist_ok=True)
 

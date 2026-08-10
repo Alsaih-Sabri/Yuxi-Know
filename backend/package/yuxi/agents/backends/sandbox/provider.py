@@ -9,7 +9,7 @@ from dataclasses import dataclass
 
 from yuxi.utils.logging_config import logger
 
-from .paths import _workspace_uid_dirname
+from .paths import _workspace_uid_dirname, ensure_thread_dirs
 from .provisioner_client import ProvisionerClient, SandboxRecord
 
 
@@ -153,6 +153,7 @@ class ProvisionerSandboxProvider:
     ) -> str:
         file_id = str(file_thread_id or thread_id).strip()
         skills_id = str(skills_thread_id or thread_id).strip()
+        ensure_thread_dirs(file_id, uid)
         cache_key = _sandbox_key(uid, file_id, skills_id)
         lock = self._thread_lock(cache_key)
         with lock:
@@ -201,6 +202,7 @@ class ProvisionerSandboxProvider:
     ) -> SandboxConnection | None:
         file_id = str(file_thread_id or thread_id).strip()
         skills_id = str(skills_thread_id or thread_id).strip()
+        ensure_thread_dirs(file_id, uid)
         cache_key = _sandbox_key(uid, file_id, skills_id)
         lock = self._thread_lock(cache_key)
         with lock:
