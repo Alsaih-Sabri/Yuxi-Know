@@ -261,6 +261,7 @@ const INLINE_PREVIEW_MIN_WIDTH = 960
 const MAX_WORKSPACE_UPLOAD_FILES = 50
 const AGENTS_WORKSPACE_PATH = '/agents'
 const CHATS_WORKSPACE_PATH = '/agents/chats'
+const CHATS_BREADCRUMB_LABEL = '历史对话'
 const knowledgeFileBrowser = reactive({
   parentId: null,
   pathPrefix: '',
@@ -476,7 +477,11 @@ const buildWorkspaceBreadcrumbItems = () => {
     (items, segment) => {
       const parentPath = items[items.length - 1].path
       const path = parentPath === '/' ? `/${segment}` : `${parentPath}/${segment}`
-      items.push({ name: threadTitleMap.value[segment] || segment, path })
+      const name =
+        path === CHATS_WORKSPACE_PATH
+          ? CHATS_BREADCRUMB_LABEL
+          : threadTitleMap.value[segment] || segment
+      items.push({ name, path })
       return items
     },
     [{ name: '工作区', path: '/' }]
