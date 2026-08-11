@@ -13,8 +13,8 @@ from fastapi import HTTPException, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from yuxi.agents.backends.sandbox.paths import (
-    global_user_data_dir,
     ensure_workspace_default_files,
+    global_user_data_dir,
     sandbox_outputs_dir,
     sandbox_uploads_dir,
     validate_thread_id,
