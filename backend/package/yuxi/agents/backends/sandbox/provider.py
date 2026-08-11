@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from yuxi.utils.logging_config import logger
 
-from .paths import _workspace_uid_dirname
+from .paths import workspace_uid_dirname
 from .provisioner_client import ProvisionerClient, SandboxRecord
 
 
@@ -177,7 +177,7 @@ class ProvisionerSandboxProvider:
             record = self._client.create(
                 sandbox_id,
                 thread_id,
-                _workspace_uid_dirname(uid),
+                workspace_uid_dirname(uid),
                 load_user_agent_env(uid) if inherit_env else {},
                 file_thread_id=file_id,
                 skills_thread_id=skills_id,
@@ -227,7 +227,7 @@ class ProvisionerSandboxProvider:
                 record = self._client.create(
                     sandbox_id,
                     thread_id,
-                    _workspace_uid_dirname(uid),
+                    workspace_uid_dirname(uid),
                     load_user_agent_env(uid) if inherit_env else {},
                     file_thread_id=file_id,
                     skills_thread_id=skills_id,

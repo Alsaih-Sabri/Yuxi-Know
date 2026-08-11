@@ -474,7 +474,7 @@ def test_provider_uses_distinct_sandbox_scope_for_different_uid(monkeypatch) -> 
 
 
 def test_provider_maps_external_uid_only_at_provisioner_filesystem_boundary(monkeypatch) -> None:
-    from yuxi.agents.backends.sandbox.paths import _workspace_uid_dirname
+    from yuxi.agents.backends.sandbox.paths import workspace_uid_dirname
     from yuxi.agents.backends.sandbox.provider import ProvisionerSandboxProvider
 
     calls = []
@@ -499,7 +499,7 @@ def test_provider_maps_external_uid_only_at_provisioner_filesystem_boundary(monk
 
     provider.acquire("thread-1", uid=logical_uid)
 
-    assert calls == [(_workspace_uid_dirname(logical_uid), {"OWNER": logical_uid})]
+    assert calls == [(workspace_uid_dirname(logical_uid), {"OWNER": logical_uid})]
     assert calls[0][0].startswith("uid-")
     assert ":" not in calls[0][0]
 

@@ -37,7 +37,7 @@ def _thread_root_dir(thread_id: str) -> Path:
     return Path(conf.save_dir) / "threads" / safe_thread_id / "user-data"
 
 
-def _workspace_uid_dirname(uid: str) -> str:
+def workspace_uid_dirname(uid: str) -> str:
     """Return a path-safe, stable workspace directory name for a logical UID.
 
     Database and OIDC subject identifiers may contain characters such as ``:``
@@ -53,9 +53,9 @@ def _workspace_uid_dirname(uid: str) -> str:
     return f"uid-{hashlib.sha256(value.encode('utf-8')).hexdigest()}"
 
 
-def _global_user_data_dir(uid: str) -> Path:
+def global_user_data_dir(uid: str) -> Path:
     """Return the shared host-side directory used for one user's workspace files."""
-    safe_uid = _workspace_uid_dirname(uid)
+    safe_uid = workspace_uid_dirname(uid)
     return Path(conf.save_dir) / "threads" / "shared" / safe_uid
 
 
@@ -65,7 +65,7 @@ def sandbox_user_data_dir(thread_id: str) -> Path:
 
 def sandbox_workspace_dir(thread_id: str, uid: str) -> Path:
     validate_thread_id(thread_id)
-    return _global_user_data_dir(uid) / WORKSPACE_DIR_NAME
+    return global_user_data_dir(uid) / WORKSPACE_DIR_NAME
 
 
 def sandbox_workspace_agent_context_file(thread_id: str, uid: str, filename: str) -> Path:
@@ -127,7 +127,7 @@ def sandbox_outputs_dir(thread_id: str) -> Path:
 
 
 def ensure_thread_dirs(thread_id: str, uid: str) -> None:
-    _resolve_threads_child_path(_global_user_data_dir(uid)).mkdir(parents=True, exist_ok=True)
+    _resolve_threads_child_path(global_user_data_dir(uid)).mkdir(parents=True, exist_ok=True)
     workspace_dir = _resolve_threads_child_path(sandbox_workspace_dir(thread_id, uid))
     workspace_dir.mkdir(parents=True, exist_ok=True)
     ensure_workspace_default_files(workspace_dir)
