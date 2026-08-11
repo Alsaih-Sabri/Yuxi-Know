@@ -22,9 +22,9 @@ def test_download_sandbox_directory_rejects_outside_path_before_download(tmp_pat
                 entries=[{"path": "/home/gem/user-data/outputs/outside.txt", "is_dir": False}],
             )
 
-        def download_file_limited(self, _path, _max_bytes):
+        def download_files(self, _paths):
             self.downloaded = True
-            return SimpleNamespace(error=None, content=b"")
+            return [SimpleNamespace(error=None, content=b"")]
 
     backend = FakeBackend()
 
@@ -118,9 +118,9 @@ def test_download_sandbox_directory_rejects_oversized_tree_before_download(tmp_p
                 ],
             )
 
-        def download_file_limited(self, _path, _max_bytes):
+        def download_files(self, _paths):
             self.downloaded = True
-            return SimpleNamespace(error=None, content=b"")
+            return [SimpleNamespace(error=None, content=b"")]
 
     backend = FakeBackend()
 
@@ -141,14 +141,35 @@ def test_download_sandbox_directory_removes_partial_target_on_failure(tmp_path: 
                 ],
             )
 
-        def download_file_limited(self, path, _max_bytes):
+        def download_files(self, paths):
+            [path] = paths
             if path == f"{REMOTE_DIR}/SKILL.md":
-                return SimpleNamespace(error=None, content=b"# demo")
-            return SimpleNamespace(error="read_failed", content=None)
+                return [SimpleNamespace(error=None, content=b"# demo")]
+            return [SimpleNamespace(error="read_failed", content=None)]
 
     target = tmp_path / "skill"
 
     with pytest.raises(ValueError, match="下载沙盒文件失败"):
+        download_sandbox_directory(FakeBackend(), REMOTE_DIR, target, empty_message="empty")
+
+    assert not target.exists()
+
+
+def test_download_sandbox_directory_rejects_actual_size_over_limit(monkeypatch, tmp_path: Path):
+    class FakeBackend:
+        def ls(self, _remote_dir):
+            return SimpleNamespace(
+                error=None,
+                entries=[{"path": f"{REMOTE_DIR}/SKILL.md", "is_dir": False, "size": 1}],
+            )
+
+        def download_files(self, _paths):
+            return [SimpleNamespace(error=None, content=b"oversized")]
+
+    monkeypatch.setattr("yuxi.agents.backends.sandbox.download.MAX_SANDBOX_TREE_BYTES", 5)
+    target = tmp_path / "skill"
+
+    with pytest.raises(ValueError, match="总大小超过限制"):
         download_sandbox_directory(FakeBackend(), REMOTE_DIR, target, empty_message="empty")
 
     assert not target.exists()

@@ -27,7 +27,7 @@ def download_sandbox_directory(
     *,
     empty_message: str,
 ) -> None:
-    """将受限的 Sandbox 目录完整下载到新建的宿主目录。"""
+    """校验并下载 Sandbox 目录到新建的宿主目录。"""
     remote_root = PurePosixPath(remote_dir.rstrip("/"))
     files: list[tuple[str, PurePosixPath]] = []
     visited_dirs: set[str] = set()
@@ -70,20 +70,14 @@ def download_sandbox_directory(
     if not files:
         raise ValueError(empty_message)
 
-    target_created = False
+    target_dir.mkdir(parents=True, exist_ok=False)
     try:
-        target_dir.mkdir(parents=True, exist_ok=False)
-        target_created = True
         downloaded_size = 0
         for remote_path, relative_path in files:
-            response = backend.download_file_limited(
-                remote_path,
-                MAX_SANDBOX_TREE_BYTES - downloaded_size,
-            )
-            error = getattr(response, "error", None)
-            content = getattr(response, "content", None)
-            if error or content is None:
-                raise ValueError(f"下载沙盒文件失败: {remote_path} ({error or 'empty_content'})")
+            response = backend.download_files([remote_path])[0]
+            if response.error or response.content is None:
+                raise ValueError(f"下载沙盒文件失败: {remote_path} ({response.error or 'empty_content'})")
+            content = response.content
             downloaded_size += len(content)
             if downloaded_size > MAX_SANDBOX_TREE_BYTES:
                 raise ValueError("Skill 目录总大小超过限制（最多 100 MB）")
@@ -92,6 +86,5 @@ def download_sandbox_directory(
             local_path.parent.mkdir(parents=True, exist_ok=True)
             local_path.write_bytes(content)
     except Exception:
-        if target_created:
-            shutil.rmtree(target_dir, ignore_errors=True)
+        shutil.rmtree(target_dir, ignore_errors=True)
         raise

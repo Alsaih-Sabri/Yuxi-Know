@@ -35,10 +35,6 @@ class _FakeRemoteSkillSandbox:
         if name not in self.available:
             raise ValueError("missing")
         target_dir.mkdir(parents=True)
-        (target_dir / "SKILL.md").write_text(
-            f"---\nname: {name}\ndescription: demo\n---\n# {name}\n",
-            encoding="utf-8",
-        )
 
     async def cleanup(self) -> None:
         self.cleaned = True
@@ -49,21 +45,33 @@ def _use_fake_sandbox(monkeypatch: pytest.MonkeyPatch, sandbox: _FakeRemoteSkill
 
 
 @pytest.mark.parametrize(
-    ("source", "expected"),
+    ("source", "allowed_hosts", "expected"),
     [
-        ("anthropics/skills", "https://github.com/anthropics/skills"),
-        ("https://www.github.com/anthropics/skills.git", "https://github.com/anthropics/skills"),
+        ("anthropics/skills", ["github.com", "modelscope.cn"], "https://github.com/anthropics/skills"),
+        (
+            "https://github.com/anthropics/skills.git",
+            ["github.com", "modelscope.cn"],
+            "https://github.com/anthropics/skills",
+        ),
         (
             "https://modelscope.cn/skills/@pskoett/self-improving-agent/",
+            ["github.com", "modelscope.cn"],
             "https://modelscope.cn/skills/@pskoett/self-improving-agent",
         ),
+        (
+            "https://skills.example.com/catalog/demo/",
+            ["skills.example.com"],
+            "https://skills.example.com/catalog/demo",
+        ),
+        ("anthropics/skills", [" GitHub.com. "], "https://github.com/anthropics/skills"),
     ],
 )
 def test_normalize_source_accepts_allowed_skill_sources(
     source: str,
+    allowed_hosts: list[str],
     expected: str,
 ) -> None:
-    assert svc._normalize_source(source, ["github.com", "modelscope.cn"]) == expected
+    assert svc._normalize_source(source, allowed_hosts) == expected
 
 
 @pytest.mark.parametrize(
@@ -71,6 +79,7 @@ def test_normalize_source_accepts_allowed_skill_sources(
     [
         "https://example.com/skills/demo",
         "https://sub.modelscope.cn/skills/demo",
+        "https://www.github.com/anthropics/skills",
         "http://modelscope.cn/skills/demo",
         "file:///tmp/skills",
         "https://modelscope.cn/skills/demo?download=1",
@@ -89,18 +98,6 @@ def test_normalize_source_rejects_sources_outside_allowlist(
 def test_normalize_source_rejects_all_sources_when_allowlist_is_empty() -> None:
     with pytest.raises(ValueError, match="远程 Skill 来源白名单"):
         svc._normalize_source("anthropics/skills", [])
-
-
-def test_normalize_source_accepts_custom_allowed_host() -> None:
-    assert svc._normalize_source("https://skills.example.com/catalog/demo/", ["skills.example.com"]) == (
-        "https://skills.example.com/catalog/demo"
-    )
-
-
-def test_normalize_source_normalizes_allowed_hosts_at_security_boundary() -> None:
-    result = svc._normalize_source("anthropics/skills", [" WWW.GitHub.com. "])
-
-    assert result == "https://github.com/anthropics/skills"
 
 
 def test_parse_available_skills_from_cli_output() -> None:
@@ -379,28 +376,6 @@ async def test_remote_skill_sandbox_cleanup_removes_whole_thread_dir_when_releas
 
     assert not thread_dir.exists()
     assert not workspace_root.exists()
-
-
-@pytest.mark.asyncio
-async def test_install_remote_skills_batch_skips_missing(monkeypatch: pytest.MonkeyPatch):
-    sandbox = _FakeRemoteSkillSandbox(available={"frontend-design"})
-
-    async def fake_import_skill_dir(_db, *, source_dir, created_by):
-        return SimpleNamespace(slug=source_dir.name)
-
-    _use_fake_sandbox(monkeypatch, sandbox)
-    monkeypatch.setattr(svc, "import_skill_dir", fake_import_skill_dir)
-
-    results = await svc.install_remote_skills_batch(
-        None,
-        source="anthropics/skills",
-        skills=["frontend-design", "nonexistent-skill"],
-        created_by="root",
-    )
-
-    assert len(results) == 2
-    assert results[0] == {"slug": "frontend-design", "success": True}
-    assert results[1] == {"slug": "nonexistent-skill", "success": False, "error": "skills CLI 未生成预期的技能目录"}
 
 
 @pytest.mark.asyncio

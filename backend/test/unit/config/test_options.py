@@ -105,7 +105,7 @@ async def test_empty_value_falls_back_to_environment(db_session, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_remote_skill_policy_preserves_default_and_explicit_empty_list(db_session):
+async def test_remote_skill_policy_preserves_supported_values(db_session):
     await options.ensure_options_in_db(db_session)
 
     assert options.remote_skill_source_policy.params["fields"][0]["type"] == "list[str]"
@@ -122,11 +122,6 @@ async def test_remote_skill_policy_preserves_default_and_explicit_empty_list(db_
 
     assert record.value["allowed_hosts"] == []
     assert disabled_policy["allowed_hosts"] == []
-
-
-@pytest.mark.asyncio
-async def test_remote_skill_policy_preserves_string_list_without_domain_validation(db_session):
-    await options.ensure_options_in_db(db_session)
 
     allowed_hosts = [" GitHub.com. ", "*.github.com", "not a domain", ""]
     record = await options.update_option_value(

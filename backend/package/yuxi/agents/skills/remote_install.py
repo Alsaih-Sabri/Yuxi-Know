@@ -28,7 +28,7 @@ ANSI_ESCAPE_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
 CONTROL_SEQUENCE_RE = re.compile(r"\x1B\][^\x07]*(?:\x07|\x1B\\)|\x1B[\(\)][A-Za-z0-9]")
 CLI_TIMEOUT_SECONDS = 300
 GITHUB_REPO_PATTERN = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?/(?!\.{1,2}$)[A-Za-z0-9_.-]+$")
-GITHUB_HOST_ALIASES = {"github.com", "www.github.com"}
+GITHUB_HOST = "github.com"
 INVALID_SOURCE_MESSAGE = "source 仅支持远程 Skill 来源白名单中的 HTTPS 地址"
 REMOTE_SKILL_SANDBOX_ROOT = "/home/gem/user-data/outputs"
 
@@ -116,11 +116,11 @@ def _normalize_source(source: str, allowed_hosts: list[str]) -> str:
     if any(ch in value for ch in ("\n", "\r", "\x00")):
         raise ValueError("source 包含非法字符")
 
-    allowed_hosts = _normalize_allowed_hosts(allowed_hosts)
+    allowed_hosts = {host.strip().lower().rstrip(".") for host in allowed_hosts}
     if GITHUB_REPO_PATTERN.fullmatch(value):
-        if "github.com" not in allowed_hosts:
+        if GITHUB_HOST not in allowed_hosts:
             raise ValueError(INVALID_SOURCE_MESSAGE)
-        return f"https://github.com/{value}"
+        return f"https://{GITHUB_HOST}/{value}"
 
     parsed = urlparse(value)
     try:
@@ -129,8 +129,6 @@ def _normalize_source(source: str, allowed_hosts: list[str]) -> str:
     except ValueError:
         raise ValueError(INVALID_SOURCE_MESSAGE) from None
 
-    if hostname in GITHUB_HOST_ALIASES:
-        hostname = "github.com"
     if (
         parsed.scheme.lower() != "https"
         or not hostname
@@ -144,24 +142,15 @@ def _normalize_source(source: str, allowed_hosts: list[str]) -> str:
         raise ValueError(INVALID_SOURCE_MESSAGE)
 
     path = parsed.path.rstrip("/") or "/"
-    if hostname == "github.com":
+    if hostname == GITHUB_HOST:
         repo_path = path.strip("/")
         if repo_path.endswith(".git"):
             repo_path = repo_path[:-4]
         if not GITHUB_REPO_PATTERN.fullmatch(repo_path):
             raise ValueError(INVALID_SOURCE_MESSAGE)
-        return f"https://github.com/{repo_path}"
+        return f"https://{GITHUB_HOST}/{repo_path}"
 
     return parsed._replace(scheme="https", netloc=hostname, path=path).geturl().rstrip("/")
-
-
-def _normalize_allowed_hosts(allowed_hosts: list[str]) -> set[str]:
-    """在远程来源边界规范化允许的域名，不限制配置项的字符串内容。"""
-    normalized_hosts = {host.strip().lower().rstrip(".") for host in allowed_hosts}
-    if normalized_hosts & GITHUB_HOST_ALIASES:
-        normalized_hosts.difference_update(GITHUB_HOST_ALIASES)
-        normalized_hosts.add("github.com")
-    return normalized_hosts
 
 
 def _normalize_skill_name(skill: str) -> str:

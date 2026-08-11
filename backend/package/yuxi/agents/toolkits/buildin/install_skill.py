@@ -1,3 +1,4 @@
+import asyncio
 import shutil
 import tempfile
 from pathlib import Path, PurePosixPath
@@ -138,7 +139,13 @@ async def _run_install_task(
 
         if source.startswith("/"):
             with tempfile.TemporaryDirectory(prefix=".skill-install-") as tmp:
-                source_dir = _prepare_skill_from_sandbox(source, thread_id, uid, Path(tmp))
+                source_dir = await asyncio.to_thread(
+                    _prepare_skill_from_sandbox,
+                    source,
+                    thread_id,
+                    uid,
+                    Path(tmp),
+                )
                 item = await install_personal_skill_dir(uid, source_dir)
                 installed_items = [item]
                 installed_slugs = [item.slug]

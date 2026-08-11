@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import importlib
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-from yuxi.agents.backends.sandbox.download import MAX_SANDBOX_TREE_BYTES
 from yuxi.agents.skills import service as skill_service
 from yuxi.agents.toolkits.buildin import install_skill as exported_install_skill
 
@@ -33,10 +33,12 @@ async def test_install_skill_from_sandbox_installs_as_current_user_private_skill
     assert exported_install_skill.name == "install_skill"
 
     calls = {}
+    event_loop_thread_id = threading.get_ident()
     db = SimpleNamespace()
     source_dir = tmp_path / "demo-skill"
 
     def prepare_skill_from_sandbox(source, thread_id, uid, staging_root):
+        calls["prepare_thread_id"] = threading.get_ident()
         calls["prepare"] = {
             "source": source,
             "thread_id": thread_id,
@@ -102,6 +104,7 @@ async def test_install_skill_from_sandbox_installs_as_current_user_private_skill
     assert result.update["activated_skills"] == ["demo-skill"]
     assert "成功安装并激活技能" in result.update["messages"][0].content
     assert calls["prepare"]["uid"] == "normal-user"
+    assert calls["prepare_thread_id"] != event_loop_thread_id
     assert calls["install"] == {"uid": "normal-user", "source_dir": source_dir}
     assert calls["prepare"]["source"] == "/home/gem/user-data/workspace/demo-skill"
     assert calls["enable"] == {
@@ -309,10 +312,9 @@ def test_prepare_skill_from_sandbox_uses_sandbox_api_without_host_path_resolutio
                 entries=[{"path": f"{remote_dir}/SKILL.md", "is_dir": False, "size": 6}],
             )
 
-        def download_file_limited(self, path, max_bytes):
-            assert path == f"{remote_dir}/SKILL.md"
-            assert max_bytes == MAX_SANDBOX_TREE_BYTES
-            return SimpleNamespace(error=None, content=b"# demo")
+        def download_files(self, paths):
+            assert paths == [f"{remote_dir}/SKILL.md"]
+            return [SimpleNamespace(error=None, content=b"# demo")]
 
     monkeypatch.setattr(
         sandbox_backend_module,
@@ -345,8 +347,8 @@ def test_prepare_skill_from_sandbox_preserves_download_error_message(monkeypatch
                 entries=[{"path": f"{remote_dir}/SKILL.md", "is_dir": False, "size": 1}],
             )
 
-        def download_file_limited(self, _path, _max_bytes):
-            return SimpleNamespace(error="read_failed", content=None)
+        def download_files(self, _paths):
+            return [SimpleNamespace(error="read_failed", content=None)]
 
     monkeypatch.setattr(sandbox_backend_module, "ProvisionerSandboxBackend", FakeProvisionerSandboxBackend)
 

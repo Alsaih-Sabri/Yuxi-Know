@@ -177,7 +177,7 @@ description: 这是一个用于处理特定任务的技能
 系统会在后端：
 - 只接受管理员白名单中的 HTTPS 来源；GitHub `owner/repo` 简写按 `github.com` 校验
 - 在不继承全局或用户环境变量的一次性 Sandbox 中执行 `npx skills`，Kubernetes Sandbox 不挂载 ServiceAccount token
-- 通过受限下载器提取对应 Skill，读取时拒绝文件或父目录中的符号链接，再生成统一草稿；个人确认写入 workspace，共享确认写入 `/app/saves/skills` 与数据库
+- 通过 Sandbox 文件 API 提取对应 Skill，严格校验返回的相对路径，并限制文件数、目录深度和总大小；个人确认写入 workspace，共享确认写入 `/app/saves/skills` 与数据库
 
 来源白名单用于限制产品允许的远程仓库，并不等同于 Sandbox 网络出口防火墙。
 

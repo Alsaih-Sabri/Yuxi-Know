@@ -1,10 +1,7 @@
 from __future__ import annotations
 
 import base64
-import hashlib
-import hmac
 import os
-import shlex
 import uuid
 from contextlib import suppress
 from datetime import datetime
@@ -389,6 +386,7 @@ class ProvisionerSandboxBackend(BaseSandbox):
             kwargs: dict[str, Any] = {"command": command}
             if timeout is not None:
                 kwargs["timeout"] = timeout
+                kwargs["request_options"] = {"timeout_in_seconds": timeout}
             result = self._get_client().shell.exec_command(**kwargs)
 
             output = result.data.output or ""
@@ -651,79 +649,3 @@ class ProvisionerSandboxBackend(BaseSandbox):
                 logger.warning(f"Download from sandbox failed for {normalized_path}: {exc}")
                 responses.append(FileDownloadResponse(path=normalized_path, content=None, error=f"read_failed: {exc}"))
         return responses
-
-    def download_file_limited(self, path: str, max_bytes: int) -> FileDownloadResponse:
-        """在 Sandbox 内限制读取字节数后下载单个文件。"""
-        output_path = f"/tmp/yuxi-download-{uuid.uuid4().hex}.b64"
-        client = None
-        try:
-            normalized_path = _normalize_path(path)
-            if not _can_read_path(normalized_path):
-                return FileDownloadResponse(path=normalized_path, content=None, error="permission_denied")
-            if max_bytes < 0:
-                return FileDownloadResponse(path=normalized_path, content=None, error="file_too_large")
-
-            path_b64 = base64.b64encode(normalized_path.encode("utf-8")).decode("ascii")
-            output_path_b64 = base64.b64encode(output_path.encode("utf-8")).decode("ascii")
-            script = (
-                "import base64, hashlib, os, stat\n"
-                f"path = base64.b64decode('{path_b64}').decode('utf-8')\n"
-                f"output_path = base64.b64decode('{output_path_b64}').decode('utf-8')\n"
-                "parts = [part for part in path.split('/') if part]\n"
-                "directory_fd = os.open('/', os.O_RDONLY | os.O_DIRECTORY)\n"
-                "try:\n"
-                "    for part in parts[:-1]:\n"
-                "        next_fd = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory_fd)\n"
-                "        os.close(directory_fd)\n"
-                "        directory_fd = next_fd\n"
-                "    file = os.fdopen(os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd), 'rb')\n"
-                "    try:\n"
-                "        if not stat.S_ISREG(os.fstat(file.fileno()).st_mode):\n"
-                "            raise ValueError('invalid_file_type')\n"
-                f"        content = file.read({max_bytes + 1})\n"
-                f"        if len(content) > {max_bytes}:\n"
-                "            raise ValueError('file_too_large')\n"
-                "    finally:\n"
-                "        file.close()\n"
-                "finally:\n"
-                "    os.close(directory_fd)\n"
-                "output_fd = os.open(output_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)\n"
-                "output = os.fdopen(output_fd, 'wb')\n"
-                "try:\n"
-                "    output.write(base64.b64encode(content))\n"
-                "finally:\n"
-                "    output.close()\n"
-                "print(hashlib.sha256(content).hexdigest(), end='')\n"
-            )
-            command = f"python3 -c {shlex.quote(script)}"
-            client = self._get_client()
-            result = client.shell.exec_command(
-                command=command,
-                timeout=self._command_timeout_seconds,
-                truncate=False,
-            )
-            if result.data.exit_code not in (0, None):
-                error = "file_too_large" if "file_too_large" in (result.data.output or "") else "invalid_path"
-                return FileDownloadResponse(path=normalized_path, content=None, error=error)
-
-            expected_digest = (result.data.output or "").strip()
-            max_encoded_bytes = 4 * ((max_bytes + 2) // 3)
-            encoded = bytearray()
-            for chunk in client.file.download_file(
-                path=output_path,
-                request_options={"chunk_size": 64 * 1024, "timeout_in_seconds": self._command_timeout_seconds},
-            ):
-                encoded.extend(chunk)
-                if len(encoded) > max_encoded_bytes:
-                    raise ValueError("download_output_too_large")
-            content = base64.b64decode(encoded, validate=True)
-            if not hmac.compare_digest(hashlib.sha256(content).hexdigest(), expected_digest):
-                raise ValueError("download_content_changed")
-            return FileDownloadResponse(path=normalized_path, content=content, error=None)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(f"Limited sandbox download failed for {path}: {exc}")
-            return FileDownloadResponse(path=str(path), content=None, error="invalid_path")
-        finally:
-            if client is not None:
-                with suppress(Exception):
-                    client.shell.exec_command(command=f"rm -f {output_path}", timeout=10)
