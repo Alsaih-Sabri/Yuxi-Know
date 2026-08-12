@@ -14,7 +14,7 @@
               :title="item.title || item.path || item.name"
               @click="handleBreadcrumbClick(item, index)"
             >
-              {{ item.name || rootLabel }}
+              <span class="file-browser-breadcrumb-label">{{ item.name || rootLabel }}</span>
             </button>
             <slot name="breadcrumb-suffix" />
           </nav>
@@ -305,6 +305,7 @@ const handleTableChange = (pagination, filters, sorter, extra) => {
   transition: color 0.16s ease;
 
   &::after {
+    flex: 0 0 auto;
     content: '/';
     margin: 0 8px;
     color: var(--gray-300);
@@ -324,6 +325,13 @@ const handleTableChange = (pagination, filters, sorter, extra) => {
     color: var(--gray-900);
     cursor: default;
   }
+}
+
+.file-browser-breadcrumb-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-browser-actions {
