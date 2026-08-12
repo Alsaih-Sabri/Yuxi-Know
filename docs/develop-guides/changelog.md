@@ -7,9 +7,11 @@
 ## v0.7.2 (current)
 
 ::: warning 升级提醒
-升级到 v0.7.2 后，管理员此前创建的 stdio MCP 会被禁用，也无法重新启用。请在详情页迁移为 SSE 或 Streamable HTTP，或直接删除；代码内置的系统 stdio MCP 不受影响。
+1. 升级到 v0.7.2 后，管理员此前创建的 stdio MCP 会被禁用，也无法重新启用。请在详情页迁移为 SSE 或 Streamable HTTP，或直接删除；代码内置的系统 stdio MCP 不受影响。
 :::
 
+
+- 优化知识库文档列表性能：根目录虚拟目录分组改用部分索引（`idx_kf_kb_parent_segment` 按路径首段聚合），平铺文件筛选与排序用 `idx_kf_kb_parent_flat` 支撑，避免大知识库全表扫描与 46MB 磁盘排序溢出；文件统计聚合结果增加 10 秒 Redis 短缓存，列表、统计、子目录计数与创建人查询并行执行，前端自动刷新轮询间隔同步调整为 10 秒。36 万文件知识库列表接口耗时由约 1.3s 降至约 300ms。
 - 修复 MCP 管理接口可通过 stdio 启动任意本地进程的问题：用户配置仅允许 SSE/Streamable HTTP，运行时拒绝加载历史用户 stdio 记录，系统内置 stdio 的连接参数改为仅由代码维护；前端移除用户 stdio 配置入口，文档补充内置 stdio 的代码添加与验证方式。
 - 工作区新增只读历史对话文件入口 `agents/chats/{thread_id}`，网页以 `YYYY-MM-DD-title` 显示并按日期标题倒序浏览各 thread 的非空 uploads 与 outputs；空目录、无文件对话及 `large_tool_results`、`conversation_history` 等内部中间产物不展示。该目录由 API 虚拟映射，不创建符号链接或复制文件，也不进入当前会话 viewer 与 sandbox 挂载，避免 Agent 读取其他会话历史。面包屑中该目录固定显示为"历史对话"与目录列表一致，多选过滤改用只读路径集合避免逐项查找。
 - 收窄知识库状态边界：读取模型统一收口至 `read_models.py`；创建、列表、详情与更新由 Manager 统一返回 `KnowledgeBaseSummary/Detail`，Router 只转换 HTTP 响应；Manager 协调查询配置、主记录与聚合统计，Repository 在行锁内合并统计投影；executor 接收 frozen `KnowledgeBaseConfig`，负责类型资源、文档操作与类型专属一致性检测，不再写知识库主记录。
@@ -47,6 +49,8 @@
 - 模型供应商列表优化：卡片移除右下角启用/禁用开关，供应商按启用状态拆分为「已启用 / 未启用」两组展示；已启用供应商保留 Base URL、能力与「管理模型」入口，未启用供应商只展示图标与名称的小卡片，不再展示 Base URL 与管理模型按钮。
 - 知识库卡片补充共享权限标签：参考 Skill / 智能体卡片，在现有类型与嵌入模型标签之外新增共享范围标签（如「只读全局」），与 Agent 卡片保持一致的灰色样式。
 - 收敛 Ruff CI 行为：Pull Request 与 push 到 main 均只检查、不修改仓库内容，发现问题直接标红并提示本地运行 `make format`；工作流仅保留 `contents: read` 权限，不再自动提交或创建修复 PR。
+- 优化知识库详情页自动轮询：轮询从固定 1s `setInterval` 改为链式调度，等上一轮知识库信息与文件列表请求全部返回后再排下一轮，慢接口下不再出现请求堆积重叠；全库 `processing_count` 持续不变时按退避因子拉长间隔（上限 30s），连续多轮无进展即自动停止轮询；离开详情页时 `onUnmounted` 主动清理定时器。
+- 统一工具调用展示名称映射：知识库工具显示名改为后端 `display_name` 定义，前端拉取完整工具元数据；工具卡片与折叠摘要按「工具列表 display name → middleware 兜底映射 → 工具 id」统一展示。
 
 
 ## v0.7.1 (2026-07-17)
