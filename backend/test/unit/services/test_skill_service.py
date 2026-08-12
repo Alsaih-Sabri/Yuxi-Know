@@ -64,8 +64,7 @@ async def test_prepare_remote_skill_install_stages_success_and_failure(
 
     preparation = FakePreparation()
 
-    async def fake_prepare_remote_skills_batch(*, source, skills, db):
-        assert db is None
+    async def fake_prepare_remote_skills_batch(*, source, skills):
         assert source == "anthropics/skills"
         assert skills == ["pdf", "broken"]
         return preparation

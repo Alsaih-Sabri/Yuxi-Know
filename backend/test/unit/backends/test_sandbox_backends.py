@@ -898,10 +898,13 @@ def test_provisioner_download_files_distinguishes_invalid_path_from_read_failure
     monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
     backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
 
-    def _fake_read_binary(path, offset=0, limit=None):
+    def download_file(**_kwargs):
         raise RuntimeError("sandbox read timeout")
 
-    monkeypatch.setattr(backend, "_read_binary", _fake_read_binary)
+    backend._get_client = MethodType(
+        lambda self: SimpleNamespace(file=SimpleNamespace(download_file=download_file)),
+        backend,
+    )
 
     responses = backend.download_files(["bad-path", "/home/gem/user-data/read-failed"])
 
@@ -913,10 +916,13 @@ def test_provisioner_download_files_treats_sandbox_404_as_missing(monkeypatch) -
     monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
     backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
 
-    def _missing_from_sandbox(path, offset=0, limit=None):
+    def download_file(**_kwargs):
         raise RuntimeError("status_code: 404, body: {'message': 'File does not exist'}")
 
-    monkeypatch.setattr(backend, "_read_binary", _missing_from_sandbox)
+    backend._get_client = MethodType(
+        lambda self: SimpleNamespace(file=SimpleNamespace(download_file=download_file)),
+        backend,
+    )
 
     responses = backend.download_files(["/home/gem/user-data/outputs/missing.md"])
 
@@ -959,6 +965,33 @@ def test_provisioner_execute_applies_timeout_to_command_and_http_request(monkeyp
         {
             "command": "echo hi",
             "timeout": 300,
+            "hard_timeout": 300,
             "request_options": {"timeout_in_seconds": 300},
+        }
+    ]
+
+
+def test_provisioner_download_files_streams_binary_bytes(monkeypatch) -> None:
+    monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
+    backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
+    calls: list[dict] = []
+
+    def download_file(**kwargs):
+        calls.append(kwargs)
+        return iter([b"\x00\xff", b"binary"])
+
+    backend._get_client = MethodType(
+        lambda self: SimpleNamespace(file=SimpleNamespace(download_file=download_file)),
+        backend,
+    )
+
+    response = backend.download_files(["/home/gem/user-data/outputs/demo.bin"])[0]
+
+    assert response.error is None
+    assert response.content == b"\x00\xffbinary"
+    assert calls == [
+        {
+            "path": "/home/gem/user-data/outputs/demo.bin",
+            "request_options": {"timeout_in_seconds": backend._command_timeout_seconds},
         }
     ]

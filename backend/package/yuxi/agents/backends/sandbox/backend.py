@@ -248,7 +248,7 @@ class ProvisionerSandboxBackend(BaseSandbox):
 
         The underlying API returns plain text by default and may include an
         explicit `encoding="base64"` marker for binary payloads. This helper is
-        the single normalization point used by read(), edit(), and download_files().
+        the single normalization point used by read() and edit().
         """
         start_line = max(0, int(offset))
         end_line = start_line + int(limit) if limit is not None else None
@@ -386,6 +386,7 @@ class ProvisionerSandboxBackend(BaseSandbox):
             kwargs: dict[str, Any] = {"command": command}
             if timeout is not None:
                 kwargs["timeout"] = timeout
+                kwargs["hard_timeout"] = timeout
                 kwargs["request_options"] = {"timeout_in_seconds": timeout}
             result = self._get_client().shell.exec_command(**kwargs)
 
@@ -614,10 +615,7 @@ class ProvisionerSandboxBackend(BaseSandbox):
         return responses
 
     def download_files(self, paths: list[str]) -> list[FileDownloadResponse]:
-        """Download file payloads as raw bytes from the sandbox file API.
-
-        _read_binary() normalizes the sandbox file API response to bytes.
-        """
+        """Download file payloads as raw bytes from the sandbox file API."""
         responses: list[FileDownloadResponse] = []
         for path in paths:
             try:
@@ -627,7 +625,12 @@ class ProvisionerSandboxBackend(BaseSandbox):
                         FileDownloadResponse(path=normalized_path, content=None, error="permission_denied")
                     )
                     continue
-                content = self._read_binary(normalized_path)
+                content = b"".join(
+                    self._get_client().file.download_file(
+                        path=normalized_path,
+                        request_options={"timeout_in_seconds": self._command_timeout_seconds},
+                    )
+                )
                 responses.append(FileDownloadResponse(path=normalized_path, content=content, error=None))
             except PermissionError:
                 normalized_path = str(path)

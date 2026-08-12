@@ -1252,7 +1252,7 @@ async def prepare_remote_skill_install(
 
     preparation = None
     try:
-        preparation = await prepare_remote_skills_batch(source=source, skills=skills, db=db)
+        preparation = await prepare_remote_skills_batch(source=source, skills=skills)
         items: list[dict[str, Any]] = []
         for result in preparation.results:
             slug = result.get("slug", "")

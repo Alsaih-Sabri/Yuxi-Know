@@ -63,7 +63,7 @@ class _RemoteSkillSandbox:
         )
 
     async def run(self, args: list[str]) -> str:
-        """执行 Skills CLI，并返回清理后的合并输出。"""
+        """执行 Skills CLI，并返回原始命令输出。"""
         workspace = f"{self.home}/workspace"
         command = " && ".join(
             [
@@ -74,7 +74,7 @@ class _RemoteSkillSandbox:
         )
         result = await asyncio.to_thread(self.backend.execute, command, timeout=CLI_TIMEOUT_SECONDS)
         output = str(result.output or "")
-        if result.exit_code not in (0, None):
+        if result.exit_code != 0:
             cleaned_lines = _clean_cli_output(output)
             error_msg = "\n".join(line for line in cleaned_lines if line)[:500]
             raise ValueError(error_msg or "skills CLI 执行失败")
@@ -216,8 +216,8 @@ def _parse_available_skills(output: str) -> list[dict[str, str]]:
     return items
 
 
-async def list_remote_skills(source: str, db: AsyncSession | None = None) -> list[dict[str, str]]:
-    policy = await remote_skill_source_policy.get(db)
+async def list_remote_skills(source: str) -> list[dict[str, str]]:
+    policy = await remote_skill_source_policy.get()
     normalized_source = _normalize_source(source, policy["allowed_hosts"])
 
     sandbox = _RemoteSkillSandbox.create()
@@ -240,7 +240,7 @@ async def install_remote_skill(
     created_by: str | None,
 ) -> Skill:
     normalized_skill = _normalize_skill_name(skill)
-    preparation = await prepare_remote_skills_batch(source=source, skills=[normalized_skill], db=db)
+    preparation = await prepare_remote_skills_batch(source=source, skills=[normalized_skill])
     try:
         result = preparation.results[0]
         if not result.get("success"):
@@ -273,7 +273,7 @@ async def install_remote_skills_batch(
     Returns:
         每个 skill 的安装结果列表，顺序与请求一致: ``[{slug, success, error?}, ...]``
     """
-    preparation = await prepare_remote_skills_batch(source=source, skills=skills, db=db)
+    preparation = await prepare_remote_skills_batch(source=source, skills=skills)
     try:
         results = preparation.results
         for index, result in enumerate(results):
@@ -302,10 +302,9 @@ async def prepare_remote_skills_batch(
     *,
     source: str,
     skills: list[str],
-    db: AsyncSession | None = None,
 ) -> RemoteSkillsBatchPreparation:
     """批量从远程仓库拉取 skill 目录，但不写数据库。"""
-    policy = await remote_skill_source_policy.get(db)
+    policy = await remote_skill_source_policy.get()
     normalized_source = _normalize_source(source, policy["allowed_hosts"])
     if not skills:
         raise ValueError("skills 列表不能为空")

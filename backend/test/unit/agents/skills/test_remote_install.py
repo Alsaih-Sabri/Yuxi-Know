@@ -173,6 +173,23 @@ async def test_remote_skill_sandbox_executes_cli_through_provisioner_backend():
     assert "npx -y skills add https://github.com/owner/repo --list" in calls[0]
 
 
+@pytest.mark.asyncio
+async def test_remote_skill_sandbox_rejects_incomplete_command() -> None:
+    class FakeBackend:
+        def execute(self, _command: str, *, timeout: int):
+            assert timeout == svc.CLI_TIMEOUT_SECONDS
+            return SimpleNamespace(output="still running", exit_code=None)
+
+    sandbox = svc._RemoteSkillSandbox(
+        thread_id="remote-skill-test",
+        home=f"{svc.REMOTE_SKILL_SANDBOX_ROOT}/.remote-skill-test",
+        backend=FakeBackend(),
+    )
+
+    with pytest.raises(ValueError, match="still running"):
+        await sandbox.run(["npx", "-y", "skills", "add", "https://github.com/owner/repo", "--list"])
+
+
 def test_remote_skill_sandbox_uses_unique_workspace_uid(monkeypatch: pytest.MonkeyPatch):
     captured: dict[str, str | bool] = {}
 

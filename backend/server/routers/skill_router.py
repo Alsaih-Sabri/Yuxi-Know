@@ -196,10 +196,9 @@ async def prepare_skill_upload_route(
 async def list_remote_skills_route(
     payload: RemoteSkillSourceRequest,
     _current_user: User = Depends(get_required_user),
-    db: AsyncSession = Depends(get_db),
 ):
     try:
-        return {"success": True, "data": await list_remote_skills(payload.source, db)}
+        return {"success": True, "data": await list_remote_skills(payload.source)}
     except ValueError as e:
         _raise_from_value_error(e)
     except Exception as e:

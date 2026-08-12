@@ -253,12 +253,11 @@ def test_remote_skill_prepare_and_admin_confirm_routes(monkeypatch):
     assert captured["confirm"]["operator_uid"] == "admin"
 
 
-def test_remote_skill_list_route_passes_request_database_session(monkeypatch):
+def test_remote_skill_list_route_reads_policy_independently(monkeypatch):
     captured: dict[str, object] = {}
 
-    async def fake_list_remote_skills(source, db):
+    async def fake_list_remote_skills(source):
         captured["source"] = source
-        captured["db"] = db
         return [{"name": "demo", "description": "demo skill"}]
 
     monkeypatch.setattr("server.routers.skill_router.list_remote_skills", fake_list_remote_skills)
@@ -270,7 +269,7 @@ def test_remote_skill_list_route_passes_request_database_session(monkeypatch):
 
     assert response.status_code == 200, response.text
     assert response.json()["data"] == [{"name": "demo", "description": "demo skill"}]
-    assert captured == {"source": "owner/repo", "db": None}
+    assert captured == {"source": "owner/repo"}
 
 
 def test_normal_user_cannot_confirm_shared_skill_install(monkeypatch):
