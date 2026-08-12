@@ -767,23 +767,44 @@ class KnowledgeBaseManager:
         normalized_page = max(int(page or 1), 1)
         normalized_page_size = min(max(int(page_size or 100), 1), 500)
         effective_recursive = recursive and bool(status and status != "all")
-        records, total = await repo.list_documents(
-            kb_id=kb_id,
-            parent_id=parent_id,
-            path_prefix=path_prefix,
-            status=status,
-            page=normalized_page,
-            page_size=normalized_page_size,
-            recursive=effective_recursive,
-            files_only=files_only,
-        )
+
+        # 列表与统计互不依赖，并行执行（大知识库下统计全表聚合耗时显著）
+        if include_stats:
+            (records, total), stats = await asyncio.gather(
+                repo.list_documents(
+                    kb_id=kb_id,
+                    parent_id=parent_id,
+                    path_prefix=path_prefix,
+                    status=status,
+                    page=normalized_page,
+                    page_size=normalized_page_size,
+                    recursive=effective_recursive,
+                    files_only=files_only,
+                ),
+                repo.get_kb_file_stats(kb_id),
+            )
+        else:
+            records, total = await repo.list_documents(
+                kb_id=kb_id,
+                parent_id=parent_id,
+                path_prefix=path_prefix,
+                status=status,
+                page=normalized_page,
+                page_size=normalized_page_size,
+                recursive=effective_recursive,
+                files_only=files_only,
+            )
+            stats = None
+
         folder_ids = [record.file_id for record in records if record.is_folder]
-        child_counts = await repo.count_children_by_parent_ids(kb_id=kb_id, parent_ids=folder_ids)
         creator_uids = [record.created_by for record in records if getattr(record, "created_by", None)]
         from yuxi.repositories.user_repository import UserRepository
 
-        creators = {user.uid: user for user in await UserRepository().list_by_uids(creator_uids)}
-        stats = await repo.get_kb_file_stats(kb_id) if include_stats else None
+        child_counts, creators = await asyncio.gather(
+            repo.count_children_by_parent_ids(kb_id=kb_id, parent_ids=folder_ids),
+            UserRepository().list_by_uids(creator_uids),
+        )
+        creators = {user.uid: user for user in creators}
         items = [
             self._file_record_list_item(record, child_counts, creators.get(getattr(record, "created_by", None)))
             for record in records
