@@ -153,6 +153,33 @@ def test_sandbox_provider_release_keeps_cache_when_delete_fails():
     assert provider._last_touch_at[cache_key] == 1.0
 
 
+def test_sandbox_provider_release_clears_cache_when_delete_fails_for_one_time_scope():
+    provider = object.__new__(ProvisionerSandboxProvider)
+    provider._lock = threading.Lock()
+    provider._thread_locks = {}
+    provider._connections = {}
+    provider._last_touch_at = {}
+
+    def fail_delete(_sandbox_id):
+        raise RuntimeError("delete failed")
+
+    provider._client = SimpleNamespace(delete=fail_delete)
+    connection = SimpleNamespace(sandbox_id="sandbox-1")
+    cache_key = "user-1::thread-1::thread-1"
+    provider._connections[cache_key] = connection
+    provider._last_touch_at[cache_key] = 1.0
+
+    with pytest.raises(RuntimeError, match="delete failed"):
+        provider.release(
+            "thread-1",
+            uid="user-1",
+            clear_cache_on_delete_failure=True,
+        )
+
+    assert cache_key not in provider._connections
+    assert cache_key not in provider._last_touch_at
+
+
 @pytest.mark.asyncio
 async def test_sync_agent_context_skills_uses_split_scope_without_blocking(monkeypatch):
     """Run 初始化应在线程池同步共享 Skill，并使用独立的 Skill 线程作用域。"""

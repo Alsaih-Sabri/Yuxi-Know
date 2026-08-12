@@ -98,6 +98,7 @@ class _RemoteSkillSandbox:
                 get_sandbox_provider().release,
                 self.thread_id,
                 uid=self.thread_id,
+                clear_cache_on_delete_failure=True,
             )
         except Exception as exc:
             logger.error(f"销毁远程 Skill Sandbox 失败: {exc}")

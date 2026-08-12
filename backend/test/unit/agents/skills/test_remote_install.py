@@ -374,9 +374,11 @@ async def test_remote_skill_sandbox_cleanup_removes_whole_thread_dir_when_releas
     (user_data_dir / "outputs").mkdir(parents=True)
     (thread_dir / "skills").mkdir()
     (workspace_root / "workspace").mkdir(parents=True)
+    release_calls: list[tuple[tuple, dict]] = []
 
     class FakeProvider:
         def release(self, *_args, **_kwargs):
+            release_calls.append((_args, _kwargs))
             raise RuntimeError("release failed")
 
     monkeypatch.setattr(svc, "get_sandbox_provider", lambda: FakeProvider())
@@ -393,6 +395,15 @@ async def test_remote_skill_sandbox_cleanup_removes_whole_thread_dir_when_releas
 
     assert not thread_dir.exists()
     assert not workspace_root.exists()
+    assert release_calls == [
+        (
+            ("remote-skill-test",),
+            {
+                "uid": "remote-skill-test",
+                "clear_cache_on_delete_failure": True,
+            },
+        )
+    ]
 
 
 @pytest.mark.asyncio

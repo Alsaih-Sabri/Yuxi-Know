@@ -254,6 +254,7 @@ class ProvisionerSandboxProvider:
         uid: str,
         file_thread_id: str | None = None,
         skills_thread_id: str | None = None,
+        clear_cache_on_delete_failure: bool = False,
     ) -> None:
         """释放一个指定作用域的 Sandbox，并清理本地连接缓存。"""
         file_id = str(file_thread_id or thread_id).strip()
@@ -263,7 +264,13 @@ class ProvisionerSandboxProvider:
         with lock:
             connection = self._connections.get(cache_key)
             sandbox_id = connection.sandbox_id if connection else sandbox_id_for_thread(file_id, skills_id, uid=uid)
-            self._client.delete(sandbox_id)
+            try:
+                self._client.delete(sandbox_id)
+            except Exception:
+                if clear_cache_on_delete_failure:
+                    self._connections.pop(cache_key, None)
+                    self._last_touch_at.pop(cache_key, None)
+                raise
             self._connections.pop(cache_key, None)
             self._last_touch_at.pop(cache_key, None)
 
