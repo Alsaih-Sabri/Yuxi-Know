@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import base64
+import gc
 import threading
+import weakref
 from types import MethodType, SimpleNamespace
 
 import pytest
@@ -17,7 +19,7 @@ from yuxi.agents.backends.composite import (
     create_agent_filesystem_middleware,
     sync_agent_context_skills,
 )
-from yuxi.agents.backends.sandbox import resolve_virtual_path, sandbox_id_for_thread
+from yuxi.agents.backends.sandbox import ProvisionerSandboxProvider, resolve_virtual_path, sandbox_id_for_thread
 from yuxi.agents.backends.sandbox.backend import ProvisionerSandboxBackend
 from yuxi.agents.middlewares.skills import SkillsMiddleware
 from yuxi.utils.paths import VIRTUAL_PATH_CONVERSATION_HISTORY, VIRTUAL_PATH_LARGE_TOOL_RESULTS
@@ -61,6 +63,121 @@ def test_create_agent_composite_backend_uses_prepared_readable_skills(monkeypatc
     assert backend.artifacts_root == "/home/gem/user-data/outputs"
     assert "/skills/" in backend.routes
     assert "/home/gem/kbs/" not in backend.routes
+
+
+def test_sandbox_provider_release_deletes_sandbox_and_clears_cache():
+    deleted: list[str] = []
+    provider = object.__new__(ProvisionerSandboxProvider)
+    provider._lock = threading.Lock()
+    provider._thread_locks = {}
+    provider._connections = {}
+    provider._last_touch_at = {}
+    provider._client = SimpleNamespace(delete=deleted.append)
+    connection = SimpleNamespace(sandbox_id="sandbox-1")
+    cache_key = "user-1::thread-1::thread-1"
+    provider._connections[cache_key] = connection
+    provider._last_touch_at[cache_key] = 1.0
+
+    provider.release("thread-1", uid="user-1")
+
+    assert deleted == ["sandbox-1"]
+    assert cache_key not in provider._connections
+    assert cache_key not in provider._last_touch_at
+
+
+def test_sandbox_provider_discards_unused_thread_locks():
+    provider = object.__new__(ProvisionerSandboxProvider)
+    provider._lock = threading.Lock()
+    provider._thread_locks = weakref.WeakValueDictionary()
+
+    lock = provider._thread_lock("user-1::thread-1::thread-1")
+    lock_ref = weakref.ref(lock)
+    assert provider._thread_lock("user-1::thread-1::thread-1") is lock
+
+    del lock
+    gc.collect()
+
+    assert lock_ref() is None
+    assert not provider._thread_locks
+
+
+def test_sandbox_provider_waiter_keeps_shared_thread_lock_alive():
+    provider = object.__new__(ProvisionerSandboxProvider)
+    provider._lock = threading.Lock()
+    provider._thread_locks = weakref.WeakValueDictionary()
+    cache_key = "user-1::thread-1::thread-1"
+    first_lock = provider._thread_lock(cache_key)
+    waiter_ready = threading.Event()
+    waiter_acquired = threading.Event()
+
+    def wait_for_lock() -> None:
+        waiting_lock = provider._thread_lock(cache_key)
+        assert waiting_lock is first_lock
+        waiter_ready.set()
+        with waiting_lock:
+            waiter_acquired.set()
+
+    first_lock.acquire()
+    waiter = threading.Thread(target=wait_for_lock)
+    waiter.start()
+    assert waiter_ready.wait(timeout=1)
+    assert provider._thread_lock(cache_key) is first_lock
+    assert not waiter_acquired.is_set()
+
+    first_lock.release()
+    waiter.join(timeout=1)
+
+    assert waiter_acquired.is_set()
+
+
+def test_sandbox_provider_release_keeps_cache_when_delete_fails():
+    provider = object.__new__(ProvisionerSandboxProvider)
+    provider._lock = threading.Lock()
+    provider._thread_locks = {}
+    provider._connections = {}
+    provider._last_touch_at = {}
+
+    def fail_delete(_sandbox_id):
+        raise RuntimeError("delete failed")
+
+    provider._client = SimpleNamespace(delete=fail_delete)
+    connection = SimpleNamespace(sandbox_id="sandbox-1")
+    cache_key = "user-1::thread-1::thread-1"
+    provider._connections[cache_key] = connection
+    provider._last_touch_at[cache_key] = 1.0
+
+    with pytest.raises(RuntimeError, match="delete failed"):
+        provider.release("thread-1", uid="user-1")
+
+    assert provider._connections[cache_key] is connection
+    assert provider._last_touch_at[cache_key] == 1.0
+
+
+def test_sandbox_provider_release_clears_cache_when_delete_fails_for_one_time_scope():
+    provider = object.__new__(ProvisionerSandboxProvider)
+    provider._lock = threading.Lock()
+    provider._thread_locks = {}
+    provider._connections = {}
+    provider._last_touch_at = {}
+
+    def fail_delete(_sandbox_id):
+        raise RuntimeError("delete failed")
+
+    provider._client = SimpleNamespace(delete=fail_delete)
+    connection = SimpleNamespace(sandbox_id="sandbox-1")
+    cache_key = "user-1::thread-1::thread-1"
+    provider._connections[cache_key] = connection
+    provider._last_touch_at[cache_key] = 1.0
+
+    with pytest.raises(RuntimeError, match="delete failed"):
+        provider.release(
+            "thread-1",
+            uid="user-1",
+            clear_cache_on_delete_failure=True,
+        )
+
+    assert cache_key not in provider._connections
+    assert cache_key not in provider._last_touch_at
 
 
 @pytest.mark.asyncio
@@ -349,8 +466,8 @@ def test_provider_uses_distinct_sandbox_scope_for_different_uid(monkeypatch) -> 
     created = []
 
     class FakeClient:
-        def create(self, sandbox_id, thread_id, uid, env, *, file_thread_id=None, skills_thread_id=None):
-            created.append((sandbox_id, thread_id, uid, env, file_thread_id, skills_thread_id))
+        def create(self, sandbox_id, thread_id, uid, env, **kwargs):
+            created.append((sandbox_id, thread_id, uid, env, kwargs["file_thread_id"], kwargs["skills_thread_id"]))
             return SimpleNamespace(sandbox_id=sandbox_id, sandbox_url=f"http://sandbox/{uid}")
 
         def touch(self, _sandbox_id):
@@ -390,7 +507,7 @@ def test_provider_maps_external_uid_only_at_provisioner_filesystem_boundary(monk
     calls = []
 
     class FakeClient:
-        def create(self, sandbox_id, thread_id, uid, env, *, file_thread_id=None, skills_thread_id=None):
+        def create(self, sandbox_id, thread_id, uid, env, **_kwargs):
             calls.append((uid, env))
             return SimpleNamespace(sandbox_id=sandbox_id, sandbox_url="http://sandbox")
 
@@ -420,8 +537,8 @@ def test_provider_get_create_if_missing_ensures_expected_split_scope(monkeypatch
     calls = []
 
     class FakeClient:
-        def create(self, sandbox_id, thread_id, uid, env, *, file_thread_id=None, skills_thread_id=None):
-            calls.append((sandbox_id, thread_id, uid, env, file_thread_id, skills_thread_id))
+        def create(self, sandbox_id, thread_id, uid, env, **kwargs):
+            calls.append((sandbox_id, thread_id, uid, env, kwargs["file_thread_id"], kwargs["skills_thread_id"]))
             return SimpleNamespace(sandbox_id=sandbox_id, sandbox_url="http://sandbox")
 
         def discover(self, _sandbox_id):
@@ -460,6 +577,33 @@ def test_provider_get_create_if_missing_ensures_expected_split_scope(monkeypatch
     ]
 
 
+def test_provider_can_create_sandbox_without_environment(monkeypatch) -> None:
+    from yuxi.agents.backends.sandbox.provider import ProvisionerSandboxProvider
+
+    calls = []
+
+    class FakeClient:
+        def create(self, sandbox_id, thread_id, uid, env, **kwargs):
+            calls.append((env, kwargs["inherit_env"]))
+            return SimpleNamespace(sandbox_id=sandbox_id, sandbox_url="http://sandbox")
+
+    provider = ProvisionerSandboxProvider.__new__(ProvisionerSandboxProvider)
+    provider._client = FakeClient()
+    provider._lock = threading.Lock()
+    provider._thread_locks = {}
+    provider._connections = {}
+    provider._last_touch_at = {}
+    provider._touch_interval_seconds = 30
+    monkeypatch.setattr(
+        "yuxi.agents.backends.sandbox.provider.load_user_agent_env",
+        lambda _uid: pytest.fail("隔离 Sandbox 不应加载用户环境变量"),
+    )
+
+    provider.get("remote-skill-test", uid="remote-skill-test", create_if_missing=True, inherit_env=False)
+
+    assert calls == [({}, False)]
+
+
 def test_provisioner_uses_file_and_skills_thread_ids(monkeypatch) -> None:
     provider_calls = []
 
@@ -490,6 +634,7 @@ def test_provisioner_uses_file_and_skills_thread_ids(monkeypatch) -> None:
                 "create_if_missing": True,
                 "file_thread_id": "parent-thread",
                 "skills_thread_id": "child-skills-thread",
+                "inherit_env": True,
             },
         )
     ]
@@ -780,10 +925,13 @@ def test_provisioner_download_files_distinguishes_invalid_path_from_read_failure
     monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
     backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
 
-    def _fake_read_binary(path, offset=0, limit=None):
+    def download_file(**_kwargs):
         raise RuntimeError("sandbox read timeout")
 
-    monkeypatch.setattr(backend, "_read_binary", _fake_read_binary)
+    backend._get_client = MethodType(
+        lambda self: SimpleNamespace(file=SimpleNamespace(download_file=download_file)),
+        backend,
+    )
 
     responses = backend.download_files(["bad-path", "/home/gem/user-data/read-failed"])
 
@@ -795,10 +943,13 @@ def test_provisioner_download_files_treats_sandbox_404_as_missing(monkeypatch) -
     monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
     backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
 
-    def _missing_from_sandbox(path, offset=0, limit=None):
+    def download_file(**_kwargs):
         raise RuntimeError("status_code: 404, body: {'message': 'File does not exist'}")
 
-    monkeypatch.setattr(backend, "_read_binary", _missing_from_sandbox)
+    backend._get_client = MethodType(
+        lambda self: SimpleNamespace(file=SimpleNamespace(download_file=download_file)),
+        backend,
+    )
 
     responses = backend.download_files(["/home/gem/user-data/outputs/missing.md"])
 
@@ -820,3 +971,54 @@ def test_provisioner_execute_returns_error_response_on_client_failure(monkeypatc
 
     assert result.exit_code == 1
     assert "Error:" in result.output
+
+
+def test_provisioner_execute_applies_timeout_to_command_and_http_request(monkeypatch) -> None:
+    monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
+    backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
+    calls: list[dict] = []
+
+    def execute(**kwargs):
+        calls.append(kwargs)
+        return SimpleNamespace(data=SimpleNamespace(exit_code=0, output="done"))
+
+    fake_client = SimpleNamespace(shell=SimpleNamespace(exec_command=execute))
+    backend._get_client = MethodType(lambda self: fake_client, backend)
+
+    result = backend.execute("echo hi", timeout=300)
+
+    assert result.exit_code == 0
+    assert calls == [
+        {
+            "command": "echo hi",
+            "timeout": 300,
+            "hard_timeout": 300,
+            "request_options": {"timeout_in_seconds": 300},
+        }
+    ]
+
+
+def test_provisioner_download_files_streams_binary_bytes(monkeypatch) -> None:
+    monkeypatch.setattr("yuxi.agents.backends.sandbox.backend.get_sandbox_provider", lambda: object())
+    backend = ProvisionerSandboxBackend(thread_id="thread-1", uid="user-1")
+    calls: list[dict] = []
+
+    def download_file(**kwargs):
+        calls.append(kwargs)
+        return iter([b"\x00\xff", b"binary"])
+
+    backend._get_client = MethodType(
+        lambda self: SimpleNamespace(file=SimpleNamespace(download_file=download_file)),
+        backend,
+    )
+
+    response = backend.download_files(["/home/gem/user-data/outputs/demo.bin"])[0]
+
+    assert response.error is None
+    assert response.content == b"\x00\xffbinary"
+    assert calls == [
+        {
+            "path": "/home/gem/user-data/outputs/demo.bin",
+            "request_options": {"timeout_in_seconds": backend._command_timeout_seconds},
+        }
+    ]

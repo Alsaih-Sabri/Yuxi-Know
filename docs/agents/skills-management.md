@@ -157,6 +157,11 @@ description: 这是一个用于处理特定任务的技能
 
 **方式三：从远程来源安装**
 
+管理员可以在「设置 → 基本设置 → Skill 配置 → 远程来源白名单」中配置允许远程安装 Skill 的来源域名；对应系统配置项为 `remote_skill_source_policy.allowed_hosts`。
+该策略保存在 PostgreSQL `config_options` 中，默认允许 `github.com` 和 `modelscope.cn`，只做
+精确域名匹配，不自动放行子域名；保存空列表时，远程 Skill 安装会被禁用。运行时以数据库
+配置为准，不依赖 `base.toml`、环境变量或 Redis 配置快照。
+
 1. 在 Skills 管理页面点击「远程安装」
 2. 在“按仓库拉取”中填写来源，例如：
    - `anthropics/skills`
@@ -170,9 +175,11 @@ description: 这是一个用于处理特定任务的技能
 也可以切换到“全局搜索发现”，输入关键字检索 skills.sh 上的开源 Skills，再选择结果安装。
 
 系统会在后端：
-- 调用 `npx skills add <source> --list` 校验来源并发现可安装的 skills
-- 使用隔离的临时 `HOME` 执行 `npx skills add <source> --skill <name> -g -y --copy`
-- 从临时目录中提取对应 skill，再生成统一草稿；个人确认写入 workspace，共享确认写入 `/app/saves/skills` 与数据库
+- 只接受管理员白名单中的 HTTPS 来源；GitHub `owner/repo` 简写按 `github.com` 校验
+- 在不继承全局或用户环境变量的一次性 Sandbox 中执行 `npx skills`，Kubernetes Sandbox 不挂载 ServiceAccount token
+- 通过 Sandbox 文件 API 提取对应 Skill，严格校验返回的相对路径，并限制文件数、目录深度和总大小；个人确认写入 workspace，共享确认写入 `/app/saves/skills` 与数据库
+
+来源白名单用于限制产品允许的远程仓库，并不等同于 Sandbox 网络出口防火墙。
 
 ::: tip ModelScope 合集适合批量安装
 ModelScope 合集地址可以作为远程来源填写，例如 `https://modelscope.cn/collections/MiniMax/MiniMax-Office-skills`。拉取后在列表中勾选需要的 Skills，再统一解析为安装草稿。

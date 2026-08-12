@@ -76,7 +76,7 @@ class SkillDependenciesUpdateRequest(BaseModel):
 
 
 class RemoteSkillSourceRequest(BaseModel):
-    source: str = Field(..., description="skills 仓库来源，如 owner/repo 或 GitHub URL")
+    source: str = Field(..., description="远程 Skill 来源，如 owner/repo 或允许的 HTTPS URL")
 
 
 class RemoteSkillPrepareRequest(RemoteSkillSourceRequest):
@@ -193,7 +193,10 @@ async def prepare_skill_upload_route(
 
 
 @user_skills.post("/remote/list")
-async def list_remote_skills_route(payload: RemoteSkillSourceRequest, _current_user: User = Depends(get_required_user)):
+async def list_remote_skills_route(
+    payload: RemoteSkillSourceRequest,
+    _current_user: User = Depends(get_required_user),
+):
     try:
         return {"success": True, "data": await list_remote_skills(payload.source)}
     except ValueError as e:
