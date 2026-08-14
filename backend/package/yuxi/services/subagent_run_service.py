@@ -25,7 +25,7 @@ from yuxi.repositories.conversation_repository import ConversationRepository
 from yuxi.repositories.subagent_thread_repository import SubagentThreadRepository
 from yuxi.services.input_message_service import AgentRunInputMessage
 from yuxi.storage.postgres.models_business import Agent, AgentRun, SubagentThread
-from yuxi.utils.datetime_utils import utc_isoformat
+from yuxi.utils.datetime_utils import format_utc_datetime
 from yuxi.utils.hash_utils import hash_id, subagent_child_thread_id
 
 
@@ -85,8 +85,8 @@ def serialize_subagent_run_state(run: AgentRun) -> dict:
         "subagent_name": runtime.get("subagent_name"),
         "child_thread_id": run.conversation_thread_id,
         "status": run.status,
-        "created_at": utc_isoformat(run.created_at) if run.created_at else None,
-        "completed_at": utc_isoformat(run.finished_at) if run.finished_at else None,
+        "created_at": format_utc_datetime(run.created_at),
+        "completed_at": format_utc_datetime(run.finished_at),
         "error": run.error_message,
         **subagent_run_urls(run.id),
     }

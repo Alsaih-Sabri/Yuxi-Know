@@ -17,6 +17,10 @@ pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
 async def _create_restricted_database(test_client, admin_headers):
     """Create a KB shared only with its creator (admin), so non-owners get 404."""
+    profile_response = await test_client.get("/api/auth/me", headers=admin_headers)
+    assert profile_response.status_code == 200, profile_response.text
+    owner_uid = profile_response.json()["uid"]
+
     response = await test_client.post(
         "/api/knowledge/databases",
         json={
@@ -25,7 +29,15 @@ async def _create_restricted_database(test_client, admin_headers):
             "embedding_model_spec": "siliconflow-cn:Pro/BAAI/bge-m3",
             "kb_type": "milvus",
             "additional_params": {},
-            "share_config": {"access_level": "user"},
+            "share_config": {
+                "version": 2,
+                "read_scope": {
+                    "access_level": "user",
+                    "department_ids": [],
+                    "user_uids": [owner_uid],
+                },
+                "manage_scope": None,
+            },
         },
         headers=admin_headers,
     )
