@@ -758,6 +758,11 @@ import AgentMessageComponent from '@/components/AgentMessageComponent.vue'
 import RefsComponent from '@/components/RefsComponent.vue'
 import ToolCallsGroupComponent from '@/components/ToolCallsGroupComponent.vue'
 import { handleChatError, handleValidationError } from '@/utils/errorHandler'
+import {
+  DRAFT_THREAD_ID,
+  createThreadDraftStore,
+  createThreadDraftSession
+} from '@/utils/thread_draft'
 import { ScrollController } from '@/utils/scrollController'
 import { AgentValidator } from '@/utils/agentValidator'
 import { useAgentStore } from '@/stores/agent'
@@ -810,7 +815,11 @@ const { agents, selectedAgentId, agentConfig, configurableItems, availableKnowle
 const { threads, currentThreadId, currentThread } = storeToRefs(chatThreadsStore)
 
 // ==================== LOCAL CHAT & UI STATE ====================
-const userInput = ref('')
+// 输入草稿按线程保存：初始按当前线程还原，后续输入实时写入对应线程
+const threadDraftStore = createThreadDraftStore()
+const threadDraftSession = createThreadDraftSession(threadDraftStore, currentThreadId.value)
+const userInput = ref(threadDraftStore.read(currentThreadId.value || DRAFT_THREAD_ID))
+watch(userInput, (text) => threadDraftSession.saveInput(text))
 const agentInputAreaRef = ref(null)
 const sendCooldownActive = ref(false)
 const cancellingRequestIds = reactive(new Set())
@@ -2705,7 +2714,14 @@ const handleAttachmentUpload = async (files = []) => {
 
 const ensureAttachmentThread = async () => {
   if (currentChatId.value) return currentChatId.value
-  return await ensureActiveThread('新的对话')
+  // 无线程状态上传附件会先创建线程：保留输入框已有文本并迁移到新线程草稿
+  const inputText = userInput.value
+  const threadId = await ensureActiveThread('新的对话')
+  if (threadId && inputText) {
+    userInput.value = inputText
+    threadDraftSession.clearDraftThread()
+  }
+  return threadId
 }
 
 const handleTmpAttachmentsAdded = async () => {
@@ -3008,6 +3024,8 @@ const handleSendMessage = async ({ image, queuePolicy = 'enqueue' } = {}) => {
     }
     // 新建线程：把草稿态的模型选择迁移到真实线程，避免选择丢失
     promoteDraftSelection(selectedModelByThread, threadId)
+    // 该线程由草稿发送创建，清理新建对话草稿，避免已发送文本再次还原
+    threadDraftSession.clearDraftThread()
   }
   // 仅当用户显式选择过模型才下发覆盖；否则传 null，由后端使用智能体配置的模型
   const modelSpec = selectedModelByThread[threadId] || null
@@ -3550,6 +3568,10 @@ watch(
 
 watch(currentChatId, (threadId, oldThreadId) => {
   if (threadId === oldThreadId) return
+  // 旧线程已被删除时丢弃输入草稿，避免写入无法再次访问的孤儿缓存
+  const keepInput = !oldThreadId || threads.value.some((thread) => thread.id === oldThreadId)
+  // 切换线程：保存旧线程的输入草稿，并还原新线程（或新建对话）的草稿
+  userInput.value = threadDraftSession.switchThread(threadId, keepInput ? userInput.value : '')
   if (!threadId || approvalState.threadId !== threadId) {
     hideApprovalState()
   }
