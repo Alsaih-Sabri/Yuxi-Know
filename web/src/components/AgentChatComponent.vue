@@ -119,6 +119,9 @@
                   <div></div>
                 </div>
                 <span class="generating-text">{{ replyLoadingText }}</span>
+                <span v-if="replyElapsedLabel" class="generating-elapsed">{{
+                  replyElapsedLabel
+                }}</span>
               </div>
             </div>
           </div>
@@ -2145,6 +2148,45 @@ const replyLoadingText = computed(() => {
   if (hasQueuedRequests.value) return `排队中（${queuedRequestCount.value} 条）...`
   return '正在生成回复...'
 })
+const replyElapsedSeconds = ref(0)
+let replyElapsedTimer = null
+let replyStartedAt = null
+const replyElapsedLabel = computed(() => {
+  const seconds = replyElapsedSeconds.value
+  if (!seconds) return ''
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  return `${minutes}分${seconds % 60}s`
+})
+const updateReplyElapsedSeconds = () => {
+  if (!replyStartedAt) return
+  replyElapsedSeconds.value = Math.floor((Date.now() - replyStartedAt) / 1000)
+}
+const startReplyElapsedTimer = ({ reset = false } = {}) => {
+  stopReplyElapsedTimer()
+  if (reset || !replyStartedAt) {
+    replyStartedAt = Date.now()
+  }
+  updateReplyElapsedSeconds()
+  replyElapsedTimer = window.setInterval(updateReplyElapsedSeconds, 1000)
+}
+const stopReplyElapsedTimer = ({ reset = false } = {}) => {
+  if (replyElapsedTimer) {
+    window.clearInterval(replyElapsedTimer)
+    replyElapsedTimer = null
+  }
+  if (reset) {
+    replyStartedAt = null
+    replyElapsedSeconds.value = 0
+  }
+}
+watch(isReplyLoading, (loading) => {
+  if (loading) {
+    startReplyElapsedTimer({ reset: true })
+  } else {
+    stopReplyElapsedTimer({ reset: true })
+  }
+}, { immediate: true })
 const isSendButtonDisabled = computed(() => {
   return (
     sendCooldownActive.value ||
@@ -2443,14 +2485,19 @@ onActivated(() => {
   nextTick(() => {
     startChatMainResizeObserver()
   })
+  if (isReplyLoading.value) {
+    startReplyElapsedTimer()
+  }
 })
 
 onDeactivated(() => {
   stopChatMainResizeObserver()
   stopStreamingStateRefresh()
+  stopReplyElapsedTimer()
 })
 
 onUnmounted(() => {
+  stopReplyElapsedTimer({ reset: true })
   if (typeof document !== 'undefined') {
     document.removeEventListener('visibilitychange', handlePageVisibilityChange)
   }
@@ -4180,10 +4227,12 @@ watch(currentChatId, (threadId, oldThreadId) => {
 .generating-indicator {
   display: flex;
   align-items: center;
-  padding: 0.75rem 0rem;
+  gap: 8px;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: var(--gray-25);
 
   .generating-text {
-    margin-left: 12px;
     font-size: 14px;
     font-weight: 500;
     letter-spacing: 0.025em;
@@ -4203,6 +4252,17 @@ watch(currentChatId, (threadId, oldThreadId) => {
     background-clip: text;
     color: transparent;
     animation: waveFlash 2s linear infinite;
+  }
+
+  .generating-elapsed {
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: var(--gray-100);
+    color: var(--gray-600);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.5;
+    white-space: nowrap;
   }
 }
 

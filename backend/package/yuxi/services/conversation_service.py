@@ -41,6 +41,13 @@ def _serialize_thread(conversation: Any, *, thread_status: str) -> dict:
     }
 
 
+def _format_naive_utc_isoformat(value: Any) -> str | None:
+    """将数据库中的 naive UTC 时间序列化为带 Z 后缀的 ISO 字符串。"""
+    if value is None:
+        return None
+    return value.isoformat() + "Z"
+
+
 async def require_user_conversation(conv_repo: ConversationRepository, thread_id: str, uid: str):
     conversation = await conv_repo.get_conversation_by_thread_id(thread_id)
     if not conversation or conversation.uid != str(uid) or conversation.status == "deleted":
@@ -261,13 +268,16 @@ async def get_thread_history_view(
 
     run_ids_in_messages = {msg.run_id for msg in messages if msg.run_id}
     run_created_at: dict[str, Any] = {}
+    run_timing: dict[str, tuple[Any, Any]] = {}
     if run_ids_in_messages:
         run_result = await db.execute(
-            select(AgentRun.id, AgentRun.created_at)
+            select(AgentRun.id, AgentRun.created_at, AgentRun.started_at, AgentRun.finished_at)
             .where(AgentRun.id.in_(run_ids_in_messages))
             .order_by(AgentRun.created_at.asc(), AgentRun.id.asc())
         )
-        run_created_at = {run_id: created_at for run_id, created_at in run_result.all()}
+        for run_id, created_at, started_at, finished_at in run_result.all():
+            run_created_at[run_id] = created_at
+            run_timing[run_id] = (started_at, finished_at)
     messages.sort(
         key=lambda message: (
             run_created_at.get(message.run_id) or message.created_at,
@@ -325,6 +335,11 @@ async def get_thread_history_view(
             "image_content": msg.image_content,
             "feedback": user_feedback,
         }
+
+        if msg.role == "assistant":
+            started_at, finished_at = run_timing.get(msg.run_id, (None, None))
+            msg_dict["run_started_at"] = _format_naive_utc_isoformat(started_at)
+            msg_dict["run_finished_at"] = _format_naive_utc_isoformat(finished_at)
 
         if msg.tool_calls:
             msg_dict["tool_calls"] = [

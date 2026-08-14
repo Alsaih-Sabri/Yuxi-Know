@@ -60,6 +60,24 @@
         </span>
         <ChevronDown :size="12" class="expand-icon" :class="{ rotated: isSourcesExpanded }" />
       </span>
+      <!-- 对话结束时间 / 执行耗时 -->
+      <span
+        v-if="messageFinishedAt"
+        class="item time-entry-btn"
+        :class="{ btn: messageDurationMs, 'is-duration': showingDuration }"
+        @click="toggleTimeDisplay"
+        :title="
+          messageDurationMs
+            ? showingDuration
+              ? '点击显示结束时间'
+              : '点击显示执行耗时'
+            : '结束时间'
+        "
+      >
+        <Clock size="12" />
+        <span v-if="showingDuration && messageDurationLabel">{{ messageDurationLabel }}</span>
+        <span v-else>{{ messageFinishedAt }}</span>
+      </span>
     </div>
 
     <!-- 来源详情面板 -->
@@ -101,9 +119,11 @@ import {
   Check,
   RotateCcw,
   BookOpen,
-  ChevronDown
+  ChevronDown,
+  Clock
 } from 'lucide-vue-next'
 import { agentApi } from '@/apis'
+import { formatDateTime, parseToShanghai } from '@/utils/time'
 import KnowledgeSourceSection from '@/components/KnowledgeSourceSection.vue'
 import WebSearchSourceSection from '@/components/WebSearchSourceSection.vue'
 
@@ -151,6 +171,33 @@ const feedbackState = reactive({
   reason: null
 })
 
+// 对话结束时间 / 执行耗时切换
+const showingDuration = ref(false)
+const messageFinishedAt = computed(() => {
+  const finishedAt = msg.value?.run_finished_at || msg.value?.created_at
+  return finishedAt ? formatDateTime(finishedAt, 'HH:mm') : ''
+})
+const messageDurationMs = computed(() => {
+  const started = parseToShanghai(msg.value?.run_started_at)
+  const finished = parseToShanghai(msg.value?.run_finished_at || msg.value?.created_at)
+  if (!started || !finished) return 0
+  const duration = finished.valueOf() - started.valueOf()
+  return Number.isFinite(duration) && duration > 0 ? duration : 0
+})
+const messageDurationLabel = computed(() => {
+  const ms = messageDurationMs.value
+  if (!ms) return ''
+  const seconds = Math.round(ms / 1000)
+  if (seconds < 60) return `耗时 ${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  const restSeconds = seconds % 60
+  return `耗时 ${minutes}分${restSeconds}s`
+})
+const toggleTimeDisplay = () => {
+  if (!messageDurationMs.value) return
+  showingDuration.value = !showingDuration.value
+}
+
 // 初始化反馈状态 - 从 antMessage.feedback 读取历史反馈
 const initFeedbackState = () => {
   if (msg.value?.feedback) {
@@ -170,6 +217,7 @@ watch(
   () => {
     msg.value = props.message
     initFeedbackState()
+    showingDuration.value = false
   },
   { immediate: true }
 )
@@ -403,6 +451,21 @@ const cancelDislike = () => {
         &.rotated {
           transform: rotate(180deg);
         }
+      }
+    }
+
+    .time-entry-btn {
+      margin-left: auto;
+      min-width: 52px;
+      color: var(--gray-500);
+      font-variant-numeric: tabular-nums;
+
+      &:hover {
+        color: var(--gray-800);
+      }
+
+      &.is-duration {
+        color: var(--main-700);
       }
     }
   }
