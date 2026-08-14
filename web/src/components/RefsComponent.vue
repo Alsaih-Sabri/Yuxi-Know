@@ -33,6 +33,24 @@
         <Copy v-else size="12" />
       </span>
 
+      <!-- 对话结束时间 / 执行耗时：纯文本，紧挨复制按钮展示 -->
+      <span
+        v-if="messageFinishedAt"
+        class="time-entry"
+        :class="{ toggleable: messageDurationMs }"
+        @click="toggleTimeDisplay"
+        :title="
+          messageDurationMs
+            ? showingDuration
+              ? '点击显示结束时间'
+              : '点击显示执行耗时'
+            : '结束时间'
+        "
+      >
+        <span v-if="showingDuration && messageDurationLabel">{{ messageDurationLabel }}</span>
+        <span v-else>{{ messageFinishedAt }}</span>
+      </span>
+
       <!-- 重试 -->
       <span
         v-if="showKey('regenerate')"
@@ -59,24 +77,6 @@
           </template>
         </span>
         <ChevronDown :size="12" class="expand-icon" :class="{ rotated: isSourcesExpanded }" />
-      </span>
-      <!-- 对话结束时间 / 执行耗时 -->
-      <span
-        v-if="messageFinishedAt"
-        class="item time-entry-btn"
-        :class="{ btn: messageDurationMs, 'is-duration': showingDuration }"
-        @click="toggleTimeDisplay"
-        :title="
-          messageDurationMs
-            ? showingDuration
-              ? '点击显示结束时间'
-              : '点击显示执行耗时'
-            : '结束时间'
-        "
-      >
-        <Clock size="12" />
-        <span v-if="showingDuration && messageDurationLabel">{{ messageDurationLabel }}</span>
-        <span v-else>{{ messageFinishedAt }}</span>
       </span>
     </div>
 
@@ -119,11 +119,10 @@ import {
   Check,
   RotateCcw,
   BookOpen,
-  ChevronDown,
-  Clock
+  ChevronDown
 } from 'lucide-vue-next'
 import { agentApi } from '@/apis'
-import { formatDateTime, parseToShanghai } from '@/utils/time'
+import { formatChatTime, parseToShanghai } from '@/utils/time'
 import KnowledgeSourceSection from '@/components/KnowledgeSourceSection.vue'
 import WebSearchSourceSection from '@/components/WebSearchSourceSection.vue'
 
@@ -175,7 +174,7 @@ const feedbackState = reactive({
 const showingDuration = ref(false)
 const messageFinishedAt = computed(() => {
   const finishedAt = msg.value?.run_finished_at || msg.value?.created_at
-  return finishedAt ? formatDateTime(finishedAt, 'HH:mm') : ''
+  return finishedAt ? formatChatTime(finishedAt) : ''
 })
 const messageDurationMs = computed(() => {
   const started = parseToShanghai(msg.value?.run_started_at)
@@ -454,18 +453,17 @@ const cancelDislike = () => {
       }
     }
 
-    .time-entry-btn {
-      margin-left: auto;
-      min-width: 52px;
-      color: var(--gray-500);
+    .time-entry {
+      color: var(--gray-400);
       font-variant-numeric: tabular-nums;
+      user-select: none;
 
-      &:hover {
-        color: var(--gray-800);
-      }
+      &.toggleable {
+        cursor: pointer;
 
-      &.is-duration {
-        color: var(--main-700);
+        &:hover {
+          color: var(--gray-700);
+        }
       }
     }
   }
