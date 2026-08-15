@@ -142,11 +142,13 @@
       </div>
     </div>
 
-    <FileSearchModal
+    <GlobalSearchModal
       v-model:open="fileSearchOpen"
-      placeholder="搜索当前对话的文件..."
-      :search="searchThreadFiles"
-      @select="handleSearchSelect"
+      :modes="['file']"
+      default-mode="file"
+      :file-search="searchThreadFiles"
+      file-placeholder="搜索当前对话的文件..."
+      @select-file="handleSearchSelect"
     />
   </div>
 </template>
@@ -157,7 +159,7 @@ import { Download, Folders, PanelRight, RefreshCw, Search, Trash2, X } from 'luc
 import { Modal, message } from 'ant-design-vue'
 import FileTreeComponent from '@/components/FileTreeComponent.vue'
 import AgentFilePreview from '@/components/AgentFilePreview.vue'
-import FileSearchModal from '@/components/FileSearchModal.vue'
+import GlobalSearchModal from '@/components/GlobalSearchModal.vue'
 import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
 import {
   deleteViewerFile,

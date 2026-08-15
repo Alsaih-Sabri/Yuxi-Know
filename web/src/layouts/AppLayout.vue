@@ -28,7 +28,8 @@ import DebugComponent from '@/components/DebugComponent.vue'
 import TaskCenterDrawer from '@/components/TaskCenterDrawer.vue'
 import SettingsModal from '@/components/SettingsModal.vue'
 import ConversationNavSection from '@/components/ConversationNavSection.vue'
-import ConversationSearchModal from '@/components/ConversationSearchModal.vue'
+import GlobalSearchModal from '@/components/GlobalSearchModal.vue'
+import { searchWorkspaceFiles } from '@/apis/workspace_api'
 
 const configStore = useConfigStore()
 const agentStore = useAgentStore()
@@ -248,6 +249,14 @@ const handleCreateConversationFromSearch = () => {
   router.push({ name: 'AgentComp' })
 }
 
+const searchWorkspace = (query) => searchWorkspaceFiles(query)
+
+// 侧边栏搜索到工作区文件后跳转到工作区并打开对应文件
+const handleSearchSelectFile = (entry) => {
+  if (!entry?.path) return
+  router.push({ name: 'WorkspaceComp', query: { open: entry.path } })
+}
+
 const handleDeleteChat = async (threadId) => {
   if (!threadId) return
   try {
@@ -444,12 +453,17 @@ provide('settingsModal', {
       <component :is="Component" v-else />
     </router-view>
 
-    <ConversationSearchModal
+    <GlobalSearchModal
       v-model:open="conversationSearchOpen"
+      :modes="['conversation', 'file']"
+      default-mode="conversation"
       :recent-threads="threads"
+      :file-search="searchWorkspace"
+      file-placeholder="搜索工作区文件..."
       @select-thread="handleSearchSelectThread"
       @create-thread="handleCreateConversationFromSearch"
       @thread-found="handleSearchThreadFound"
+      @select-file="handleSearchSelectFile"
     />
 
     <!-- Debug Modal -->

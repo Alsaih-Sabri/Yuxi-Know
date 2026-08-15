@@ -39,11 +39,13 @@
       @change="handleUploadInputChange"
     />
 
-    <FileSearchModal
+    <GlobalSearchModal
       v-model:open="fileSearchOpen"
-      placeholder="搜索工作区文件..."
-      :search="searchWorkspace"
-      @select="handleFileSearchSelect"
+      :modes="['file']"
+      default-mode="file"
+      :file-search="searchWorkspace"
+      file-placeholder="搜索工作区文件..."
+      @select-file="handleFileSearchSelect"
     />
 
     <div class="workspace-shell" :class="{ 'is-sidebar-collapsed': sidebarCollapsed }">
@@ -213,6 +215,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import { ChevronLeft, ChevronRight, CircleHelp, LibraryBig, Search } from 'lucide-vue-next'
 import PageHeader from '@/components/shared/PageHeader.vue'
@@ -235,10 +238,11 @@ import {
   searchWorkspaceFiles,
   uploadWorkspaceFiles
 } from '@/apis/workspace_api'
-import FileSearchModal from '@/components/FileSearchModal.vue'
+import GlobalSearchModal from '@/components/GlobalSearchModal.vue'
 import { normalizePreviewResponse } from '@/utils/file_preview'
 
 const userStore = useUserStore()
+const route = useRoute()
 
 const activeSourceKey = ref('personal')
 const currentPath = ref('/')
@@ -252,6 +256,15 @@ const handleFileSearchSelect = async (entry) => {
   const parentPath = entry.path.replace(/\/[^/]+$/, '') || '/'
   await selectWorkspacePath(parentPath)
   const matched = entries.value.find((item) => item.path === entry.path)
+  if (matched) await loadWorkspacePreview(matched)
+}
+
+// 侧边栏全局搜索选中工作区文件后，通过 query 跳转打开对应文件
+const openFileByPath = async (path) => {
+  if (!path) return
+  const parentPath = String(path).replace(/\/[^/]+$/, '') || '/'
+  await selectWorkspacePath(parentPath)
+  const matched = entries.value.find((item) => item.path === String(path))
   if (matched) await loadWorkspacePreview(matched)
 }
 const knowledgeBreadcrumbItems = ref([])
@@ -932,7 +945,17 @@ onMounted(async () => {
     })
     workspaceResizeObserver.observe(workspaceMainRef.value)
   }
+
+  // 侧边栏全局搜索跳转后打开指定文件
+  await openFileByPath(route.query.open)
 })
+
+watch(
+  () => route.query.open,
+  (path) => {
+    if (path) openFileByPath(path)
+  }
+)
 
 onUnmounted(() => {
   workspaceResizeObserver?.disconnect()
