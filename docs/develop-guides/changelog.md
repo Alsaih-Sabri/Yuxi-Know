@@ -10,6 +10,9 @@
 1. 升级到 v0.7.2 后，管理员此前创建的 stdio MCP 会被禁用，也无法重新启用。请在详情页迁移为 SSE 或 Streamable HTTP，或直接删除；代码内置的系统 stdio MCP 不受影响。
 :::
 
+- 清理测试套件冗余：删除 5 个自证式/假绿/重复覆盖的测试文件（`test_hash_utils`、`test_skills_backend_error_handling`、`test_graph_router_list`、`test_agent_sync_e2e`、`test_viewer_filesystem_e2e`），合并约 50 个文件的重复场景与参数转发断言，抽取 eval 与 e2e 共享 helper；净减约 2,900 行测试代码，真实回归覆盖不变。
+
+
 - 完善 Agent Token 用量统计：state 同时保留近似上下文与主 Agent 模型返回的 Provider `usage_metadata`，实际用量拆分为最近调用、当前 Run 和线程累计；前端只读取 state，终态 chunk 不传递用量，worker 在 Run 终态时将父线程中 Run ID 匹配的 state 快照写入 AgentRun。支持 OpenAI priority/flex 缓存明细；L2 摘要内部调用暂未计入完整账单口径。
 - 对话输入草稿按线程保存：输入内容实时写入 localStorage（按线程 ID 区分），切换对话时保存旧线程草稿并还原新线程草稿，新建对话使用独立草稿、发送创建线程后自动清理，刷新页面后草稿仍可还原，删除对话时同步清理对应草稿。
 - 对话消息补充时间信息：历史接口为 assistant 消息附上关联 run 的 started_at/finished_at；复制按钮右侧以纯文本显示消息完成时间，点击切换为执行耗时（如"耗时 5s"）再点切回，无背景色块与时钟图标；时间按相对规则展示（今天 HH:mm、昨天、一周内周几、更早显示日期、跨年补全年份）。流式生成时 loading 旁实时显示已执行时长，loading 指示器去除背景色块并改为轻微呼吸的文字样式。
