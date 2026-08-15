@@ -2,6 +2,10 @@
   <div class="workspace-view layout-container">
     <PageHeader title="工作区" :loading="loadingTree || loadingPreview" :show-border="true">
       <template #actions>
+        <a-button class="lucide-icon-btn" @click="fileSearchOpen = true">
+          <template #icon><Search :size="16" /></template>
+          搜索
+        </a-button>
         <a-button
           v-if="isAgentsWorkspacePath"
           class="lucide-icon-btn"
@@ -33,6 +37,13 @@
       type="file"
       multiple
       @change="handleUploadInputChange"
+    />
+
+    <FileSearchModal
+      v-model:open="fileSearchOpen"
+      placeholder="搜索工作区文件..."
+      :search="searchWorkspace"
+      @select="handleFileSearchSelect"
     />
 
     <div class="workspace-shell" :class="{ 'is-sidebar-collapsed': sidebarCollapsed }">
@@ -203,7 +214,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { ChevronLeft, ChevronRight, CircleHelp, LibraryBig } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, CircleHelp, LibraryBig, Search } from 'lucide-vue-next'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import AgentFilePreview from '@/components/AgentFilePreview.vue'
 import WorkspaceFileList from '@/components/workspace/WorkspaceFileList.vue'
@@ -221,14 +232,28 @@ import {
   getWorkspaceKnowledgeTree,
   getWorkspaceTree,
   saveWorkspaceFileContent,
+  searchWorkspaceFiles,
   uploadWorkspaceFiles
 } from '@/apis/workspace_api'
+import FileSearchModal from '@/components/FileSearchModal.vue'
 import { normalizePreviewResponse } from '@/utils/file_preview'
 
 const userStore = useUserStore()
 
 const activeSourceKey = ref('personal')
 const currentPath = ref('/')
+const fileSearchOpen = ref(false)
+
+const searchWorkspace = (query) => searchWorkspaceFiles(query)
+
+// 搜索命中后切到文件所在目录并打开预览
+const handleFileSearchSelect = async (entry) => {
+  if (!entry?.path) return
+  const parentPath = entry.path.replace(/\/[^/]+$/, '') || '/'
+  await selectWorkspacePath(parentPath)
+  const matched = entries.value.find((item) => item.path === entry.path)
+  if (matched) await loadWorkspacePreview(matched)
+}
 const knowledgeBreadcrumbItems = ref([])
 const workspaceBreadcrumbItems = ref(null)
 const threadTitleMap = ref({})

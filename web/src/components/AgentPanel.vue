@@ -34,6 +34,15 @@
       </div>
       <div class="window-actions">
         <button
+          class="header-action-btn"
+          title="搜索文件"
+          aria-label="搜索文件"
+          :disabled="!threadId"
+          @click="fileSearchOpen = true"
+        >
+          <Search :size="15" />
+        </button>
+        <button
           v-if="hasActivePreview"
           class="header-action-btn"
           :class="{ active: treePaneVisible }"
@@ -132,21 +141,30 @@
         </div>
       </div>
     </div>
+
+    <FileSearchModal
+      v-model:open="fileSearchOpen"
+      placeholder="搜索当前对话的文件..."
+      :search="searchThreadFiles"
+      @select="handleSearchSelect"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { Download, Folders, PanelRight, RefreshCw, Trash2, X } from 'lucide-vue-next'
+import { Download, Folders, PanelRight, RefreshCw, Search, Trash2, X } from 'lucide-vue-next'
 import { Modal, message } from 'ant-design-vue'
 import FileTreeComponent from '@/components/FileTreeComponent.vue'
 import AgentFilePreview from '@/components/AgentFilePreview.vue'
+import FileSearchModal from '@/components/FileSearchModal.vue'
 import FileTypeIcon from '@/components/common/FileTypeIcon.vue'
 import {
   deleteViewerFile,
   downloadViewerFile,
   getViewerFileContent,
-  getViewerFileSystemTree
+  getViewerFileSystemTree,
+  searchViewerFiles
 } from '@/apis/viewer_filesystem'
 import { normalizePreviewResponse } from '@/utils/file_preview'
 
@@ -205,6 +223,19 @@ const selectedKeys = ref([])
 const expandedKeys = ref([])
 const deletingPaths = ref(new Set())
 const isResizing = ref(false)
+const fileSearchOpen = ref(false)
+
+// 顶层需要预取子项的目录：outputs/uploads 为空时不展示，workspace 默认展开
+const PREFETCH_DIRECTORY_NAMES = ['outputs', 'uploads', 'workspace']
+const HIDE_WHEN_EMPTY_NAMES = ['outputs', 'uploads']
+
+const searchThreadFiles = (query) => searchViewerFiles(props.threadId, query)
+
+const handleSearchSelect = (entry) => {
+  if (!entry?.path || !props.threadId) return
+  selectedKeys.value = [entry.path]
+  emit('open-preview', { ...entry, type: 'file' }, true)
+}
 
 const normalizedPreviewTabs = computed(() =>
   (props.previewTabs || [])
@@ -367,10 +398,37 @@ const refreshFileSystem = async () => {
         (entry) => entry?.is_dir && entry.name === DISPLAY_ROOT_DIRECTORY_NAME
       )
 
-      dynamicTreeData.value = displayRootEntry
+      let nodes = displayRootEntry
         ? await loadDirectoryChildren(displayRootEntry.path)
         : []
-      expandedKeys.value = []
+
+      // 预取关键目录子项：空的 outputs/uploads 不展示，workspace 默认展开
+      const prefetched = await Promise.all(
+        nodes.map(async (node) => {
+          if (!PREFETCH_DIRECTORY_NAMES.includes(node.title)) return { node, children: null }
+          let children = null
+          try {
+            children = await loadDirectoryChildren(node.key)
+          } catch (error) {
+            console.error('Failed to prefetch children for', node.key, error)
+          }
+          return { node, children }
+        })
+      )
+
+      nodes = prefetched.reduce((visible, { node, children }) => {
+        if (children === null) {
+          visible.push(node)
+        } else if (children.length || !HIDE_WHEN_EMPTY_NAMES.includes(node.title)) {
+          visible.push({ ...node, children })
+        }
+        return visible
+      }, [])
+
+      dynamicTreeData.value = nodes
+      expandedKeys.value = nodes
+        .filter((node) => node.title === 'workspace' && node.children?.length)
+        .map((node) => node.key)
       selectedKeys.value = props.activePreviewPath ? [props.activePreviewPath] : []
     } else {
       dynamicTreeData.value = []

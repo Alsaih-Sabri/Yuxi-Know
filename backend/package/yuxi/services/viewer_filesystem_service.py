@@ -279,6 +279,57 @@ async def _resolve_viewer_state(
     return sandbox_backend, skills_backend, selected_skills
 
 
+async def _list_viewer_directory_entries(
+    sandbox_backend,
+    skills_backend,
+    selected_skills,
+    *,
+    thread_id: str,
+    current_user: User,
+    normalized_path: str,
+) -> list[dict]:
+    """列出 viewer 命名空间内单个目录的条目，根目录返回虚拟命名空间入口。"""
+    if normalized_path == "/":
+        # 根目录只显示 viewer 暴露的虚拟命名空间，避免为只读树视图触发 sandbox 冷启动。
+        entries = [
+            {"path": f"{USER_DATA_PATH}/", "name": "user-data", "is_dir": True, "size": 0, "modified_at": ""}
+        ]
+        if selected_skills:
+            entries.append({"path": f"{SKILLS_PATH}/", "name": "skills", "is_dir": True, "size": 0, "modified_at": ""})
+        return entries
+
+    try:
+        if _is_user_data_path(normalized_path):
+            uid = str(current_user.uid)
+            ensure_thread_dirs(thread_id, uid)
+            if _is_workspace_path(normalized_path):
+                response = await list_workspace_tree(
+                    path=_workspace_relative_path(normalized_path),
+                    current_user=current_user,
+                )
+                return [_viewer_entry_from_workspace_entry(entry) for entry in response.get("entries", [])]
+            if normalized_path == USER_DATA_PATH:
+                return await asyncio.to_thread(_list_user_data_root_entries, thread_id, uid)
+            actual_path = _resolve_local_user_data_path(thread_id, uid, normalized_path)
+            if not actual_path.exists():
+                return []
+            if not actual_path.is_dir():
+                raise HTTPException(status_code=400, detail="当前路径不是目录")
+            return await asyncio.to_thread(_list_local_entries, thread_id, uid, actual_path)
+
+        if _is_skills_path(normalized_path):
+            result = await asyncio.to_thread(skills_backend.ls, _strip_skills_prefix(normalized_path))
+            if result.error:
+                raise HTTPException(status_code=400, detail=result.error)
+            return [_remap_prefixed_entry(entry, SKILLS_PATH) for entry in (result.entries or [])]
+    except PermissionError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+
+    raise HTTPException(status_code=400, detail=f"Access denied: '{normalized_path}' is outside viewer namespace")
+
+
 async def list_viewer_filesystem_tree(
     *,
     thread_id: str,
@@ -295,53 +346,63 @@ async def list_viewer_filesystem_tree(
         current_user=current_user,
         db=db,
     )
+    entries = await _list_viewer_directory_entries(
+        sandbox_backend,
+        skills_backend,
+        selected_skills,
+        thread_id=thread_id,
+        current_user=current_user,
+        normalized_path=normalized_path,
+    )
+    return {"entries": _sort_entries(entries)}
 
-    if normalized_path == "/":
-        # 根目录只显示 viewer 暴露的虚拟命名空间，避免为只读树视图触发 sandbox 冷启动。
-        entries = []
 
-        entries.append(
-            {"path": f"{USER_DATA_PATH}/", "name": "user-data", "is_dir": True, "size": 0, "modified_at": ""}
+# 搜索保护上限：匹配条数与遍历目录数，避免异常大的目录树拖垮请求
+SEARCH_MAX_RESULTS = 100
+SEARCH_MAX_DIRECTORIES = 600
+
+
+async def search_viewer_files(
+    *,
+    thread_id: str,
+    query: str,
+    current_user: User,
+    db: AsyncSession,
+) -> dict:
+    """按文件名在 viewer 命名空间内递归搜索，仅返回文件条目。"""
+    if not thread_id:
+        raise HTTPException(status_code=422, detail="thread_id 不能为空")
+
+    normalized_query = (query or "").strip().lower()
+    if not normalized_query:
+        return {"entries": []}
+
+    sandbox_backend, skills_backend, selected_skills = await _resolve_viewer_state(
+        thread_id=thread_id,
+        current_user=current_user,
+        db=db,
+    )
+
+    matches: list[dict] = []
+    pending: list[str] = ["/"]
+    visited_directories = 0
+    while pending and len(matches) < SEARCH_MAX_RESULTS and visited_directories < SEARCH_MAX_DIRECTORIES:
+        directory_path = pending.pop(0)
+        visited_directories += 1
+        entries = await _list_viewer_directory_entries(
+            sandbox_backend,
+            skills_backend,
+            selected_skills,
+            thread_id=thread_id,
+            current_user=current_user,
+            normalized_path=directory_path,
         )
-        if selected_skills:
-            entries.append({"path": f"{SKILLS_PATH}/", "name": "skills", "is_dir": True, "size": 0, "modified_at": ""})
-
-        return {"entries": _sort_entries(entries)}
-
-    try:
-        if _is_user_data_path(normalized_path):
-            uid = str(current_user.uid)
-            ensure_thread_dirs(thread_id, uid)
-            if _is_workspace_path(normalized_path):
-                response = await list_workspace_tree(
-                    path=_workspace_relative_path(normalized_path),
-                    current_user=current_user,
-                )
-                entries = [_viewer_entry_from_workspace_entry(entry) for entry in response.get("entries", [])]
-                return {"entries": _sort_entries(entries)}
-            if normalized_path == USER_DATA_PATH:
-                entries = await asyncio.to_thread(_list_user_data_root_entries, thread_id, uid)
-                return {"entries": _sort_entries(entries)}
-            actual_path = _resolve_local_user_data_path(thread_id, uid, normalized_path)
-            if not actual_path.exists():
-                return {"entries": []}
-            if not actual_path.is_dir():
-                raise HTTPException(status_code=400, detail="当前路径不是目录")
-            entries = await asyncio.to_thread(_list_local_entries, thread_id, uid, actual_path)
-            return {"entries": _sort_entries(entries)}
-
-        if _is_skills_path(normalized_path):
-            result = await asyncio.to_thread(skills_backend.ls, _strip_skills_prefix(normalized_path))
-            if result.error:
-                raise HTTPException(status_code=400, detail=result.error)
-            remapped = [_remap_prefixed_entry(entry, SKILLS_PATH) for entry in (result.entries or [])]
-            return {"entries": _sort_entries(remapped)}
-    except PermissionError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except ValueError as e:
-        raise HTTPException(status_code=422, detail=str(e)) from e
-
-    raise HTTPException(status_code=400, detail=f"Access denied: '{normalized_path}' is outside viewer namespace")
+        for entry in entries:
+            if entry.get("is_dir"):
+                pending.append(str(entry.get("path") or "").rstrip("/"))
+            elif normalized_query in str(entry.get("name") or "").lower():
+                matches.append(entry)
+    return {"entries": matches}
 
 
 async def read_viewer_file_content(

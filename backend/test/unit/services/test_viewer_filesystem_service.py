@@ -158,3 +158,39 @@ async def test_read_viewer_outputs_office_conversion_failure_returns_400(
 
     assert exc_info.value.status_code == 400
     assert "转换 PDF 失败" in exc_info.value.detail
+
+
+@pytest.mark.asyncio
+async def test_search_viewer_files_matches_filenames_recursively(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAVE_DIR", str(tmp_path))
+    thread_id = "thread-1"
+    uid = "user-1"
+    user = SimpleNamespace(uid=uid)
+    sandbox_paths.ensure_thread_dirs(thread_id, uid)
+    outputs_dir = sandbox_paths.sandbox_outputs_dir(thread_id)
+    (outputs_dir / "年度报告.docx").write_bytes(b"report")
+    nested_dir = outputs_dir / "分组"
+    nested_dir.mkdir()
+    (nested_dir / "record-2026.md").write_text("record", encoding="utf-8")
+
+    async def fake_resolve_viewer_state(**kwargs):
+        return None, None, []
+
+    monkeypatch.setattr(svc, "_resolve_viewer_state", fake_resolve_viewer_state)
+
+    response = await svc.search_viewer_files(
+        thread_id=thread_id, query="record", current_user=user, db=None
+    )
+    assert [entry["name"] for entry in response["entries"]] == ["record-2026.md"]
+    assert response["entries"][0]["path"] == "/home/gem/user-data/outputs/分组/record-2026.md"
+
+    chinese_response = await svc.search_viewer_files(
+        thread_id=thread_id, query="报告", current_user=user, db=None
+    )
+    assert [entry["name"] for entry in chinese_response["entries"]] == ["年度报告.docx"]
+
+    empty = await svc.search_viewer_files(thread_id=thread_id, query="  ", current_user=user, db=None)
+    assert empty["entries"] == []

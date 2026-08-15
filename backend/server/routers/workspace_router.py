@@ -18,6 +18,7 @@ from yuxi.services.workspace_service import (
     is_workspace_chat_path,
     list_workspace_tree,
     read_workspace_file_content,
+    search_workspace_files,
     upload_workspace_files,
     workspace_path_uses_chat_mapping,
     write_workspace_file_content,
@@ -115,6 +116,14 @@ async def get_workspace_tree(
         current_user=current_user,
         thread_titles=thread_titles,
     )
+
+
+@workspace.get("/search", response_model=dict)
+async def search_workspace_files_route(
+    query: str = Query(..., description="搜索关键词"),
+    current_user: User = Depends(get_required_user),
+):
+    return await search_workspace_files(query=query, current_user=current_user)
 
 
 def _binary_preview_response(data: dict) -> StreamingResponse:
