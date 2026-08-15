@@ -194,3 +194,36 @@ async def test_search_viewer_files_matches_filenames_recursively(
 
     empty = await svc.search_viewer_files(thread_id=thread_id, query="  ", current_user=user, db=None)
     assert empty["entries"] == []
+
+
+@pytest.mark.asyncio
+async def test_search_viewer_files_skips_unreadable_directories(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("SAVE_DIR", str(tmp_path))
+    thread_id = "thread-1"
+    user = SimpleNamespace(uid="user-1")
+
+    async def fake_resolve_viewer_state(**kwargs):
+        return None, None, []
+
+    visited: list[str] = []
+
+    async def flaky_listing(*args, **kwargs):
+        normalized_path = kwargs["normalized_path"]
+        visited.append(normalized_path)
+        if normalized_path == "/":
+            return [{"path": "/home/gem/user-data/workspace", "name": "workspace", "is_dir": True}]
+        if normalized_path == "/home/gem/user-data/workspace":
+            raise HTTPException(status_code=400, detail="目录不可读")
+        return []
+
+    monkeypatch.setattr(svc, "_resolve_viewer_state", fake_resolve_viewer_state)
+    monkeypatch.setattr(svc, "_list_viewer_directory_entries", flaky_listing)
+
+    response = await svc.search_viewer_files(
+        thread_id=thread_id, query="anything", current_user=user, db=None
+    )
+    assert response["entries"] == []
+    assert "/home/gem/user-data/workspace" in visited

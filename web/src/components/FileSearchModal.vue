@@ -61,6 +61,8 @@
             </button>
           </div>
 
+          <div v-else-if="searchError" class="file-search-error">{{ searchError }}</div>
+
           <div v-else-if="!isSearching" class="file-search-empty">未找到相关文件</div>
         </div>
       </section>
@@ -100,6 +102,7 @@ const searchText = ref('')
 const results = ref([])
 const selectedIndex = ref(0)
 const isSearching = ref(false)
+const searchError = ref('')
 let searchTimer = null
 let searchRequestId = 0
 
@@ -112,6 +115,7 @@ const resetState = () => {
   results.value = []
   selectedIndex.value = 0
   isSearching.value = false
+  searchError.value = ''
 }
 
 const close = () => {
@@ -140,6 +144,7 @@ const selectResult = (item) => {
 const searchFiles = async (query) => {
   const requestId = ++searchRequestId
   isSearching.value = true
+  searchError.value = ''
   try {
     const response = await props.search(query)
     if (requestId !== searchRequestId) return
@@ -149,6 +154,7 @@ const searchFiles = async (query) => {
     if (requestId === searchRequestId) {
       console.warn('搜索文件失败:', error)
       results.value = []
+      searchError.value = error?.message || '搜索失败，请重试'
     }
   } finally {
     if (requestId === searchRequestId) isSearching.value = false
@@ -409,6 +415,13 @@ const splitName = (item) => {
 .file-search-empty {
   padding: 48px 16px;
   color: var(--gray-500);
+  font-size: 14px;
+  text-align: center;
+}
+
+.file-search-error {
+  padding: 48px 16px;
+  color: var(--color-error-500, #ff4d4f);
   font-size: 14px;
   text-align: center;
 }

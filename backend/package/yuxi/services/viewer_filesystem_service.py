@@ -51,6 +51,7 @@ from yuxi.services.workspace_service import (
 )
 from yuxi.storage.postgres.models_business import User
 from yuxi.utils.datetime_utils import utc_isoformat_from_timestamp
+from yuxi.utils.logging_config import logger
 from yuxi.utils.paths import VIRTUAL_PATH_OUTPUTS, VIRTUAL_PATH_UPLOADS, VIRTUAL_PATH_WORKSPACE
 
 _PROTECTED_USER_DATA_ROOTS = frozenset(
@@ -389,20 +390,24 @@ async def search_viewer_files(
     while pending and len(matches) < SEARCH_MAX_RESULTS and visited_directories < SEARCH_MAX_DIRECTORIES:
         directory_path = pending.pop(0)
         visited_directories += 1
-        entries = await _list_viewer_directory_entries(
-            sandbox_backend,
-            skills_backend,
-            selected_skills,
-            thread_id=thread_id,
-            current_user=current_user,
-            normalized_path=directory_path,
-        )
+        try:
+            entries = await _list_viewer_directory_entries(
+                sandbox_backend,
+                skills_backend,
+                selected_skills,
+                thread_id=thread_id,
+                current_user=current_user,
+                normalized_path=directory_path,
+            )
+        except HTTPException as exc:
+            logger.warning("搜索时跳过无法访问的目录 %s: %s", directory_path, exc.detail)
+            continue
         for entry in entries:
             if entry.get("is_dir"):
                 pending.append(str(entry.get("path") or "").rstrip("/"))
             elif normalized_query in str(entry.get("name") or "").lower():
                 matches.append(entry)
-    return {"entries": matches}
+    return {"entries": _sort_entries(matches)}
 
 
 async def read_viewer_file_content(
