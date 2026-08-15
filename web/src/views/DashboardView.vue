@@ -9,7 +9,7 @@
     </div>
 
     <!-- Grid布局的主要内容区域 -->
-    <div class="dashboard-grid">
+    <div class="dashboard-grid" :class="{ 'without-knowledge': !knowledgeEnabled }">
       <!-- 调用统计模块 - 占据2x1网格 -->
       <CallStatsComponent :loading="loading" ref="callStatsRef" />
 
@@ -41,7 +41,7 @@
       </div>
 
       <!-- 知识库使用情况 - 占据1x1网格 -->
-      <div class="grid-item knowledge-stats">
+      <div v-if="knowledgeEnabled" class="grid-item knowledge-stats">
         <KnowledgeStatsComponent
           :knowledge-stats="allStatsData?.knowledge"
           :loading="loading"
@@ -57,8 +57,10 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
 import { message } from 'ant-design-vue'
 import { dashboardApi } from '@/apis/dashboard_api'
+import { useRuntimeCapabilitiesStore } from '@/stores/runtimeCapabilities'
 
 // 导入子组件
 import StatusBar from '@/components/StatusBar.vue'
@@ -72,6 +74,8 @@ import FeedbackModalComponent from '@/components/dashboard/FeedbackModalComponen
 
 // 组件引用
 const feedbackModal = ref(null)
+const runtimeCapabilitiesStore = useRuntimeCapabilitiesStore()
+const { knowledgeEnabled } = storeToRefs(runtimeCapabilitiesStore)
 
 // 统计数据 - 使用新的响应式结构
 const basicStats = ref({})
@@ -99,7 +103,9 @@ const loadAllStats = async () => {
   loading.value = true
   try {
     // 使用并行API调用获取所有统计数据
-    const response = await dashboardApi.getAllStats()
+    const response = await dashboardApi.getAllStats({
+      includeKnowledge: knowledgeEnabled.value
+    })
 
     // 更新基础统计数据
     basicStats.value = response.basic
@@ -147,8 +153,9 @@ const cleanupCharts = () => {
 }
 
 // 初始化
-onMounted(() => {
-  loadAllStats()
+onMounted(async () => {
+  await runtimeCapabilitiesStore.ensureLoaded()
+  await loadAllStats()
 })
 
 // 组件卸载时清理图表
@@ -222,6 +229,10 @@ onUnmounted(() => {
       grid-row: 2 / 3;
       min-height: 350px;
     }
+  }
+
+  &.without-knowledge .grid-item.tool-stats {
+    grid-column: 2 / 4;
   }
 }
 
@@ -390,6 +401,10 @@ onUnmounted(() => {
         min-height: 300px;
       }
     }
+
+    &.without-knowledge .grid-item.tool-stats {
+      grid-column: 1 / 3;
+    }
   }
 }
 
@@ -412,6 +427,10 @@ onUnmounted(() => {
         grid-row: auto;
         min-height: 300px;
       }
+    }
+
+    &.without-knowledge .grid-item.tool-stats {
+      grid-column: 1 / 2;
     }
   }
 

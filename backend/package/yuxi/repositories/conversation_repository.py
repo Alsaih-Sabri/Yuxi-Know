@@ -198,6 +198,7 @@ class ConversationRepository:
         run_id: str | None = None,
         request_id: str | None = None,
         delivery_status: str = "complete",
+        commit: bool = True,
     ) -> Message:
         message = Message(
             conversation_id=conversation_id,
@@ -216,10 +217,12 @@ class ConversationRepository:
         if conversation:
             conversation.updated_at = utc_now_naive()
 
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(message)
 
         await self._update_message_count(conversation_id)
+        if commit:
+            await self.db.commit()
 
         logger.debug(f"Added {role} message to conversation {conversation_id}")
         return message
@@ -235,6 +238,7 @@ class ConversationRepository:
         run_id: str | None = None,
         request_id: str | None = None,
         delivery_status: str = "complete",
+        commit: bool = True,
     ) -> Message | None:
         conversation = await self.get_conversation_by_thread_id(thread_id)
         if not conversation:
@@ -251,6 +255,7 @@ class ConversationRepository:
             run_id=run_id,
             request_id=request_id,
             delivery_status=delivery_status,
+            commit=commit,
         )
 
     async def add_tool_call(
@@ -262,6 +267,7 @@ class ConversationRepository:
         status: str = "pending",
         error_message: str | None = None,
         langgraph_tool_call_id: str | None = None,
+        commit: bool = True,
     ) -> ToolCall:
         if langgraph_tool_call_id:
             existing = await self.get_tool_call_by_langgraph_id(langgraph_tool_call_id)
@@ -283,8 +289,10 @@ class ConversationRepository:
         )
 
         self.db.add(tool_call)
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(tool_call)
+        if commit:
+            await self.db.commit()
 
         logger.debug(f"Added tool call {tool_name} to message {message_id}")
         return tool_call
@@ -554,6 +562,7 @@ class ConversationRepository:
         tool_output: str,
         status: str = "success",
         error_message: str | None = None,
+        commit: bool = True,
     ) -> ToolCall | None:
         tool_call = await self.get_tool_call_by_langgraph_id(langgraph_tool_call_id)
         if not tool_call:
@@ -565,8 +574,10 @@ class ConversationRepository:
         if error_message:
             tool_call.error_message = error_message
 
-        await self.db.commit()
+        await self.db.flush()
         await self.db.refresh(tool_call)
+        if commit:
+            await self.db.commit()
 
         logger.debug(f"Updated tool call {langgraph_tool_call_id} with output")
         return tool_call
@@ -579,7 +590,7 @@ class ConversationRepository:
             result = await self.db.execute(select(func.count()).where(Message.conversation_id == conversation_id))
             message_count = result.scalar()
             stats.message_count = message_count
-            await self.db.commit()
+            await self.db.flush()
 
     async def get_attachments(self, conversation_id: int) -> list[dict]:
         conversation = await self.get_conversation_by_id(conversation_id)

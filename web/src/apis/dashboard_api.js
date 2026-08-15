@@ -95,24 +95,27 @@ export const dashboardApi = {
 
   /**
    * 批量获取所有统计数据（并行请求）
+   * @param {Object} options - 当前运行时能力
+   * @param {boolean} options.includeKnowledge - 是否请求知识库统计
    * @returns {Promise<Object>} - 所有统计数据
    */
-  getAllStats: async () => {
+  getAllStats: async ({ includeKnowledge = false } = {}) => {
     try {
-      const [basicStats, userStats, toolStats, knowledgeStats, agentStats] = await Promise.all([
-        apiAdminGet('/api/dashboard/stats'),
-        apiAdminGet('/api/dashboard/stats/users'),
-        apiAdminGet('/api/dashboard/stats/tools'),
-        apiAdminGet('/api/dashboard/stats/knowledge'),
-        apiAdminGet('/api/dashboard/stats/agents')
-      ])
+      const requests = {
+        basic: apiAdminGet('/api/dashboard/stats'),
+        users: apiAdminGet('/api/dashboard/stats/users'),
+        tools: apiAdminGet('/api/dashboard/stats/tools'),
+        agents: apiAdminGet('/api/dashboard/stats/agents')
+      }
+      if (includeKnowledge) {
+        requests.knowledge = apiAdminGet('/api/dashboard/stats/knowledge')
+      }
 
+      const entries = Object.entries(requests)
+      const values = await Promise.all(entries.map(([, request]) => request))
       return {
-        basic: basicStats,
-        users: userStats,
-        tools: toolStats,
-        knowledge: knowledgeStats,
-        agents: agentStats
+        knowledge: null,
+        ...Object.fromEntries(entries.map(([name], index) => [name, values[index]]))
       }
     } catch (error) {
       console.error('批量获取统计数据失败:', error)

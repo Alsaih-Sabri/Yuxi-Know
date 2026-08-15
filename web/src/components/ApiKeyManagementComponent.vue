@@ -92,6 +92,7 @@
       v-model:open="createModalVisible"
       title="创建 API Key"
       @ok="handleCreate"
+      @cancel="handleCreateCancel"
       :confirmLoading="createLoading"
       ok-text="创建"
       cancel-text="取消"
@@ -155,6 +156,8 @@ const createModalVisible = ref(false)
 const secretModalVisible = ref(false)
 const createLoading = ref(false)
 const createdSecret = ref('')
+const createRequestId = ref('')
+const CREATE_REQUEST_STORAGE_KEY = 'yuxi_pending_api_key_request_id'
 
 const createForm = reactive({
   name: '',
@@ -204,7 +207,15 @@ const handleRefresh = async () => {
 const showCreateModal = () => {
   createForm.name = ''
   createForm.expires_at = null
+  createRequestId.value =
+    sessionStorage.getItem(CREATE_REQUEST_STORAGE_KEY) || globalThis.crypto.randomUUID()
+  sessionStorage.setItem(CREATE_REQUEST_STORAGE_KEY, createRequestId.value)
   createModalVisible.value = true
+}
+
+const handleCreateCancel = () => {
+  sessionStorage.removeItem(CREATE_REQUEST_STORAGE_KEY)
+  createRequestId.value = ''
 }
 
 const handleCreate = async () => {
@@ -215,12 +226,14 @@ const handleCreate = async () => {
 
   createLoading.value = true
   try {
-    const data = { name: createForm.name }
+    const data = { name: createForm.name, request_id: createRequestId.value }
     if (createForm.expires_at) {
       data.expires_at = createForm.expires_at.format('YYYY-MM-DDTHH:mm:ss')
     }
 
     const res = await apikeyApi.create(data)
+    sessionStorage.removeItem(CREATE_REQUEST_STORAGE_KEY)
+    createRequestId.value = ''
     createdSecret.value = res.secret
     createModalVisible.value = false
     secretModalVisible.value = true

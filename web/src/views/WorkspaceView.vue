@@ -50,6 +50,7 @@
           :current-path="currentPath"
           :databases="databases"
           :loading-databases="loadingDatabases"
+          :knowledge-enabled="knowledgeEnabled"
           :current-uid="userStore.uid"
           @select-personal="selectPersonalWorkspace"
           @select-database="selectDatabase"
@@ -202,6 +203,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
 import { ChevronLeft, ChevronRight, CircleHelp, LibraryBig } from 'lucide-vue-next'
 import PageHeader from '@/components/shared/PageHeader.vue'
@@ -211,6 +213,7 @@ import WorkspacePreviewPane from '@/components/workspace/WorkspacePreviewPane.vu
 import WorkspaceSidebar from '@/components/workspace/WorkspaceSidebar.vue'
 import { databaseApi } from '@/apis/knowledge_api'
 import { useUserStore } from '@/stores/user'
+import { useRuntimeCapabilitiesStore } from '@/stores/runtimeCapabilities'
 import {
   createWorkspaceDirectory,
   deleteWorkspacePath,
@@ -226,6 +229,8 @@ import {
 import { normalizePreviewResponse } from '@/utils/file_preview'
 
 const userStore = useUserStore()
+const runtimeCapabilitiesStore = useRuntimeCapabilitiesStore()
+const { knowledgeEnabled } = storeToRefs(runtimeCapabilitiesStore)
 
 const activeSourceKey = ref('personal')
 const currentPath = ref('/')
@@ -541,6 +546,10 @@ const loadKnowledgeEntries = async (
 }
 
 const loadDatabases = async () => {
+  if (!knowledgeEnabled.value) {
+    databases.value = []
+    return
+  }
   loadingDatabases.value = true
   try {
     const response = await databaseApi.getAccessibleDatabases()
@@ -896,7 +905,10 @@ const startPreviewResize = (event) => {
 let workspaceResizeObserver = null
 
 onMounted(async () => {
-  await Promise.all([loadWorkspaceEntries('/'), loadDatabases()])
+  await runtimeCapabilitiesStore.ensureLoaded()
+  const initialRequests = [loadWorkspaceEntries('/')]
+  if (knowledgeEnabled.value) initialRequests.push(loadDatabases())
+  await Promise.all(initialRequests)
 
   if (workspaceMainRef.value && typeof ResizeObserver !== 'undefined') {
     workspaceMainWidth.value = workspaceMainRef.value.clientWidth || 0

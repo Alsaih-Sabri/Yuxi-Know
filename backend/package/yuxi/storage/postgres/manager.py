@@ -8,23 +8,19 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from psycopg_pool import AsyncConnectionPool
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-from sqlalchemy.orm import declarative_base
 from yuxi.storage.postgres.models_business import AGENT_RUN_TERMINAL_STATUSES, UNVIEWED_RUN_MARKER
 from yuxi.storage.postgres.models_business import Base as BusinessBase
 from yuxi.storage.postgres.models_knowledge import Base as KnowledgeBase
 from yuxi.utils import logger
 from yuxi.utils.singleton import SingletonMeta
 
-# 合并两个 Base
-CombinedBase = declarative_base()
 AGENT_RUN_TERMINAL_STATUS_SQL = ", ".join(f"'{status}'" for status in AGENT_RUN_TERMINAL_STATUSES)
-
-# 继承所有表
-for module in [KnowledgeBase, BusinessBase]:
-    for table_name in dir(module):
-        table = getattr(module, table_name)
-        if isinstance(table, type) and hasattr(table, "__tablename__"):
-            setattr(CombinedBase, table_name, table)
+AGENT_RUN_LEASE_SCHEMA_STATEMENTS = (
+    "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS worker_id VARCHAR(128)",
+    "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS heartbeat_at TIMESTAMP WITHOUT TIME ZONE",
+    "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMP WITHOUT TIME ZONE",
+    "CREATE INDEX IF NOT EXISTS ix_agent_runs_status_lease_expires ON agent_runs(status, lease_expires_at)",
+)
 
 
 class PostgresManager(metaclass=SingletonMeta):
@@ -615,6 +611,20 @@ class PostgresManager(metaclass=SingletonMeta):
             """,
             "DELETE FROM api_keys WHERE user_id IS NULL",
             "ALTER TABLE IF EXISTS api_keys ALTER COLUMN user_id SET NOT NULL",
+            "ALTER TABLE IF EXISTS api_keys ADD COLUMN IF NOT EXISTS request_id VARCHAR(64)",
+            "ALTER TABLE IF EXISTS api_keys ADD COLUMN IF NOT EXISTS intent_hash VARCHAR(64)",
+            "ALTER TABLE IF EXISTS api_keys ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMP WITHOUT TIME ZONE",
+            """
+            UPDATE api_keys AS api_key
+            SET is_enabled = FALSE,
+                revoked_at = COALESCE(api_key.revoked_at, users.deleted_at, CURRENT_TIMESTAMP)
+            FROM users
+            WHERE api_key.user_id = users.id
+              AND users.is_deleted <> 0
+              AND api_key.revoked_at IS NULL
+            """,
+            "CREATE UNIQUE INDEX IF NOT EXISTS ix_api_keys_request_id ON api_keys(request_id)",
+            "CREATE INDEX IF NOT EXISTS ix_api_keys_revoked_at ON api_keys(revoked_at)",
             "CREATE UNIQUE INDEX IF NOT EXISTS ix_agents_slug ON agents(slug)",
             "CREATE INDEX IF NOT EXISTS ix_agents_backend_id ON agents(backend_id)",
             "CREATE INDEX IF NOT EXISTS ix_agents_is_subagent ON agents(is_subagent)",
@@ -686,6 +696,7 @@ class PostgresManager(metaclass=SingletonMeta):
             "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS source VARCHAR(32) NOT NULL DEFAULT 'chat'",
             "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS channel VARCHAR(32) NOT NULL DEFAULT 'web'",
             "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS external_id VARCHAR(128)",
+            *AGENT_RUN_LEASE_SCHEMA_STATEMENTS,
             (
                 "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS "
                 "origin_metadata JSONB NOT NULL DEFAULT '{}'::jsonb"

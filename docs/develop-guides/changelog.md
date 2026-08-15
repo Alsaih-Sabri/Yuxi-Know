@@ -10,6 +10,9 @@
 1. 升级到 v0.7.2 后，管理员此前创建的 stdio MCP 会被禁用，也无法重新启用。请在详情页迁移为 SSE 或 Streamable HTTP，或直接删除；代码内置的系统 stdio MCP 不受影响。
 :::
 
+- 建立 Agent-first 工程信任系统：高风险主张在语义 Owner 处绑定负向 oracle、CI gate 与决策记录，审计视图从当前代码、测试、workflow 和决策派生；补齐 Web gate 和完整 unit inventory。API 分离 liveness/readiness；Run 输出只允许当前 lease owner 绑定同 conversation、Run 与 request 的 assistant Message，缺失或非法输出不能进入 completed；worker 以 attempt lease/heartbeat 识别失联并收敛为带 `worker_lease_expired` 原因的失败，PostgreSQL 取消事实与终态不再被 Redis 事件故障绕过。LITE startup 不创建或宣告知识能力，Web 从 runtime discovery 同步隐藏并停止请求不存在的能力；checkpoint 初始化不再静默改变持久化语义。
+- API Key 创建支持并发与响应丢失后的安全重放；删除用户、OIDC 恢复和旧库升级均保留不可复活 tombstone，API/CLI 创建与删除按 User 行锁串行化。三项安全密钥不可复用，Bash/PowerShell 均有原生负控。Web 错误对象不再携带任意服务端上下文。
+
 - 清理测试套件冗余：删除 5 个自证式/假绿/重复覆盖的测试文件（`test_hash_utils`、`test_skills_backend_error_handling`、`test_graph_router_list`、`test_agent_sync_e2e`、`test_viewer_filesystem_e2e`），合并约 50 个文件的重复场景与参数转发断言，抽取 eval 与 e2e 共享 helper；净减约 2,900 行测试代码，真实回归覆盖不变。
 
 

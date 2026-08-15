@@ -32,12 +32,13 @@ NEO4J_PASSWORD=
 MINIO_ACCESS_KEY=
 MINIO_SECRET_KEY=
 JWT_SECRET_KEY=
+API_KEY_DERIVATION_SECRET=
 YUXI_INSTANCE_ID=
 SANDBOX_PROVISIONER_TOKEN=
 SILICONFLOW_API_KEY=
 ```
 
-生产 Compose 会在前七项配置缺失或为空时拒绝启动，并提示具体变量名。`JWT_SECRET_KEY` 和 `SANDBOX_PROVISIONER_TOKEN` 均应至少使用 32 字节随机值并持久保存，可分别使用 `openssl rand -hex 32` 生成；两者不能复用。`YUXI_INSTANCE_ID` 应是每套部署稳定且唯一的实例标识。模型 API 密钥按实际使用的供应商配置。
+生产 Compose 会在前八项配置缺失或为空时拒绝启动，并提示具体变量名。`JWT_SECRET_KEY`、`API_KEY_DERIVATION_SECRET` 和 `SANDBOX_PROVISIONER_TOKEN` 均应至少使用 32 字节随机值并持久保存，可分别使用 `openssl rand -hex 32` 生成；三者不能复用，API/worker startup 也会执行该独立性检查。初始化脚本会拒绝短值和复用值，Linux/macOS 下把 `.env` 权限收紧为 `600`。`API_KEY_DERIVATION_SECRET` 决定幂等 API Key 的安全重放，升级时必须在重建 API/worker 前生成，之后轮换会使既有创建请求无法重放原 secret。`YUXI_INSTANCE_ID` 应是每套部署稳定且唯一的实例标识。模型 API 密钥按实际使用的供应商配置。
 
 ### 2. 启动服务
 
@@ -54,7 +55,10 @@ docker compose -f docker-compose.prod.yml --profile all up -d --build
 ### 3. 验证部署
 
 - Web 访问：http://localhost（直接通过 80 端口）
-- API 健康检查：`curl http://localhost/api/system/health`
+- API 进程存活：`curl http://localhost/api/system/health`
+- API 接流量就绪（启动完成、PostgreSQL/Redis 可用且兼容 worker 正在续租）：`curl http://localhost/api/system/ready`
+
+`/api/system/ready` 只证明核心运行依赖满足接流量条件，不替代登录、对话、知识库或 Agent Run 的真实业务链路验收。
 
 公开头像和 Agent 图片通过前端同源路径 `/minio/public/...` 读取，由 Nginx 只读代理到 MinIO 的 `public` bucket。无需也不应向公网开放 MinIO 的 `9000` 对象 API 或 `9001` 管理控制台；知识库等私有 bucket 不经过这个代理。需要使用独立静态资源域名时，可在 `.env.prod` 中设置 `MINIO_PUBLIC_URL=https://assets.example.com`，并在该域名侧保持同等的只读 bucket 限制。
 
@@ -85,7 +89,7 @@ PostgreSQL 可以在数据库容器内使用交互式命令修改，避免新密
 docker compose -f docker-compose.prod.yml exec postgres psql -U postgres -d yuxi -c '\password postgres'
 ```
 
-Neo4j 应使用 `cypher-shell` 的当前用户密码修改流程；MinIO 应使用 `mc admin` 或部署所采用的密钥管理流程。不要把真实密码写入文档、测试脚本或命令历史。完成凭据轮换并配置 `SANDBOX_PROVISIONER_TOKEN` 后，再执行下面的重建命令。
+Neo4j 应使用 `cypher-shell` 的当前用户密码修改流程；MinIO 应使用 `mc admin` 或部署所采用的密钥管理流程。不要把真实密码写入文档、测试脚本或命令历史。完成凭据轮换并分别配置 `API_KEY_DERIVATION_SECRET`、`SANDBOX_PROVISIONER_TOKEN` 后，再执行下面的重建命令。
 
 ### 更新代码
 
