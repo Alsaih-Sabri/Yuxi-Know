@@ -38,6 +38,13 @@ E2E_AGENT_SLUG_PREFIXES = (
 SAFE_THREAD_ID = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
+def _postgres_dsn() -> str:
+    """返回测试环境 PostgreSQL DSN（去掉 SQLAlchemy 驱动前缀）。"""
+    return os.getenv("POSTGRES_URL", "postgresql+asyncpg://postgres:postgres@postgres:5432/yuxi").replace(
+        "+asyncpg", ""
+    )
+
+
 def _is_pytest_resource(name: object) -> bool:
     """判断资源名称是否属于 pytest 约定的测试数据。"""
 
@@ -102,11 +109,52 @@ def remove_e2e_thread_storage(thread_id: str) -> None:
         shutil.rmtree(thread_root)
 
 
+async def _delete_e2e_run_rows(thread_ids: set[str]) -> None:
+    """删除 E2E 测试线程对应的 agent_runs 审计行。
+
+    线程删除 API 只软删对话，run 行作为审计事实不会级联；测试 run 若不
+    清理会永久残留并污染运行历史，因此按已识别（带 _yuxi_e2e 标记）的
+    线程 id 直接删除。外键链 agent_run_requests/messages/tool_calls/
+    message_feedbacks 均无级联，按叶子到根的顺序删除；attempt 由级联
+    外键一并删除。
+    """
+    if not thread_ids:
+        return
+    thread_ids_list = sorted(thread_ids)
+    run_ids_sql = "SELECT id FROM agent_runs WHERE conversation_thread_id = ANY($1::text[])"
+    message_ids_sql = f"SELECT id FROM messages WHERE run_id IN ({run_ids_sql})"
+    conn = await asyncpg.connect(_postgres_dsn())
+    try:
+        async with conn.transaction():
+            await conn.execute(
+                f"DELETE FROM tool_calls WHERE message_id IN ({message_ids_sql})",
+                thread_ids_list,
+            )
+            await conn.execute(
+                f"DELETE FROM message_feedbacks WHERE message_id IN ({message_ids_sql})",
+                thread_ids_list,
+            )
+            await conn.execute(
+                "DELETE FROM agent_run_requests "
+                f"WHERE conversation_thread_id = ANY($1::text[]) OR dispatched_run_id IN ({run_ids_sql})",
+                thread_ids_list,
+            )
+            await conn.execute(
+                f"DELETE FROM messages WHERE run_id IN ({run_ids_sql})",
+                thread_ids_list,
+            )
+            await conn.execute(
+                "DELETE FROM agent_runs WHERE conversation_thread_id = ANY($1::text[])",
+                thread_ids_list,
+            )
+    finally:
+        await conn.close()
+
+
 async def _list_e2e_thread_statuses(owner_uid: str) -> dict[str, str]:
     """读取当前 E2E 用户的已标记线程及其子智能体线程状态。"""
 
-    postgres_url = os.getenv("POSTGRES_URL", "postgresql+asyncpg://postgres:postgres@postgres:5432/yuxi")
-    conn = await asyncpg.connect(postgres_url.replace("+asyncpg", ""))
+    conn = await asyncpg.connect(_postgres_dsn())
     try:
         rows = await conn.fetch(
             "SELECT id, thread_id, status, extra_metadata FROM conversations WHERE uid = $1",
@@ -237,6 +285,13 @@ async def cleanup_e2e_chat_resources(
             remove_e2e_thread_storage(thread_id)
         except (OSError, RuntimeError) as exc:
             failures.append(f"Failed to delete persisted E2E conversation storage {thread_id}: {exc}")
+
+    e2e_thread_ids = set(deleted_thread_ids) | set(thread_storage_statuses)
+    if e2e_thread_ids:
+        try:
+            await _delete_e2e_run_rows(e2e_thread_ids)
+        except Exception as exc:  # noqa: BLE001
+            failures.append(f"Failed to delete E2E agent_runs: {exc}")
 
     agents_response = await client.get(
         "/api/agent",
