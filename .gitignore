@@ -83,3 +83,6 @@ docs/vibe
 .taskr/
 .workbuddy/
 web/src/utils/__tests__/
+
+docs/develop-guides/decisions/*.md
+!docs/develop-guides/decisions/README.md
