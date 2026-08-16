@@ -292,9 +292,7 @@ async def _list_viewer_directory_entries(
     """列出 viewer 命名空间内单个目录的条目，根目录返回虚拟命名空间入口。"""
     if normalized_path == "/":
         # 根目录只显示 viewer 暴露的虚拟命名空间，避免为只读树视图触发 sandbox 冷启动。
-        entries = [
-            {"path": f"{USER_DATA_PATH}/", "name": "user-data", "is_dir": True, "size": 0, "modified_at": ""}
-        ]
+        entries = [{"path": f"{USER_DATA_PATH}/", "name": "user-data", "is_dir": True, "size": 0, "modified_at": ""}]
         if selected_skills:
             entries.append({"path": f"{SKILLS_PATH}/", "name": "skills", "is_dir": True, "size": 0, "modified_at": ""})
         return entries

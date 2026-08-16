@@ -78,9 +78,7 @@ async def search_workspace_files(*, query: str, current_user: User) -> dict:
         current_user=current_user,
     )
     entries = [
-        entry
-        for entry in response.get("entries", [])
-        if normalized_query in str(entry.get("name") or "").lower()
+        entry for entry in response.get("entries", []) if normalized_query in str(entry.get("name") or "").lower()
     ]
     return {"entries": entries[:WORKSPACE_SEARCH_MAX_RESULTS]}
 
