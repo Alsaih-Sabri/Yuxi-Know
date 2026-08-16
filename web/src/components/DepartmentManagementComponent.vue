@@ -186,7 +186,7 @@
 <script setup>
 import { reactive, onMounted, watch } from 'vue'
 import { notification, message, Modal } from 'ant-design-vue'
-import { departmentApi, apiSuperAdminGet } from '@/apis'
+import { authApi, departmentApi } from '@/apis'
 import { Plus, RefreshCw, SquarePen, Trash2 } from 'lucide-vue-next'
 import { isPasswordLongEnough, MIN_PASSWORD_LENGTH } from '@/utils/passwordValidation'
 
@@ -349,7 +349,7 @@ const checkAdminUid = async () => {
 
   // 检查是否已存在
   try {
-    const result = await apiSuperAdminGet(`/api/auth/check-uid/${uid}`)
+    const result = await authApi.checkUid(uid)
     if (!result.is_available) {
       departmentManagement.form.uidError = '该UID已被使用'
     }

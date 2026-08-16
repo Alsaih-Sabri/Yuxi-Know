@@ -756,6 +756,8 @@ class APIKey(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     key_hash = Column(String(64), nullable=False, unique=True, index=True)
     key_prefix = Column(String(16), nullable=False)
+    request_id = Column(String(64), nullable=True, unique=True, index=True)
+    intent_hash = Column(String(64), nullable=True)
     name = Column(String(100), nullable=False)
 
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
@@ -763,6 +765,7 @@ class APIKey(Base):
 
     expires_at = Column(DateTime, nullable=True)
     is_enabled = Column(Boolean, nullable=False, default=True)
+    revoked_at = Column(DateTime, nullable=True, index=True)
     last_used_at = Column(DateTime, nullable=True)
 
     created_by = Column(String(64), nullable=False)
@@ -789,6 +792,8 @@ class APIKey(Base):
     def is_valid(self) -> bool:
         """检查 Key 是否有效"""
         if not self.is_enabled:
+            return False
+        if self.revoked_at is not None:
             return False
         if self.expires_at and utc_now_naive() > self.expires_at:
             return False
@@ -877,6 +882,9 @@ class AgentRun(Base):
     token_usage = Column(JSON_VALUE, nullable=False, default=dict, comment="Run token usage grouped by model")
     error_type = Column(String(64), nullable=True, comment="Error type")
     error_message = Column(Text, nullable=True, comment="Error message")
+    worker_id = Column(String(128), nullable=True, comment="稳定 worker identity 与 attempt UUID 组成的 owner token")
+    heartbeat_at = Column(DateTime, nullable=True, comment="当前 owner 最近一次成功续租时间")
+    lease_expires_at = Column(DateTime, nullable=True, comment="当前执行 ownership 的到期时间")
     started_at = Column(DateTime, nullable=True, comment="Start time")
     finished_at = Column(DateTime, nullable=True, comment="Finish time")
     created_at = Column(DateTime, default=utc_now_naive, comment="Creation time")
@@ -921,6 +929,7 @@ Index(
     postgresql_where=AgentRun.status.notin_(AGENT_RUN_TERMINAL_STATUSES),
     sqlite_where=AgentRun.status.notin_(AGENT_RUN_TERMINAL_STATUSES),
 )
+Index("ix_agent_runs_status_lease_expires", AgentRun.status, AgentRun.lease_expires_at)
 
 
 class AgentRunRequest(Base):
