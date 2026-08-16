@@ -104,6 +104,7 @@ def _patch_common(monkeypatch: pytest.MonkeyPatch, run_obj: SimpleNamespace):
     monkeypatch.setattr(run_worker, "get_agent_state_view", fake_get_agent_state_view)
     monkeypatch.setattr(run_worker, "mark_run_running", fake_mark_run_running)
     monkeypatch.setattr(run_worker, "release_run_lease_for_retry", fake_mark_run_running)
+    monkeypatch.setattr(run_worker, "persist_run_manifest", fake_noop)
     monkeypatch.setattr(run_worker, "clear_cancel_signal", fake_noop)
     monkeypatch.setattr(run_worker, "stream_agent_chat", lambda **kwargs: object())
     monkeypatch.setattr(run_worker.RunContext, "start", fake_noop)
@@ -1022,3 +1023,37 @@ async def test_worker_shutdown_closes_queue_clients_before_postgres(monkeypatch:
 
     assert calls == ["redis", "postgres"]
     assert reconciliation_task.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_manifest_persist_failure_fails_run_before_execution(monkeypatch: pytest.MonkeyPatch):
+    """manifest 固化失败时 Run 显式失败，且不得进入执行流。"""
+    run_obj = _build_run()
+    _patch_common(monkeypatch, run_obj)
+    terminal_calls: list[dict] = []
+    stream_called = asyncio.Event()
+
+    async def fake_persist_manifest(**kwargs):
+        del kwargs
+        raise RuntimeError("manifest db unavailable")
+
+    async def fake_mark_terminal(run_id: str, status: str, **kwargs):
+        terminal_calls.append({"run_id": run_id, "status": status, **kwargs})
+        return run_worker.TerminalTransition(status=status, changed=True)
+
+    def fake_stream_agent_chat(**kwargs):
+        del kwargs
+        stream_called.set()
+        return _BytesAsyncIter([])
+
+    monkeypatch.setattr(run_worker, "persist_run_manifest", fake_persist_manifest)
+    monkeypatch.setattr(run_worker, "mark_run_terminal", fake_mark_terminal)
+    monkeypatch.setattr(run_worker, "stream_agent_chat", fake_stream_agent_chat)
+
+    await run_worker.process_agent_run({"job_try": 1}, "run-1")
+
+    assert not stream_called.is_set()
+    assert len(terminal_calls) == 1
+    assert terminal_calls[0]["status"] == "failed"
+    assert terminal_calls[0]["error_type"] == "manifest_persist_failed"
+    assert "执行未开始" in terminal_calls[0]["error_message"]

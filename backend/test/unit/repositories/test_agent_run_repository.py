@@ -603,3 +603,145 @@ async def test_durable_cancel_wins_terminal_race_for_live_owner(session):
     assert completed is False
     assert cancelled is True
     assert persisted.status == "cancelled"
+
+
+async def _seed_running_run(db, *, run_id: str = "attempt-run", request_id: str = "attempt-request") -> AgentRun:
+    run = await AgentRunRepository(db).create_run(
+        run_id=run_id,
+        conversation_thread_id="attempt-thread",
+        agent_slug="main",
+        uid="user-1",
+        request_id=request_id,
+        input_payload={},
+    )
+    await db.flush()
+    return run
+
+
+async def test_mark_running_creates_single_attempt_for_initial_claim_and_live_owner(session):
+    repository = AgentRunRepository(session)
+    run = await _seed_running_run(session)
+    now = utc_now_naive()
+
+    _, first_acquired = await repository.mark_running(run.id, worker_id="worker-a:token-1", lease_seconds=60, now=now)
+    _, second_acquired = await repository.mark_running(
+        run.id, worker_id="worker-a:token-1", lease_seconds=60, now=now + timedelta(seconds=1)
+    )
+    attempts = await repository.list_run_attempts(run.id)
+
+    assert first_acquired is True
+    assert second_acquired is True
+    assert [attempt.attempt_no for attempt in attempts] == [1]
+    assert attempts[0].worker_id == "worker-a:token-1"
+    assert attempts[0].finished_at is None
+
+
+async def test_retry_release_then_reclaim_uses_new_attempt_no_and_keeps_old_fact(session):
+    repository = AgentRunRepository(session)
+    run = await _seed_running_run(session)
+    now = utc_now_naive()
+
+    await repository.mark_running(run.id, worker_id="worker-a:token-1", lease_seconds=60, now=now)
+    released = await repository.release_lease_for_retry(
+        run.id, worker_id="worker-a:token-1", now=now + timedelta(seconds=1)
+    )
+    await repository.mark_running(
+        run.id, worker_id="worker-b:token-2", lease_seconds=60, now=now + timedelta(seconds=2)
+    )
+    attempts = await repository.list_run_attempts(run.id)
+
+    assert released is True
+    assert [attempt.attempt_no for attempt in attempts] == [1, 2]
+    assert attempts[0].outcome == "retry_released"
+    assert attempts[0].finished_at is not None
+    assert attempts[1].worker_id == "worker-b:token-2"
+    assert attempts[1].outcome is None
+
+
+async def test_terminal_status_finishes_owner_attempt_with_matching_outcome(session):
+    repository = AgentRunRepository(session)
+    run = await _seed_running_run(session, run_id="terminal-attempt-run", request_id="terminal-attempt-request")
+    now = utc_now_naive()
+
+    await repository.mark_running(run.id, worker_id="worker-a:token-1", lease_seconds=60, now=now)
+    await _bind_valid_output(
+        session,
+        repository,
+        run,
+        worker_id="worker-a:token-1",
+        now=now + timedelta(seconds=1),
+    )
+    _, changed = await repository.set_terminal_status(
+        run.id, status="completed", worker_id="worker-a:token-1", now=now + timedelta(seconds=2)
+    )
+    attempts = await repository.list_run_attempts(run.id)
+
+    assert changed is True
+    assert len(attempts) == 1
+    assert attempts[0].outcome == "completed"
+    assert attempts[0].finished_at is not None
+
+
+async def test_reconcile_closes_open_attempt_as_lease_expired(session):
+    repository = AgentRunRepository(session)
+    run = await _seed_running_run(session, run_id="reconcile-run", request_id="reconcile-request")
+    now = utc_now_naive()
+
+    await repository.mark_running(run.id, worker_id="worker-dead:token-1", lease_seconds=10, now=now)
+    reconciled = await repository.reconcile_expired_leases(now=now + timedelta(seconds=11))
+    attempts = await repository.list_run_attempts(run.id)
+
+    assert [item.id for item in reconciled] == [run.id]
+    assert len(attempts) == 1
+    assert attempts[0].outcome == "lease_expired"
+    assert attempts[0].error_type == "worker_lease_expired"
+
+
+async def test_record_run_manifest_is_write_once_and_requires_live_owner(session):
+    repository = AgentRunRepository(session)
+    run = await _seed_running_run(session, run_id="manifest-run", request_id="manifest-request")
+    now = utc_now_naive()
+
+    await repository.mark_running(run.id, worker_id="worker-a:token-1", lease_seconds=60, now=now)
+
+    with pytest.raises(ValueError, match="lease owner"):
+        await repository.record_run_manifest(
+            run.id,
+            manifest={"version": 1},
+            fingerprint="a" * 64,
+            worker_id="worker-b:token-2",
+            now=now + timedelta(seconds=1),
+        )
+
+    _, recorded = await repository.record_run_manifest(
+        run.id,
+        manifest={"version": 1, "agent": {"slug": "main"}},
+        fingerprint="b" * 64,
+        worker_id="worker-a:token-1",
+        now=now + timedelta(seconds=2),
+    )
+    _, rewritten = await repository.record_run_manifest(
+        run.id,
+        manifest={"version": 1, "agent": {"slug": "changed"}},
+        fingerprint="c" * 64,
+        worker_id="worker-a:token-1",
+        now=now + timedelta(seconds=3),
+    )
+    attempts = await repository.list_run_attempts(run.id)
+
+    assert recorded is True
+    assert rewritten is False
+    assert run.manifest == {"version": 1, "agent": {"slug": "main"}}
+    assert run.manifest_fingerprint == "b" * 64
+    assert run.manifest_recorded_at == now + timedelta(seconds=2)
+    # manifest 固化不得额外制造执行占有事实。
+    assert len(attempts) == 1
+
+    with pytest.raises(ValueError, match="lease owner"):
+        await repository.record_run_manifest(
+            run.id,
+            manifest={"version": 1},
+            fingerprint="d" * 64,
+            worker_id="worker-a:token-1",
+            now=now + timedelta(seconds=61),
+        )

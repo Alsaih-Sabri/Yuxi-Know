@@ -21,6 +21,33 @@ AGENT_RUN_LEASE_SCHEMA_STATEMENTS = (
     "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS lease_expires_at TIMESTAMP WITHOUT TIME ZONE",
     "CREATE INDEX IF NOT EXISTS ix_agent_runs_status_lease_expires ON agent_runs(status, lease_expires_at)",
 )
+AGENT_RUN_FACT_SCHEMA_STATEMENTS = (
+    "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS manifest JSONB",
+    "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS manifest_fingerprint VARCHAR(64)",
+    "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS manifest_recorded_at TIMESTAMP WITHOUT TIME ZONE",
+    """
+    CREATE TABLE IF NOT EXISTS agent_run_attempts (
+        id SERIAL PRIMARY KEY,
+        run_id VARCHAR(64) NOT NULL REFERENCES agent_runs(id) ON DELETE CASCADE,
+        attempt_no INTEGER NOT NULL,
+        worker_id VARCHAR(128) NOT NULL,
+        started_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+        heartbeat_at TIMESTAMP WITHOUT TIME ZONE,
+        lease_expires_at TIMESTAMP WITHOUT TIME ZONE,
+        finished_at TIMESTAMP WITHOUT TIME ZONE,
+        outcome VARCHAR(32),
+        error_type VARCHAR(64),
+        error_message TEXT,
+        created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NOW()
+    )
+    """,
+    (
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_agent_run_attempts_run_attempt_no "
+        "ON agent_run_attempts(run_id, attempt_no)"
+    ),
+    "CREATE INDEX IF NOT EXISTS ix_agent_run_attempts_open ON agent_run_attempts(run_id, finished_at)",
+)
 
 
 class PostgresManager(metaclass=SingletonMeta):
@@ -697,6 +724,7 @@ class PostgresManager(metaclass=SingletonMeta):
             "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS channel VARCHAR(32) NOT NULL DEFAULT 'web'",
             "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS external_id VARCHAR(128)",
             *AGENT_RUN_LEASE_SCHEMA_STATEMENTS,
+            *AGENT_RUN_FACT_SCHEMA_STATEMENTS,
             (
                 "ALTER TABLE IF EXISTS agent_runs ADD COLUMN IF NOT EXISTS "
                 "origin_metadata JSONB NOT NULL DEFAULT '{}'::jsonb"

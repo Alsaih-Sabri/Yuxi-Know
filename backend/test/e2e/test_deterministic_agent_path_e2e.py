@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 
 import asyncpg
@@ -143,6 +145,58 @@ async def _assert_persisted_causality(run_id: str, request_id: str) -> None:
         await conn.close()
 
 
+async def _assert_persisted_execution_facts(run_id: str, agent_slug: str) -> None:
+    """真实 worker 链路固化后的 manifest 指纹与 attempt 终止事实。"""
+    conn = await asyncpg.connect(postgres_dsn())
+    try:
+        row = await conn.fetchrow(
+            """
+            SELECT manifest, manifest_fingerprint, manifest_recorded_at, started_at
+            FROM agent_runs
+            WHERE id = $1
+            """,
+            run_id,
+        )
+        assert row, f"agent_runs row missing for {run_id}"
+        raw_manifest = row["manifest"]
+        manifest = json.loads(raw_manifest) if isinstance(raw_manifest, str) else raw_manifest
+        assert manifest is not None, "执行完成的 Run 必须已固化运行清单"
+        assert manifest["manifest_version"] == 1
+        assert manifest["agent"] == {"slug": agent_slug, "backend_id": "ChatbotAgent"}
+        assert manifest["model"] == {"spec": MODEL_SPEC}
+        assert manifest["resources"]["skills"] == []
+        assert row["manifest_recorded_at"] is not None
+        assert row["manifest_recorded_at"] >= row["started_at"]
+
+        serialized = json.dumps(manifest, ensure_ascii=False)
+        # 用户正文、prompt 与 provider 密钥不得进入 manifest 直接字段。
+        assert EXPECTED_OUTPUT not in serialized
+        assert "不要调用工具" not in serialized
+        assert "ci-replay-key" not in serialized
+        assert len(manifest["config_digest"]) == 64
+
+        expected_fingerprint = hashlib.sha256(
+            json.dumps(manifest, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        assert row["manifest_fingerprint"] == expected_fingerprint
+
+        attempts = await conn.fetch(
+            """
+            SELECT attempt_no, worker_id, outcome, finished_at
+            FROM agent_run_attempts
+            WHERE run_id = $1
+            ORDER BY attempt_no
+            """,
+            run_id,
+        )
+        assert attempts, "completed Run 必须有执行占有事实"
+        assert attempts[-1]["outcome"] == "completed"
+        assert all(attempt["finished_at"] is not None for attempt in attempts)
+        assert [attempt["attempt_no"] for attempt in attempts] == list(range(1, len(attempts) + 1))
+    finally:
+        await conn.close()
+
+
 async def test_deterministic_agent_path_reaches_persisted_result(
     e2e_client: httpx.AsyncClient,
     e2e_headers: dict[str, str],
@@ -199,6 +253,7 @@ async def test_deterministic_agent_path_reaches_persisted_result(
         assert result.json()["thread_id"] == thread_id
 
         await _assert_persisted_causality(run_id, request_id)
+        await _assert_persisted_execution_facts(run_id, agent_slug)
         run_completed = True
     finally:
         if run_id and not run_completed:

@@ -21,6 +21,7 @@ from yuxi.services.agent_request_queue_service import (
     dispatch_next_request,
     recover_pending_dispatches,
 )
+from yuxi.services.agent_run_manifest_service import build_run_manifest, compute_manifest_fingerprint
 from yuxi.services.chat_service import get_agent_state_view, stream_agent_chat, stream_agent_resume
 from yuxi.services.input_message_service import restore_chat_input_message
 from yuxi.services.run_queue_service import (
@@ -36,7 +37,7 @@ from yuxi.services.run_queue_service import (
     wait_for_cancel_signal,
 )
 from yuxi.storage.postgres.manager import pg_manager
-from yuxi.storage.postgres.models_business import Message, User
+from yuxi.storage.postgres.models_business import AgentRun, Message, User
 from yuxi.storage.redis import get_arq_redis_settings
 from yuxi.utils.auth_utils import AuthUtils
 from yuxi.utils.logging_config import logger
@@ -315,6 +316,19 @@ async def reconcile_expired_run_leases(*, now: datetime | None = None) -> list[s
     async with pg_manager.get_async_session_context() as db:
         runs = await AgentRunRepository(db).reconcile_expired_leases(now=now)
         return [run.id for run in runs]
+
+
+async def persist_run_manifest(*, run: AgentRun, user, worker_id: str) -> None:
+    """在执行上下文构造前固化运行清单与指纹；固化失败由调用方显式失败。"""
+    async with pg_manager.get_async_session_context() as db:
+        manifest = await build_run_manifest(run=run, user=user, db=db)
+        fingerprint = compute_manifest_fingerprint(manifest)
+        await AgentRunRepository(db).record_run_manifest(
+            run.id,
+            manifest=manifest,
+            fingerprint=fingerprint,
+            worker_id=worker_id,
+        )
 
 
 async def _load_user(uid: str):
@@ -680,6 +694,24 @@ async def process_agent_run(ctx, run_id: str):
                     worker_id=worker_id,
                 )
                 return
+
+        # 运行清单必须在真正构造执行上下文前固化；固化失败时执行不得开始。
+        try:
+            await persist_run_manifest(run=run, user=user, worker_id=worker_id)
+        except Exception as manifest_error:
+            logger.error(f"Failed to persist AgentRun manifest: run={run_id}", exc_info=True)
+            await mark_run_terminal(
+                run_id,
+                "failed",
+                error_type="manifest_persist_failed",
+                error_message=f"运行清单固化失败，执行未开始：{manifest_error}",
+                worker_id=worker_id,
+            )
+            return
+
+        # 固化期间用户可能已取消；复查一次，把取消竞态窗口恢复到执行开始前的水平。
+        if await _is_cancel_requested(run_id):
+            raise asyncio.CancelledError(f"run {run_id} cancelled after manifest recorded")
 
         meta = {
             "run_id": run_id,
