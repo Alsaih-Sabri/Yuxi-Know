@@ -243,3 +243,16 @@ async def test_remove_e2e_thread_storage_rejects_symlink(tmp_path, monkeypatch):
         remove_e2e_thread_storage("thread-e2e")
 
     assert user_dir.exists()
+
+
+async def test_is_e2e_thread_recognizes_marker_or_e2e_agent_prefix():
+    from test.live_api_cleanup import _is_e2e_thread
+
+    marked = {"id": "t1", "agent_id": "default-chatbot", "metadata": {"_yuxi_e2e": True, "test": "viewer-fs-e2e"}}
+    agent_prefix = {"id": "invocation_x", "agent_id": "e2e-agent-call-deadbeef"}
+    plain = {"id": "t2", "agent_id": "default-chatbot"}
+
+    assert _is_e2e_thread(marked)
+    assert _is_e2e_thread(agent_prefix)
+    assert not _is_e2e_thread(plain)
+    assert not _is_e2e_thread("not-a-dict")

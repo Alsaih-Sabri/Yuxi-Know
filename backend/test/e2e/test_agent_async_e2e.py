@@ -8,7 +8,14 @@ import asyncpg
 import httpx
 import pytest
 
-from e2e_helpers import cancel_run, consume_events, delete_agent, postgres_dsn, wait_for_run
+from e2e_helpers import (
+    cancel_run,
+    consume_events,
+    delete_agent,
+    postgres_dsn,
+    skip_if_external_quota,
+    wait_for_run,
+)
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.e2e, pytest.mark.slow]
 
@@ -112,6 +119,7 @@ async def _assert_run_persisted(
                 ar.id,
                 ar.request_id,
                 ar.status,
+                ar.error_message,
                 ar.run_type,
                 ar.agent_slug,
                 ar.uid,
@@ -137,6 +145,8 @@ async def _assert_run_persisted(
         )
         assert row, f"agent_runs row missing for {run_id}"
         assert row["request_id"] == request_id
+        if row["status"] != "completed":
+            skip_if_external_quota(row["error_message"])
         assert row["status"] == "completed"
         assert row["run_type"] == "chat"
         assert row["agent_slug"] == agent_slug

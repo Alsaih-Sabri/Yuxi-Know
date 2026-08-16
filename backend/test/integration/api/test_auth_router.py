@@ -15,10 +15,24 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from yuxi.services import login_rate_limit_service as login_limiter
 from yuxi.storage.postgres.models_business import User as UserModel
-from yuxi.storage.redis import create_async_redis_client
+from yuxi.storage.redis import close_async_redis_client, create_async_redis_client, get_async_redis_client
 from yuxi.utils.datetime_utils import utc_now_naive
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
+
+
+@pytest.fixture()
+async def isolated_redis_client():
+    """把进程内共享 Redis 客户端绑定到当前用例的 loop，结束后关闭。
+
+    集成套件跨用例共享 pytest 进程内的 Redis 单例；若其在上一个用例的 loop
+    中创建、本用例 loop 中复用会报 "attached to a different loop"。先关闭再
+    重建，保证本用例拿到绑定当前 loop 的新客户端。
+    """
+    await close_async_redis_client()
+    client = await get_async_redis_client()
+    yield client
+    await close_async_redis_client()
 
 
 async def _expire_login_lock(user_id: int) -> None:
@@ -156,7 +170,7 @@ async def test_user_is_locked_after_repeated_failed_logins(test_client, standard
     assert "登录被锁定" in still_locked_response.json()["detail"]
 
 
-async def test_login_rate_limit_blocks_repeated_failures_per_ip_and_account(test_client):
+async def test_login_rate_limit_blocks_repeated_failures_per_ip_and_account(test_client, isolated_redis_client):
     # 测试进程连 localhost:5050，服务端看到的来源 IP 是 127.0.0.1
     identifier = f"nouser_{uuid.uuid4().hex[:8]}"
     for _ in range(login_limiter.LOGIN_FAILURE_IP_ACCOUNT_MAX - 1):
@@ -178,9 +192,7 @@ async def test_login_rate_limit_blocks_repeated_failures_per_ip_and_account(test
     assert "过于频繁" in blocked_response.json()["detail"]
 
 
-async def test_expired_lock_resets_failure_count_before_next_failure(
-    test_client, standard_user
-):
+async def test_expired_lock_resets_failure_count_before_next_failure(test_client, standard_user):
     uid = standard_user["user"]["uid"]
 
     for _ in range(4):

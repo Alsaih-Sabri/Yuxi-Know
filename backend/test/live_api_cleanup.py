@@ -58,19 +58,22 @@ def _has_prefix(value: object, prefixes: tuple[str, ...]) -> bool:
 
 
 def _is_e2e_thread(thread: object) -> bool:
-    """只识别测试显式写入的 E2E 标记，不按用户可控标题猜测资源。"""
+    """识别 E2E 测试线程：显式 _yuxi_e2e 标记，或使用 E2E 测试智能体前缀。
+
+    后一种覆盖 agent-invocation（agent-call/eval 等由后端创建会话、测试无法
+    写入线程标记）的流程，与 agent 清理共享同一 E2E_AGENT_SLUG_PREFIXES
+    信任边界，不按用户可控标题猜测。
+    """
 
     if not isinstance(thread, dict):
         return False
 
     metadata = thread.get("metadata")
-    if not isinstance(metadata, dict):
-        return False
-    if metadata.get("_yuxi_e2e") is not True:
-        return False
-    return metadata.get("test") in E2E_THREAD_TEST_MARKERS or _has_prefix(
-        metadata.get("marker"), ("YUXI_SUBAGENT_STREAM_E2E_",)
-    )
+    if isinstance(metadata, dict) and metadata.get("_yuxi_e2e") is True:
+        return metadata.get("test") in E2E_THREAD_TEST_MARKERS or _has_prefix(
+            metadata.get("marker"), ("YUXI_SUBAGENT_STREAM_E2E_",)
+        )
+    return _has_prefix(thread.get("agent_id") or thread.get("agent_slug") or "", E2E_AGENT_SLUG_PREFIXES)
 
 
 def _is_e2e_agent(agent: object, owner_uid: str) -> bool:
@@ -152,12 +155,12 @@ async def _delete_e2e_run_rows(thread_ids: set[str]) -> None:
 
 
 async def _list_e2e_thread_statuses(owner_uid: str) -> dict[str, str]:
-    """读取当前 E2E 用户的已标记线程及其子智能体线程状态。"""
+    """读取当前 E2E 用户已标记或使用 E2E 测试智能体的线程及其子线程状态。"""
 
     conn = await asyncpg.connect(_postgres_dsn())
     try:
         rows = await conn.fetch(
-            "SELECT id, thread_id, status, extra_metadata FROM conversations WHERE uid = $1",
+            "SELECT id, thread_id, status, extra_metadata, agent_id FROM conversations WHERE uid = $1",
             owner_uid,
         )
         marked_parent_ids: list[int] = []
@@ -169,10 +172,16 @@ async def _list_e2e_thread_statuses(owner_uid: str) -> dict[str, str]:
                     metadata = json.loads(metadata)
                 except json.JSONDecodeError:
                     metadata = None
-            if not isinstance(metadata, dict) or metadata.get("_yuxi_e2e") is not True:
+            is_e2e_metadata = isinstance(metadata, dict) and metadata.get("_yuxi_e2e") is True
+            is_e2e_agent = _has_prefix(str(row["agent_id"] or ""), E2E_AGENT_SLUG_PREFIXES)
+            if not is_e2e_metadata and not is_e2e_agent:
+                continue
+            thread_id = str(row["thread_id"] or "")
+            # 命名空间式线程 id（如 subagent:...）不是真实会话、无独立沙盒目录。
+            if not SAFE_THREAD_ID.fullmatch(thread_id):
                 continue
             marked_parent_ids.append(int(row["id"]))
-            statuses[str(row["thread_id"])] = str(row["status"] or "")
+            statuses[thread_id] = str(row["status"] or "")
 
         if marked_parent_ids:
             child_rows = await conn.fetch(
@@ -184,7 +193,11 @@ async def _list_e2e_thread_statuses(owner_uid: str) -> dict[str, str]:
                 """,
                 marked_parent_ids,
             )
-            statuses.update({str(row["child_thread_id"]): str(row["status"] or "") for row in child_rows})
+            for row in child_rows:
+                child_id = str(row["child_thread_id"] or "")
+                # 命名空间式子线程 id（如 subagent:...）无独立沙盒目录，跳过存储清理。
+                if SAFE_THREAD_ID.fullmatch(child_id):
+                    statuses[child_id] = str(row["status"] or "")
         return statuses
     finally:
         await conn.close()
