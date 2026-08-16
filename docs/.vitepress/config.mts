@@ -73,6 +73,10 @@ export default defineConfig({
           { text: '版本变更记录', link: '/develop-guides/changelog' },
           { text: '界面设计规范', link: '/develop-guides/design' },
           { text: '测试规范', link: '/develop-guides/testing-guidelines' },
+          { text: 'Yuxi Spec Loop', link: '/develop-guides/spec-loop' },
+          { text: '工程信任系统', link: '/develop-guides/engineering-trust' },
+          { text: '工程决策记录', link: '/develop-guides/decisions/README' },
+          { text: '工程事故复盘', link: '/develop-guides/postmortems/README' },
         ]
       }
     ],

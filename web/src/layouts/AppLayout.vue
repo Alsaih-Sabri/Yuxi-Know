@@ -20,6 +20,7 @@ import { useChatThreadsStore } from '@/stores/chatThreads'
 import { useChatUIStore } from '@/stores/chatUI'
 import { useDatabaseStore } from '@/stores/database'
 import { useInfoStore } from '@/stores/info'
+import { useRuntimeCapabilitiesStore } from '@/stores/runtimeCapabilities'
 import { useTaskerStore } from '@/stores/tasker'
 import { useUserStore } from '@/stores/user'
 import { storeToRefs } from 'pinia'
@@ -37,9 +38,11 @@ const chatThreadsStore = useChatThreadsStore()
 const chatUIStore = useChatUIStore()
 const databaseStore = useDatabaseStore()
 const infoStore = useInfoStore()
+const runtimeCapabilitiesStore = useRuntimeCapabilitiesStore()
 const taskerStore = useTaskerStore()
 const userStore = useUserStore()
 const { activeCount: activeCountRef, isDrawerOpen } = storeToRefs(taskerStore)
+const { knowledgeEnabled } = storeToRefs(runtimeCapabilitiesStore)
 const { threads, currentThreadId, hasMoreThreads, isLoadingMoreThreads } =
   storeToRefs(chatThreadsStore)
 
@@ -77,6 +80,8 @@ const getRemoteConfig = async () => {
 }
 
 const getRemoteDatabase = async () => {
+  await runtimeCapabilitiesStore.ensureLoaded()
+  if (!knowledgeEnabled.value) return
   try {
     await databaseStore.loadDatabases()
   } catch (error) {
@@ -175,7 +180,7 @@ const mainList = computed(() => {
   })
 
   items.push({
-    name: '知识库 · 技能',
+    name: knowledgeEnabled.value ? '知识库 · 技能' : '技能',
     path: '/extensions',
     activePaths: ['/extensions'],
     icon: LibraryBig,

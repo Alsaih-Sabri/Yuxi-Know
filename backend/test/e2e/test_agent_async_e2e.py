@@ -123,6 +123,8 @@ async def _assert_run_persisted(
                 input_msg.request_id AS input_request_id,
                 output_msg.role AS output_role,
                 output_msg.run_id AS output_run_id,
+                output_msg.request_id AS output_request_id,
+                output_msg.conversation_id AS output_conversation_id,
                 output_msg.content AS output_content,
                 conv.thread_id AS persisted_thread_id
             FROM agent_runs ar
@@ -147,6 +149,8 @@ async def _assert_run_persisted(
         assert row["input_request_id"] == request_id
         assert row["output_role"] == "assistant"
         assert row["output_run_id"] == run_id
+        assert row["output_request_id"] == request_id
+        assert row["output_conversation_id"] == row["conversation_id"]
         assert EXPECTED_OUTPUT in row["output_content"]
         assert row["persisted_thread_id"] == thread_id
     finally:

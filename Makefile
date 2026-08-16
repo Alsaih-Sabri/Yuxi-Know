@@ -1,5 +1,5 @@
 
-.PHONY: up up-lite down logs lint format seed reset
+.PHONY: up up-lite down logs lint format seed reset test verify-trust
 
 PYTEST_ARGS ?=
 BACKEND_PYTHON ?= $(shell cat backend/.python-version)
@@ -31,7 +31,7 @@ up-lite:
 		echo "Error: .env file not found. Please create it from .env.template"; \
 		exit 1; \
 	fi
-	LITE_MODE=true VITE_USE_RUNS_API=false docker compose up -d postgres redis minio api web
+	LITE_MODE=true docker compose up -d postgres redis minio api worker web
 
 logs:
 	@docker logs --tail=50 api-dev
@@ -57,8 +57,12 @@ format:
 lint:
 	cd backend && UV_PYTHON=$(BACKEND_PYTHON) uv run ruff check package
 	cd backend && UV_PYTHON=$(BACKEND_PYTHON) uv run ruff check --select I package
-	cd web && pnpm run lint
+	cd web && pnpm run lint:check
 
 # 后端单元测试（不依赖 docker 服务）；integration/e2e 需在容器环境运行
 test:
-	cd backend && UV_PYTHON=$(BACKEND_PYTHON) uv run pytest -m unit $(PYTEST_ARGS)
+	cd backend && UV_PYTHON=$(BACKEND_PYTHON) uv run pytest test/unit -m "not slow" $(PYTEST_ARGS)
+
+verify-trust:
+	python3 scripts/verify_engineering_contracts.py
+	python3 -m unittest scripts.test_verify_engineering_contracts
