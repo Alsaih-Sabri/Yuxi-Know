@@ -6,7 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.verify_engineering_contracts import verify
+from scripts.verify_engineering_contracts import AGENTS_FILE_BUDGETS, verify
 
 
 class EngineeringContractVerifierTest(unittest.TestCase):
@@ -52,6 +52,7 @@ Owner 与 gate 必须在同一变更中保持一致。
 """,
         )
         self._write_valid_workflows()
+        self._write_valid_agents_files()
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
@@ -125,6 +126,19 @@ jobs:
       - run: docker compose exec -T api uv run pytest test/integration/services/test_identity_admin_service.py test/integration/services/test_api_key_schema_migration.py test/integration/services/test_api_key_user_lifecycle.py test/integration/api/test_apikey_router.py -q
 """,
         )
+
+    def _write_valid_agents_files(self) -> None:
+        self._write(
+            "AGENTS.md",
+            "# 根约定\n\n见 [架构](ARCHITECTURE.md) 与 [决策](docs/develop-guides/decisions/README.md)。\n",
+        )
+        self._write("ARCHITECTURE.md", "# 架构\n")
+        self._write(
+            "docs/develop-guides/decisions/README.md", "# 决策记录\n"
+        )
+        self._write("backend/AGENTS.md", "# Backend 约定\n见 [根约定](../AGENTS.md)。\n")
+        self._write("web/AGENTS.md", "# Web 约定\n见 [根约定](../AGENTS.md)。\n")
+        self._write("docs/AGENTS.md", "# 文档约定\n见 [根约定](../AGENTS.md)。\n")
 
     def _errors(self) -> list[str]:
         return verify(self.root)[0]
@@ -385,6 +399,104 @@ jobs:
             any(
                 "web/src/apis 外不得拥有 /api 路径" in error for error in self._errors()
             )
+        )
+
+    def test_agents_instruction_file_missing_is_rejected(self) -> None:
+        (self.root / "backend/AGENTS.md").unlink()
+
+        self.assertTrue(
+            any("缺少 AGENTS 指令文件" in error for error in self._errors())
+        )
+
+    def test_agents_instruction_broken_link_is_rejected(self) -> None:
+        path = self.root / "AGENTS.md"
+        path.write_text(
+            "# 根约定\n\n见 [断链](missing-guide.md)。\n", encoding="utf-8"
+        )
+
+        self.assertTrue(
+            any("AGENTS 指令引用失效" in error for error in self._errors())
+        )
+
+    def test_agents_instruction_external_link_is_allowed(self) -> None:
+        path = self.root / "AGENTS.md"
+        path.write_text(
+            "# 根约定\n\n参考 [规范](https://example.com/spec) 与 [锚点](#任务)。\n",
+            encoding="utf-8",
+        )
+
+        self.assertEqual(self._errors(), [])
+
+    def test_agents_instruction_multiple_h1_is_rejected(self) -> None:
+        path = self.root / "web/AGENTS.md"
+        path.write_text(
+            "# Web 约定\n\n# 重复标题\n见 [根约定](../AGENTS.md)。\n",
+            encoding="utf-8",
+        )
+
+        self.assertTrue(
+            any("必须有且只有一个 H1" in error for error in self._errors())
+        )
+
+    def test_agents_instruction_budget_overflow_is_rejected(self) -> None:
+        for relative in AGENTS_FILE_BUDGETS:
+            with self.subTest(relative=relative):
+                path = self.root / relative
+                path.write_text(
+                    "# 标题\n\n" + "规则" * 3000 + "\n", encoding="utf-8"
+                )
+
+                self.assertTrue(
+                    any(
+                        "超出字符预算" in error and relative in error
+                        for error in self._errors()
+                    )
+                )
+
+    def test_proposed_decision_missing_acceptance_heading_is_rejected(self) -> None:
+        self._write(
+            "docs/develop-guides/decisions/proposed/2026-08-16-flawed-proposal.md",
+            "# 有缺陷的提案\n\n状态：proposed\nOwner：owner.md\n\n## 问题\n缺验收标准。\n\n## 提案\n占位。\n\n## 替代方案\n无。\n\n## 风险\n无。\n",
+        )
+
+        self.assertTrue(
+            any("缺少标题：## 验收标准" in error for error in self._errors())
+        )
+
+    def test_rejected_decision_missing_rejection_reason_is_rejected(self) -> None:
+        self._write(
+            "docs/develop-guides/decisions/rejected/2026-08-16-flawed-rejection.md",
+            "# 缺拒绝理由\n\n状态：rejected\nOwner：owner.md\n\n## 问题\n占位。\n\n## 提案\n占位。\n\n## 替代方案\n无。\n",
+        )
+
+        self.assertTrue(
+            any("缺少标题：## 拒绝理由" in error for error in self._errors())
+        )
+
+    def test_archived_decision_with_progress_heading_is_rejected(self) -> None:
+        self._write(
+            "docs/develop-guides/decisions/archived/2026-08-16-flawed-archive.md",
+            "# 带进度章节的归档\n\n状态：archived\nOwner：owner.md\n\n## 问题\n占位。\n\n## 决策\n占位。\n\n## 替代方案\n无。\n\n## 后果\n无。\n\n## 验证\n占位。\n\n## Checklist\n遗留清单。\n",
+        )
+
+        self.assertTrue(
+            any("不能保留提案或进度标题" in error for error in self._errors())
+        )
+
+    def test_decision_status_must_match_lifecycle_directory(self) -> None:
+        path = (
+            self.root
+            / "docs/develop-guides/decisions/implemented/2026-08-15-valid-decision.md"
+        )
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "状态：implemented", "状态：proposed"
+            ),
+            encoding="utf-8",
+        )
+
+        self.assertTrue(
+            any("状态必须是 implemented" in error for error in self._errors())
         )
 
     def test_projection_is_derived_from_current_owners(self) -> None:

@@ -42,6 +42,14 @@ ROUTER_DB_METHODS = frozenset(
 )
 ROUTER_DB_RECEIVERS = frozenset({"db", "session", "connection", "database"})
 DIRECT_WEB_API_LITERAL = re.compile(r"(?P<quote>['\"`])/api(?:[/ ?]|(?P=quote))")
+AGENTS_FILE_BUDGETS = {
+    "AGENTS.md": 5000,
+    "backend/AGENTS.md": 2400,
+    "web/AGENTS.md": 1000,
+    "docs/AGENTS.md": 1400,
+}
+AGENTS_LINK_PATTERN = re.compile(r"\[[^\]]+\]\(([^)\s]+)\)")
+EXTERNAL_LINK_PREFIXES = ("http://", "https://", "mailto:")
 
 
 @dataclass(frozen=True)
@@ -528,6 +536,34 @@ def _attribute_root_name(node: ast.expr) -> str | None:
     return node.id if isinstance(node, ast.Name) else None
 
 
+def _validate_agents_files(root: Path, errors: list[str]) -> list[dict[str, Any]]:
+    """检查分层 AGENTS 指令的链接、单一 H1 与字符预算。"""
+
+    projection: list[dict[str, Any]] = []
+    for relative, budget in AGENTS_FILE_BUDGETS.items():
+        path = root / relative
+        if not path.is_file():
+            errors.append(f"缺少 AGENTS 指令文件：{relative}")
+            continue
+        text = path.read_text(encoding="utf-8")
+        visible = _visible_markdown_lines(text)
+        if sum(1 for line in visible if line.startswith("# ")) != 1:
+            errors.append(f"AGENTS 指令必须有且只有一个 H1：{relative}")
+        for line in visible:
+            for link in AGENTS_LINK_PATTERN.findall(line):
+                target = link.split("#", 1)[0]
+                if not target or target.startswith(EXTERNAL_LINK_PREFIXES):
+                    continue
+                if not (path.parent / target).resolve().exists():
+                    errors.append(f"AGENTS 指令引用失效：{relative} -> {link}")
+        if len(text) > budget:
+            errors.append(
+                f"AGENTS 指令超出字符预算：{relative} {len(text)} > {budget}"
+            )
+        projection.append({"path": relative, "chars": len(text), "budget": budget})
+    return projection
+
+
 def _validate_router_boundaries(root: Path, errors: list[str]) -> int:
     routers_root = root / "backend/server/routers"
     checked = 0
@@ -603,6 +639,7 @@ def verify(root: Path) -> tuple[list[str], dict[str, Any]]:
             )
     decisions = _validate_decisions(resolved_root, errors)
     workflows = _validate_workflows(resolved_root, errors)
+    agents_files = _validate_agents_files(resolved_root, errors)
     router_files = _validate_router_boundaries(resolved_root, errors)
     web_files = _validate_web_api_boundary(resolved_root, errors)
     projection = {
@@ -610,6 +647,7 @@ def verify(root: Path) -> tuple[list[str], dict[str, Any]]:
         "authority": "owner-local code, tests, decisions and workflows",
         "decisions": decisions,
         "workflows": workflows,
+        "agents_files": agents_files,
         "boundaries": {
             "router_files_checked": router_files,
             "web_source_files_checked": web_files,
@@ -641,6 +679,7 @@ def main() -> int:
             "工程信任检查通过："
             f"{len(projection['decisions'])} decisions / "
             f"{len(projection['workflows'])} workflows / "
+            f"{len(projection['agents_files'])} agents files / "
             f"{projection['boundaries']['router_files_checked']} routers / "
             f"{projection['boundaries']['web_source_files_checked']} web sources"
         )
