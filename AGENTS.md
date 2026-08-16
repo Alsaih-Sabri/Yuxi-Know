@@ -5,6 +5,7 @@ Yuxi 是基于 LangGraph、FastAPI、Vue 和多种持久化服务构建的知识
 ## 每次任务先加载什么
 
 - [ARCHITECTURE.md](ARCHITECTURE.md)：稳定边界、主链路和架构不变量。
+- [Yuxi Spec Loop](docs/develop-guides/spec-loop.md)：非平凡变更从提案、证据到收敛的流程。
 - [工程信任系统](docs/develop-guides/engineering-trust.md)：语义 Owner、证据、决策记录、派生审计和 gate 规则。
 - [测试规范](docs/develop-guides/testing-guidelines.md)：unit、integration、E2E 的职责与命令。
 - [贡献指南](docs/develop-guides/contributing.md)：分支、独立 Review、commit 和 PR 流程。

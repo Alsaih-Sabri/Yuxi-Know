@@ -11,6 +11,8 @@
 
 提案实现后，把记录移动到 `implemented/` 并改写为当前事实；不要保留迁移 checklist、进度日志或”应当”式 spec。决定被部分取代时，在新旧记录中交叉链接；完全失去当前价值时，将旧记录移到 `archived/`，或在理由已经被新记录完整吸收后删除。任何记录移入 `archived/` 前先改写为问题、决策、替代方案、后果、验证结构，不保留提案、进度或迁移章节。
 
+非平凡工作必须在实现前创建 `proposed`。小而完整、在同一变更中已经生效且没有待裁决替代或风险的修复可直接写 `implemented`，但 PR 必须解释为何不需要 proposal；不得用 diff 大小或文件数量自动判定 trivial。完整流程见 [Yuxi Spec Loop](../spec-loop.md)。
+
 ## 何时需要
 
 满足任一条件即为非平凡：
@@ -30,6 +32,7 @@
 # 决策标题
 
 状态：implemented
+类型：feature
 Owner：path/to/owner
 
 ## 问题
@@ -39,4 +42,13 @@ Owner：path/to/owner
 ## 验证
 ```
 
-`Owner` 指向拥有当前行为的首要代码、契约或文档；一项决定跨越多个事实 Owner 时，在正文明确分工，不能让 decision record 反向成为运行时事实源。`proposed` 使用 `## 问题`、`## 提案`、`## 替代方案`、`## 验收标准`、`## 风险`；`rejected` 说明拒绝原因。不要保存 chain-of-thought、逐步实现叙事、Review 对话、人员评价或敏感数据。
+`类型` 只使用 `feature`、`bug-fix`、`simplification`、`architecture`、`process`、`testing`。`Owner` 指向拥有当前行为的首要代码、契约或文档；一项决定跨越多个事实 Owner 时，在正文明确分工，不能让 decision record 反向成为运行时事实源。
+
+`proposed` 使用 `## 问题`、`## 提案`、`## 替代方案`、`## 验收标准`、`## 风险`，并在验收标准中包含以下证据矩阵：
+
+```markdown
+| 验收主张 | 失败面 | 语义 Owner | 直接证据 / 命令 | 负向案例 | 当前结果 |
+|---|---|---|---|---|---|
+```
+
+`simplification` 提案和 implemented 记录还必须分别在 `## 验收标准` 或 `## 验证` 中包含 `旧能力不存在：` 与 `重新引入条件：`，避免只增加替代物而不删除旧表面。`rejected` 说明拒绝原因。不要保存 chain-of-thought、逐步实现叙事、Review 对话、人员评价或敏感数据。

@@ -33,6 +33,7 @@ class EngineeringContractVerifierTest(unittest.TestCase):
             """# 有效决策
 
 状态：implemented
+类型：process
 Owner：owner.md
 
 ## 问题
@@ -53,6 +54,7 @@ Owner 与 gate 必须在同一变更中保持一致。
         )
         self._write_valid_workflows()
         self._write_valid_agents_files()
+        self._write_valid_postmortem_files()
 
     def tearDown(self) -> None:
         self.tempdir.cleanup()
@@ -115,6 +117,8 @@ jobs:
       - 'backend/package/yuxi/**'
       - 'backend/server/**'
       - 'backend/test/integration/**'
+      - 'backend/test/e2e/**'
+      - 'backend/test/support/**'
       - '.github/workflows/system-tests.yml'
 jobs:
   system:
@@ -123,7 +127,23 @@ jobs:
       - run: docker compose exec -T api uv run pytest test/integration/services/test_agent_request_queue_concurrency.py -q
       - run: docker compose exec -T api uv run pytest test/integration/services/test_agent_run_lease.py -q
       - run: docker compose exec -T api uv run pytest test/integration/api/test_agent_run_result_causality.py -q
+      - run: docker compose exec -T -e E2E_USERNAME -e E2E_PASSWORD api uv run --no-sync --no-dev pytest test/e2e/test_deterministic_agent_path_e2e.py -q
       - run: docker compose exec -T api uv run pytest test/integration/services/test_identity_admin_service.py test/integration/services/test_api_key_schema_migration.py test/integration/services/test_api_key_user_lifecycle.py test/integration/api/test_apikey_router.py -q
+""",
+        )
+        self._write(
+            ".github/workflows/real-provider-probe.yml",
+            """on:
+  workflow_dispatch:
+jobs:
+  probe:
+    steps:
+      - run: |
+          if [ -z "$SILICONFLOW_API_KEY" ]; then
+            echo "SILICONFLOW_API_KEY repository secret is required for this manual probe." >&2
+            exit 1
+          fi
+      - run: docker compose exec -T -e E2E_USERNAME -e E2E_PASSWORD api uv run --no-sync --no-dev pytest test/e2e/test_agent_async_e2e.py -q
 """,
         )
 
@@ -139,6 +159,38 @@ jobs:
         self._write("backend/AGENTS.md", "# Backend 约定\n见 [根约定](../AGENTS.md)。\n")
         self._write("web/AGENTS.md", "# Web 约定\n见 [根约定](../AGENTS.md)。\n")
         self._write("docs/AGENTS.md", "# 文档约定\n见 [根约定](../AGENTS.md)。\n")
+
+    def _write_valid_postmortem_files(self) -> None:
+        self._write(
+            "docs/develop-guides/postmortems/README.md",
+            "# 工程事故复盘\n\n达到门槛的事故使用模板。\n",
+        )
+        self._write(
+            "docs/develop-guides/postmortems/TEMPLATE.md",
+            """# 事故标题
+
+## 影响
+影响。
+
+## 事实时间线
+时间线。
+
+## 因果链
+因果。
+
+## 安全网为何漏过
+漏过原因。
+
+## 修正与验证
+验证。
+
+## 防复发措施
+措施。
+
+## 未解决风险
+风险。
+""",
+        )
 
     def _errors(self) -> list[str]:
         return verify(self.root)[0]
@@ -178,6 +230,20 @@ jobs:
         )
 
         self.assertTrue(any("Owner 引用不存在" in error for error in self._errors()))
+
+    def test_decision_unknown_type_is_rejected(self) -> None:
+        path = (
+            self.root
+            / "docs/develop-guides/decisions/implemented/2026-08-15-valid-decision.md"
+        )
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "类型：process", "类型：refactor"
+            ),
+            encoding="utf-8",
+        )
+
+        self.assertTrue(any("类型必须是" in error for error in self._errors()))
 
     def test_decision_owner_symlink_cannot_escape_repository(self) -> None:
         (self.root / "outside-owner").symlink_to("/etc/hosts")
@@ -363,6 +429,89 @@ jobs:
             )
         )
 
+    def test_system_workflow_cannot_ignore_e2e_changes(self) -> None:
+        path = self.root / ".github/workflows/system-tests.yml"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "      - 'backend/test/e2e/**'\n", ""
+            ),
+            encoding="utf-8",
+        )
+
+        self.assertTrue(
+            any(
+                "workflow PR paths 缺少 owning scope" in error
+                and "backend/test/e2e/**" in error
+                for error in self._errors()
+            )
+        )
+
+    def test_system_workflow_cannot_ignore_e2e_support_changes(self) -> None:
+        path = self.root / ".github/workflows/system-tests.yml"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "      - 'backend/test/support/**'\n", ""
+            ),
+            encoding="utf-8",
+        )
+
+        self.assertTrue(
+            any(
+                "workflow PR paths 缺少 owning scope" in error
+                and "backend/test/support/**" in error
+                for error in self._errors()
+            )
+        )
+
+    def test_deterministic_e2e_command_cannot_be_removed(self) -> None:
+        path = self.root / ".github/workflows/system-tests.yml"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "test/e2e/test_deterministic_agent_path_e2e.py",
+                "test/e2e/test_other_path.py",
+            ),
+            encoding="utf-8",
+        )
+
+        self.assertTrue(any("缺少实际 run step" in error for error in self._errors()))
+
+    def test_real_provider_probe_requires_manual_trigger(self) -> None:
+        path = self.root / ".github/workflows/real-provider-probe.yml"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "workflow_dispatch:", "push:"
+            ),
+            encoding="utf-8",
+        )
+
+        self.assertTrue(
+            any("workflow 不监听 workflow_dispatch" in error for error in self._errors())
+        )
+
+    def test_real_provider_probe_command_cannot_be_removed(self) -> None:
+        path = self.root / ".github/workflows/real-provider-probe.yml"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "test/e2e/test_agent_async_e2e.py",
+                "test/e2e/test_other_real_provider.py",
+            ),
+            encoding="utf-8",
+        )
+
+        self.assertTrue(any("缺少实际 run step" in error for error in self._errors()))
+
+    def test_real_provider_probe_cannot_drop_credential_preflight(self) -> None:
+        path = self.root / ".github/workflows/real-provider-probe.yml"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                'if [ -z "$SILICONFLOW_API_KEY" ]; then',
+                'if [ -n "$SILICONFLOW_API_KEY" ]; then',
+            ),
+            encoding="utf-8",
+        )
+
+        self.assertTrue(any("缺少实际 run step" in error for error in self._errors()))
+
     def test_router_sqlalchemy_query_builder_is_rejected(self) -> None:
         self._write(
             "backend/server/routers/invalid_router.py",
@@ -463,6 +612,219 @@ jobs:
             any("缺少标题：## 验收标准" in error for error in self._errors())
         )
 
+    def test_proposed_decision_without_evidence_matrix_is_rejected(self) -> None:
+        self._write(
+            "docs/develop-guides/decisions/proposed/2026-08-16-no-evidence.md",
+            """# 缺证据矩阵的提案
+
+状态：proposed
+类型：feature
+Owner：owner.md
+
+## 问题
+问题。
+
+## 提案
+方案。
+
+## 替代方案
+替代。
+
+## 验收标准
+只有散文验收。
+
+## 风险
+风险。
+""",
+        )
+
+        self.assertTrue(
+            any("proposed 验收标准缺少证据矩阵表头" in error for error in self._errors())
+        )
+
+    def test_proposed_decision_empty_evidence_matrix_is_rejected(self) -> None:
+        self._write(
+            "docs/develop-guides/decisions/proposed/2026-08-16-empty-evidence.md",
+            """# 空证据矩阵
+
+状态：proposed
+类型：feature
+Owner：owner.md
+
+## 问题
+问题。
+
+## 提案
+方案。
+
+## 替代方案
+替代。
+
+## 验收标准
+| 验收主张 | 失败面 | 语义 Owner | 直接证据 / 命令 | 负向案例 | 当前结果 |
+|---|---|---|---|---|---|
+
+## 风险
+风险。
+""",
+        )
+
+        self.assertTrue(
+            any("proposed 验收标准缺少证据矩阵数据行" in error for error in self._errors())
+        )
+
+    def test_proposed_evidence_matrix_empty_cell_is_rejected(self) -> None:
+        self._write(
+            "docs/develop-guides/decisions/proposed/2026-08-16-empty-cell.md",
+            """# 证据矩阵空列
+
+状态：proposed
+类型：feature
+Owner：owner.md
+
+## 问题
+问题。
+
+## 提案
+方案。
+
+## 替代方案
+替代。
+
+## 验收标准
+| 验收主张 | 失败面 | 语义 Owner | 直接证据 / 命令 | 负向案例 | 当前结果 |
+|---|---|---|---|---|---|
+| 主张 |  | owner.md | command | negative | Not run |
+
+## 风险
+风险。
+""",
+        )
+
+        self.assertTrue(
+            any("proposed 证据矩阵必须填写全部六列" in error for error in self._errors())
+        )
+
+    def test_proposed_evidence_matrix_unknown_result_is_rejected(self) -> None:
+        self._write(
+            "docs/develop-guides/decisions/proposed/2026-08-16-bad-result.md",
+            """# 证据矩阵非法结果
+
+状态：proposed
+类型：feature
+Owner：owner.md
+
+## 问题
+问题。
+
+## 提案
+方案。
+
+## 替代方案
+替代。
+
+## 验收标准
+| 验收主张 | 失败面 | 语义 Owner | 直接证据 / 命令 | 负向案例 | 当前结果 |
+|---|---|---|---|---|---|
+| 主张 | 失败 | owner.md | command | negative | Maybe |
+
+## 风险
+风险。
+""",
+        )
+
+        self.assertTrue(
+            any("proposed 证据结果必须是" in error for error in self._errors())
+        )
+
+    def test_simplification_without_deletion_contract_is_rejected(self) -> None:
+        self._write(
+            "docs/develop-guides/decisions/proposed/2026-08-16-weak-simplification.md",
+            """# 不完整的简化提案
+
+状态：proposed
+类型：simplification
+Owner：owner.md
+
+## 问题
+问题。
+
+## 提案
+方案。
+
+## 替代方案
+替代。
+
+## 验收标准
+| 验收主张 | 失败面 | 语义 Owner | 直接证据 / 命令 | 负向案例 | 当前结果 |
+|---|---|---|---|---|---|
+| 简化 | 旧实现残留 | owner.md | 搜索 | 恢复旧入口 | Not run |
+
+## 风险
+风险。
+""",
+        )
+
+        errors = self._errors()
+        self.assertTrue(any("旧能力不存在：" in error for error in errors))
+        self.assertTrue(any("重新引入条件：" in error for error in errors))
+
+    def test_implemented_simplification_without_deletion_contract_is_rejected(
+        self,
+    ) -> None:
+        path = (
+            self.root
+            / "docs/develop-guides/decisions/implemented/2026-08-15-valid-decision.md"
+        )
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "类型：process", "类型：simplification"
+            ),
+            encoding="utf-8",
+        )
+
+        errors = self._errors()
+        self.assertTrue(any("simplification ## 验证 缺少：旧能力不存在：" in error for error in errors))
+        self.assertTrue(any("simplification ## 验证 缺少：重新引入条件：" in error for error in errors))
+
+    def test_postmortem_readme_missing_is_rejected(self) -> None:
+        (self.root / "docs/develop-guides/postmortems/README.md").unlink()
+
+        self.assertTrue(
+            any("缺少 postmortem 入口或模板" in error for error in self._errors())
+        )
+
+    def test_postmortem_template_missing_is_rejected(self) -> None:
+        (self.root / "docs/develop-guides/postmortems/TEMPLATE.md").unlink()
+
+        self.assertTrue(
+            any("缺少 postmortem 入口或模板" in error for error in self._errors())
+        )
+
+    def test_postmortem_template_missing_heading_is_rejected(self) -> None:
+        path = self.root / "docs/develop-guides/postmortems/TEMPLATE.md"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace("## 防复发措施", "## 后续"),
+            encoding="utf-8",
+        )
+
+        self.assertTrue(
+            any("postmortem 模板缺少标题：## 防复发措施" in error for error in self._errors())
+        )
+
+    def test_postmortem_template_empty_heading_is_rejected(self) -> None:
+        path = self.root / "docs/develop-guides/postmortems/TEMPLATE.md"
+        path.write_text(
+            path.read_text(encoding="utf-8").replace(
+                "## 防复发措施\n措施。", "## 防复发措施\n"
+            ),
+            encoding="utf-8",
+        )
+
+        self.assertTrue(
+            any("postmortem 模板标题下没有内容：## 防复发措施" in error for error in self._errors())
+        )
+
     def test_rejected_decision_missing_rejection_reason_is_rejected(self) -> None:
         self._write(
             "docs/develop-guides/decisions/rejected/2026-08-16-flawed-rejection.md",
@@ -510,8 +872,16 @@ jobs:
                 {
                     "path": "docs/develop-guides/decisions/implemented/2026-08-15-valid-decision.md",
                     "status": "implemented",
+                    "type": "process",
                     "owner": "owner.md",
                 }
+            ],
+        )
+        self.assertEqual(
+            projection["postmortems"],
+            [
+                "docs/develop-guides/postmortems/README.md",
+                "docs/develop-guides/postmortems/TEMPLATE.md",
             ],
         )
         self.assertEqual(
@@ -521,6 +891,7 @@ jobs:
                 ".github/workflows/test.yml",
                 ".github/workflows/web.yml",
                 ".github/workflows/system-tests.yml",
+                ".github/workflows/real-provider-probe.yml",
             },
         )
 

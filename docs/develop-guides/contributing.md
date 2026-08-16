@@ -302,7 +302,12 @@ compare branch:  当前任务分支
 
 由 Agent（Codex、Claude Code 等）创建的 PR，在调用创建命令前先向用户展示拟提交的标题和完整正文，等待明确确认后再创建。确认针对的是标题和正文，不代表跳过测试、敏感信息检查、Fork/远程目标检查和 CI 结果记录等提交前必做项。
 
-PR 标题直接表达变更目标。正文按照 [PR 模板](https://github.com/xerrors/Yuxi/blob/main/.github/PULL_REQUEST_TEMPLATE.md) 填写，并按实际改动补充对应章节：
+PR 标题直接表达变更目标。正文按创建方式选择模板：
+
+- Agent 创建的 PR 使用默认的 [Agent PR 模板](https://github.com/xerrors/Yuxi/blob/main/.github/PULL_REQUEST_TEMPLATE.md)，保留工程主张、证据矩阵、独立 Review 和未验证范围。
+- 人工或其他非 Agent 方式创建的 PR 可使用 [简化模板](https://github.com/xerrors/Yuxi/blob/main/.github/PULL_REQUEST_TEMPLATE/non-agent.md)。使用 GitHub compare 页面时增加 `template=non-agent.md` 查询参数，使用 GitHub CLI 时传入 `--template .github/PULL_REQUEST_TEMPLATE/non-agent.md`。
+
+模板复杂度不同，不改变下述非 trivial / 高风险变更的工程证据要求：
 
 所有非 trivial PR 都要用自然语言逐条列出受影响的工程主张、事实 Owner / commit point / 观察边界、决策记录、实际执行的 oracle 与负向案例，以及未执行检查和剩余风险。不要创建或引用中央 claim ID；提交者自述、测试数量或一次演示不能替代这些证据。
 

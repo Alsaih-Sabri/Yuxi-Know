@@ -20,6 +20,7 @@
   - 关键链路端到端测试
   - 覆盖 run、viewer、附件、文件落盘等完整流程
   - 默认数量少、执行更慢
+  - PR 阻断优先使用无外部密钥的 deterministic assembled-path；真实 provider/browser 作为手工或周期探针
 
 其他子项目约定：
 
@@ -167,6 +168,8 @@ docker compose exec api uv run --group test pytest test/integration
 docker compose exec api uv run --group test pytest test/e2e -m e2e
 ```
 
+PR 的确定性 assembled-path 由 `system-tests.yml` 自动执行；需要仓库 `SILICONFLOW_API_KEY` secret 的真实 provider 校准通过 GitHub Actions 的 `Real Provider Agent Probe` 手工启动。探针缺少凭证会明确失败，不以 skip 冒充通过。
+
 运行全部测试：
 
 ```bash
@@ -225,6 +228,6 @@ Backend workflow 会在 `windows-latest` 上阻断短值、密钥复用和首尾
 - 优先保持测试可执行和可信
 - 优先减少假绿和环境耦合
 
-CI 的 backend unit selector 固定执行 `test/unit -m "not slow"`，不能改回依赖可遗漏 marker 的 `-m unit`。Integration、E2E 与真实 provider 探针按风险和环境能力分开：未执行的真实链路必须在 PR 中列为未验证，不能由 unit、HTTP 200 或日志关键词代替。
+CI 的 backend unit selector 固定执行 `test/unit -m "not slow"`，不能改回依赖可遗漏 marker 的 `-m unit`。Integration、deterministic E2E 与真实 provider 探针按风险和环境能力分开：deterministic E2E 必须经过 shipping Compose、API、worker、SSE 和最终持久化事实，不得在进程内 monkeypatch；真实 provider 未执行时必须在 PR 中记为 `Not run`，不能由 replay、unit、HTTP 200 或日志关键词代替。
 
 对当前 Yuxi 来说，这就是最务实、也最容易持续执行的测试标准。

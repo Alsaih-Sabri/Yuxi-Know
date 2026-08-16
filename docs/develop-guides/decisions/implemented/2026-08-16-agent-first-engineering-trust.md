@@ -1,6 +1,7 @@
 # Agent-first 工程信任体系与治理重构
 
 状态：implemented
+类型：process
 Owner：docs/develop-guides/engineering-trust.md
 
 ## 问题

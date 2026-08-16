@@ -7,6 +7,8 @@ on:
       - 'backend/package/yuxi/**'
       - 'backend/server/**'
       - 'backend/test/integration/**'
+      - 'backend/test/e2e/**'
+      - 'backend/test/support/**'
       - 'docker-compose.yml'
       - 'docker-compose.prod.yml'
       - '.github/workflows/system-tests.yml'
@@ -17,6 +19,8 @@ on:
       - 'backend/package/yuxi/**'
       - 'backend/server/**'
       - 'backend/test/integration/**'
+      - 'backend/test/e2e/**'
+      - 'backend/test/support/**'
       - 'docker-compose.yml'
       - 'docker-compose.prod.yml'
       - '.github/workflows/system-tests.yml'
@@ -31,7 +35,7 @@ concurrency:
 
 jobs:
   system-tests:
-    name: PostgreSQL, readiness and Run lifecycle
+    name: PostgreSQL, readiness and deterministic Agent path
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -40,6 +44,8 @@ jobs:
       JWT_SECRET_KEY: ci-jwt-secret-at-least-thirty-two-characters
       API_KEY_DERIVATION_SECRET: ci-api-key-derivation-secret-at-least-32-chars
       SANDBOX_PROVISIONER_TOKEN: ci-sandbox-token-at-least-thirty-two-characters
+      E2E_USERNAME: ci_e2e_admin
+      E2E_PASSWORD: ci-e2e-password-at-least-eight
     steps:
       - uses: actions/checkout@v4
       - name: Prepare Compose environment
@@ -61,6 +67,21 @@ jobs:
           done
           docker compose ps
           docker compose logs api worker --tail 200
+          exit 1
+      - name: Initialize isolated E2E administrator
+        run: |
+          curl -fsS -X POST http://localhost:5050/api/auth/initialize \
+            -H 'Content-Type: application/json' \
+            --data "{\"uid\":\"${E2E_USERNAME}\",\"password\":\"${E2E_PASSWORD}\"}" >/dev/null
+      - name: Start deterministic OpenAI-compatible replay
+        run: |
+          docker compose exec -d api uv run --no-sync --no-dev python test/support/openai_replay_server.py
+          for attempt in $(seq 1 20); do
+            if docker compose exec -T api curl -fsS http://localhost:8765/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
           exit 1
       - name: Verify worker shipping health
         run: docker compose exec -T worker uv run --no-sync --no-dev arq --check server.worker_main.WorkerSettings
@@ -102,6 +123,8 @@ jobs:
         run: docker compose exec -T api uv run pytest test/integration/services/test_agent_run_lease.py -q
       - name: Verify Run result causality
         run: docker compose exec -T api uv run pytest test/integration/api/test_agent_run_result_causality.py -q
+      - name: Verify deterministic Agent assembled path
+        run: docker compose exec -T -e E2E_USERNAME -e E2E_PASSWORD api uv run --no-sync --no-dev pytest test/e2e/test_deterministic_agent_path_e2e.py -q
       - name: Verify identity transaction and replayable secret publication
         run: docker compose exec -T api uv run pytest test/integration/services/test_identity_admin_service.py test/integration/services/test_api_key_schema_migration.py test/integration/services/test_api_key_user_lifecycle.py test/integration/api/test_apikey_router.py -q
       - name: Runtime logs on failure

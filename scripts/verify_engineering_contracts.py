@@ -12,8 +12,12 @@ from pathlib import Path
 from typing import Any
 
 DECISIONS_PATH = Path("docs/develop-guides/decisions")
+POSTMORTEMS_PATH = Path("docs/develop-guides/postmortems")
 FORBIDDEN_CENTRAL_INVENTORIES = (Path("docs/develop-guides/engineering-claims.json"),)
 DECISION_FILE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*\.md$")
+DECISION_TYPES = frozenset(
+    {"feature", "bug-fix", "simplification", "architecture", "process", "testing"}
+)
 DECISION_REQUIRED_HEADINGS = {
     "implemented": ("## 问题", "## 决策", "## 替代方案", "## 后果", "## 验证"),
     "proposed": ("## 问题", "## 提案", "## 替代方案", "## 验收标准", "## 风险"),
@@ -26,6 +30,20 @@ IMPLEMENTED_BANNED_HEADINGS = (
     "## 迁移步骤",
     "## Checklist",
     "## 进度",
+)
+PROPOSED_EVIDENCE_HEADER = (
+    "| 验收主张 | 失败面 | 语义 Owner | 直接证据 / 命令 | 负向案例 | 当前结果 |"
+)
+EVIDENCE_RESULTS = frozenset({"Passed", "Inspected", "Not run", "Inferred"})
+SIMPLIFICATION_REQUIRED_LABELS = ("旧能力不存在：", "重新引入条件：")
+POSTMORTEM_TEMPLATE_HEADINGS = (
+    "## 影响",
+    "## 事实时间线",
+    "## 因果链",
+    "## 安全网为何漏过",
+    "## 修正与验证",
+    "## 防复发措施",
+    "## 未解决风险",
 )
 ROUTER_DB_METHODS = frozenset(
     {
@@ -58,6 +76,7 @@ class WorkflowContract:
 
     path: str
     commands: tuple[str, ...]
+    trigger: str = "pull_request"
     required_paths: tuple[str, ...] = ()
     unfiltered_pull_request: bool = False
 
@@ -98,13 +117,24 @@ WORKFLOW_CONTRACTS = (
             "docker compose exec -T api uv run pytest test/integration/services/test_agent_request_queue_concurrency.py -q",
             "docker compose exec -T api uv run pytest test/integration/services/test_agent_run_lease.py -q",
             "docker compose exec -T api uv run pytest test/integration/api/test_agent_run_result_causality.py -q",
+            "docker compose exec -T -e E2E_USERNAME -e E2E_PASSWORD api uv run --no-sync --no-dev pytest test/e2e/test_deterministic_agent_path_e2e.py -q",
             "docker compose exec -T api uv run pytest test/integration/services/test_identity_admin_service.py test/integration/services/test_api_key_schema_migration.py test/integration/services/test_api_key_user_lifecycle.py test/integration/api/test_apikey_router.py -q",
         ),
         required_paths=(
             "backend/package/yuxi/**",
             "backend/server/**",
             "backend/test/integration/**",
+            "backend/test/e2e/**",
+            "backend/test/support/**",
             ".github/workflows/system-tests.yml",
+        ),
+    ),
+    WorkflowContract(
+        path=".github/workflows/real-provider-probe.yml",
+        trigger="workflow_dispatch",
+        commands=(
+            'if [ -z "$SILICONFLOW_API_KEY" ]; then\necho "SILICONFLOW_API_KEY repository secret is required for this manual probe." >&2\nexit 1\nfi',
+            "docker compose exec -T -e E2E_USERNAME -e E2E_PASSWORD api uv run --no-sync --no-dev pytest test/e2e/test_agent_async_e2e.py -q",
         ),
     ),
 )
@@ -380,6 +410,30 @@ def _workflow_pull_request_filters(
     return True, paths if has_paths else None, paths_ignore
 
 
+def _workflow_has_trigger(text: str, trigger: str) -> bool:
+    """检查 workflow 的 ``on`` 顶层是否声明指定事件。"""
+
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        match = re.match(r"^(\s*)on:\s*(.*?)\s*$", line)
+        if not match:
+            continue
+        indentation = len(match.group(1))
+        inline = _inline_yaml_list(match.group(2))
+        if inline is not None:
+            return trigger in inline
+        if match.group(2):
+            return _yaml_scalar(match.group(2)) == trigger
+        for nested in lines[index + 1 :]:
+            if nested.strip() and len(nested) - len(nested.lstrip()) <= indentation:
+                break
+            event = re.match(r"^\s*([a-zA-Z0-9_-]+):", nested)
+            if event and event.group(1) == trigger:
+                return True
+        return False
+    return False
+
+
 def _validate_workflows(root: Path, errors: list[str]) -> list[dict[str, Any]]:
     projection: list[dict[str, Any]] = []
     for contract in WORKFLOW_CONTRACTS:
@@ -421,25 +475,30 @@ def _validate_workflows(root: Path, errors: list[str]) -> list[dict[str, Any]]:
                     f"workflow 命令只存在于被跳过或吞错的 step：{contract.path} -> {command}"
                 )
 
-        has_pr, paths, paths_ignore = _workflow_pull_request_filters(text)
-        if not has_pr:
-            errors.append(f"workflow 不监听 pull_request：{contract.path}")
-        if contract.unfiltered_pull_request and (paths is not None or paths_ignore):
-            errors.append(f"全仓信任 workflow 不得使用 path filter：{contract.path}")
-        if paths_ignore:
-            errors.append(
-                f"阻断 workflow 不得用 paths-ignore 隐藏变更：{contract.path}"
-            )
-        if contract.required_paths:
-            actual_paths = set(paths or [])
-            missing_paths = sorted(set(contract.required_paths) - actual_paths)
-            if missing_paths:
+        paths: list[str] | None = None
+        if contract.trigger == "pull_request":
+            has_pr, paths, paths_ignore = _workflow_pull_request_filters(text)
+            if not has_pr:
+                errors.append(f"workflow 不监听 pull_request：{contract.path}")
+            if contract.unfiltered_pull_request and (paths is not None or paths_ignore):
+                errors.append(f"全仓信任 workflow 不得使用 path filter：{contract.path}")
+            if paths_ignore:
                 errors.append(
-                    f"workflow PR paths 缺少 owning scope：{contract.path} -> {missing_paths}"
+                    f"阻断 workflow 不得用 paths-ignore 隐藏变更：{contract.path}"
                 )
+            if contract.required_paths:
+                actual_paths = set(paths or [])
+                missing_paths = sorted(set(contract.required_paths) - actual_paths)
+                if missing_paths:
+                    errors.append(
+                        f"workflow PR paths 缺少 owning scope：{contract.path} -> {missing_paths}"
+                    )
+        elif not _workflow_has_trigger(text, contract.trigger):
+            errors.append(f"workflow 不监听 {contract.trigger}：{contract.path}")
         projection.append(
             {
                 "path": contract.path,
+                "trigger": contract.trigger,
                 "pull_request_paths": paths,
                 "commands": [step["command"] for step in steps],
             }
@@ -479,6 +538,29 @@ def _decision_sections(lines: list[str]) -> dict[str, list[str]]:
     return sections
 
 
+def _evidence_rows(lines: list[str]) -> list[list[str]]:
+    """提取 proposed 验收矩阵的数据行。"""
+
+    header_index = next(
+        (
+            index
+            for index, line in enumerate(lines)
+            if _normalized(line) == PROPOSED_EVIDENCE_HEADER
+        ),
+        None,
+    )
+    if header_index is None:
+        return []
+
+    rows: list[list[str]] = []
+    for line in lines[header_index + 2 :]:
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            break
+        rows.append([cell.strip().strip("`") for cell in stripped.strip("|").split("|")])
+    return rows
+
+
 def _validate_decisions(root: Path, errors: list[str]) -> list[dict[str, str]]:
     decisions_root = root / DECISIONS_PATH
     projection: list[dict[str, str]] = []
@@ -500,6 +582,11 @@ def _validate_decisions(root: Path, errors: list[str]) -> list[dict[str, str]]:
             status = _metadata(lines, "状态：")
             if status != lifecycle:
                 errors.append(f"{relative} 状态必须是 {lifecycle}，实际为 {status!r}")
+            decision_type = _metadata(lines, "类型：")
+            if decision_type not in DECISION_TYPES:
+                errors.append(
+                    f"{relative} 类型必须是 {sorted(DECISION_TYPES)} 之一，实际为 {decision_type!r}"
+                )
             owner = _metadata(lines, "Owner：")
             _require_repository_path(
                 root, owner, f"{relative} Owner", errors, file_only=True
@@ -518,16 +605,72 @@ def _validate_decisions(root: Path, errors: list[str]) -> list[dict[str, str]]:
                         errors.append(
                             f"当前/归档记录不能保留提案或进度标题：{relative} -> {heading}"
                         )
+            if lifecycle == "proposed" and "## 验收标准" in sections:
+                acceptance_lines = sections["## 验收标准"]
+                has_header = any(
+                    _normalized(line) == PROPOSED_EVIDENCE_HEADER
+                    for line in acceptance_lines
+                )
+                if not has_header:
+                    errors.append(f"{relative} proposed 验收标准缺少证据矩阵表头")
+                else:
+                    rows = _evidence_rows(acceptance_lines)
+                    if not rows:
+                        errors.append(f"{relative} proposed 验收标准缺少证据矩阵数据行")
+                    for row in rows:
+                        if len(row) != 6 or not all(row):
+                            errors.append(f"{relative} proposed 证据矩阵必须填写全部六列")
+                            continue
+                        if row[-1] not in EVIDENCE_RESULTS:
+                            errors.append(
+                                f"{relative} proposed 证据结果必须是 {sorted(EVIDENCE_RESULTS)} 之一，实际为 {row[-1]!r}"
+                            )
+            if decision_type == "simplification" and lifecycle in {
+                "proposed",
+                "implemented",
+            }:
+                target_heading = "## 验收标准" if lifecycle == "proposed" else "## 验证"
+                target_text = "\n".join(sections.get(target_heading, []))
+                for label in SIMPLIFICATION_REQUIRED_LABELS:
+                    if label not in target_text:
+                        errors.append(
+                            f"{relative} simplification {target_heading} 缺少：{label}"
+                        )
             projection.append(
                 {
                     "path": str(relative),
                     "status": status or "missing",
+                    "type": decision_type or "missing",
                     "owner": owner or "missing",
                 }
             )
     if not projection:
         errors.append("至少需要一份 tracked decision record")
     return projection
+
+
+def _validate_postmortems(root: Path, errors: list[str]) -> list[str]:
+    """检查复盘入口与模板结构，语义充分性仍由 Reviewer 裁决。"""
+
+    checked: list[str] = []
+    readme = root / POSTMORTEMS_PATH / "README.md"
+    template = root / POSTMORTEMS_PATH / "TEMPLATE.md"
+    for path in (readme, template):
+        if not path.is_file():
+            errors.append(f"缺少 postmortem 入口或模板：{path.relative_to(root)}")
+            continue
+        checked.append(str(path.relative_to(root)))
+
+    if template.is_file():
+        sections = _decision_sections(
+            _visible_markdown_lines(template.read_text(encoding="utf-8"))
+        )
+        for heading in POSTMORTEM_TEMPLATE_HEADINGS:
+            if heading not in sections:
+                errors.append(f"postmortem 模板缺少标题：{heading}")
+            elif not any(line.strip() for line in sections[heading]):
+                errors.append(f"postmortem 模板标题下没有内容：{heading}")
+    return checked
 
 
 def _attribute_root_name(node: ast.expr) -> str | None:
@@ -638,6 +781,7 @@ def verify(root: Path) -> tuple[list[str], dict[str, Any]]:
                 f"禁止手工中央主张清单；主张必须在语义 Owner 处闭合：{forbidden}"
             )
     decisions = _validate_decisions(resolved_root, errors)
+    postmortems = _validate_postmortems(resolved_root, errors)
     workflows = _validate_workflows(resolved_root, errors)
     agents_files = _validate_agents_files(resolved_root, errors)
     router_files = _validate_router_boundaries(resolved_root, errors)
@@ -646,6 +790,7 @@ def verify(root: Path) -> tuple[list[str], dict[str, Any]]:
         "derived": True,
         "authority": "owner-local code, tests, decisions and workflows",
         "decisions": decisions,
+        "postmortems": postmortems,
         "workflows": workflows,
         "agents_files": agents_files,
         "boundaries": {
