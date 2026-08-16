@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 
-
 LANGGRAPH_CHECKPOINTER_BACKEND_ENV = "LANGGRAPH_CHECKPOINTER_BACKEND"
 SUPPORTED_CHECKPOINTER_BACKENDS = frozenset({"postgres", "sqlite"})
 

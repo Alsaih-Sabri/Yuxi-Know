@@ -38,8 +38,8 @@ from yuxi.services.run_queue_service import (
 from yuxi.storage.postgres.manager import pg_manager
 from yuxi.storage.postgres.models_business import Message, User
 from yuxi.storage.redis import get_arq_redis_settings
-from yuxi.utils.logging_config import logger
 from yuxi.utils.auth_utils import AuthUtils
+from yuxi.utils.logging_config import logger
 from yuxi.utils.thread_utils import extract_thread_id
 
 LOADING_FLUSH_INTERVAL_MS = 100

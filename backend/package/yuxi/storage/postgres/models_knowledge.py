@@ -16,7 +16,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import declarative_base
-
 from yuxi.utils.datetime_utils import utc_now_naive
 
 Base = declarative_base()
