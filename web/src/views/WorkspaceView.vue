@@ -2,6 +2,10 @@
   <div class="workspace-view layout-container">
     <PageHeader title="工作区" :loading="loadingTree || loadingPreview" :show-border="true">
       <template #actions>
+        <a-button class="lucide-icon-btn" @click="fileSearchOpen = true">
+          <template #icon><Search :size="16" /></template>
+          搜索
+        </a-button>
         <a-button
           v-if="isAgentsWorkspacePath"
           class="lucide-icon-btn"
@@ -33,6 +37,15 @@
       type="file"
       multiple
       @change="handleUploadInputChange"
+    />
+
+    <GlobalSearchModal
+      v-model:open="fileSearchOpen"
+      :modes="['file']"
+      default-mode="file"
+      :file-search="searchWorkspace"
+      file-placeholder="搜索工作区文件..."
+      @select-file="handleFileSearchSelect"
     />
 
     <div class="workspace-shell" :class="{ 'is-sidebar-collapsed': sidebarCollapsed }">
@@ -203,9 +216,10 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { storeToRefs } from 'pinia'
 import { message, Modal } from 'ant-design-vue'
-import { ChevronLeft, ChevronRight, CircleHelp, LibraryBig } from 'lucide-vue-next'
+import { ChevronLeft, ChevronRight, CircleHelp, LibraryBig, Search } from 'lucide-vue-next'
 import PageHeader from '@/components/shared/PageHeader.vue'
 import AgentFilePreview from '@/components/AgentFilePreview.vue'
 import WorkspaceFileList from '@/components/workspace/WorkspaceFileList.vue'
@@ -224,16 +238,40 @@ import {
   getWorkspaceKnowledgeTree,
   getWorkspaceTree,
   saveWorkspaceFileContent,
+  searchWorkspaceFiles,
   uploadWorkspaceFiles
 } from '@/apis/workspace_api'
+import GlobalSearchModal from '@/components/GlobalSearchModal.vue'
 import { normalizePreviewResponse } from '@/utils/file_preview'
 
 const userStore = useUserStore()
+const route = useRoute()
 const runtimeCapabilitiesStore = useRuntimeCapabilitiesStore()
 const { knowledgeEnabled } = storeToRefs(runtimeCapabilitiesStore)
 
 const activeSourceKey = ref('personal')
 const currentPath = ref('/')
+const fileSearchOpen = ref(false)
+
+const searchWorkspace = (query) => searchWorkspaceFiles(query)
+
+// 搜索命中后切到文件所在目录并打开预览
+const handleFileSearchSelect = async (entry) => {
+  if (!entry?.path) return
+  const parentPath = entry.path.replace(/\/[^/]+$/, '') || '/'
+  await selectWorkspacePath(parentPath)
+  const matched = entries.value.find((item) => item.path === entry.path)
+  if (matched) await loadWorkspacePreview(matched)
+}
+
+// 侧边栏全局搜索选中工作区文件后，通过 query 跳转打开对应文件
+const openFileByPath = async (path) => {
+  if (!path) return
+  const parentPath = String(path).replace(/\/[^/]+$/, '') || '/'
+  await selectWorkspacePath(parentPath)
+  const matched = entries.value.find((item) => item.path === String(path))
+  if (matched) await loadWorkspacePreview(matched)
+}
 const knowledgeBreadcrumbItems = ref([])
 const workspaceBreadcrumbItems = ref(null)
 const threadTitleMap = ref({})
@@ -919,7 +957,17 @@ onMounted(async () => {
     })
     workspaceResizeObserver.observe(workspaceMainRef.value)
   }
+
+  // 侧边栏全局搜索跳转后打开指定文件
+  await openFileByPath(route.query.open)
 })
+
+watch(
+  () => route.query.open,
+  (path) => {
+    if (path) openFileByPath(path)
+  }
+)
 
 onUnmounted(() => {
   workspaceResizeObserver?.disconnect()
